@@ -292,6 +292,7 @@ def parse_file_actions(response_text: str) -> tuple:
     """
     actions = []
     clean_message = response_text
+    json_text = None
     
     json_fenced_pattern = r'```json\s*(\{[\s\S]*?"actions"[\s\S]*?\})\s*```'
     matches = re.findall(json_fenced_pattern, response_text, re.IGNORECASE)
@@ -301,14 +302,42 @@ def parse_file_actions(response_text: str) -> tuple:
             _parse_action_json(match, actions)
         clean_message = re.sub(json_fenced_pattern, '', response_text, flags=re.IGNORECASE).strip()
     else:
-        inline_pattern = r'(\{"actions"\s*:\s*\[[\s\S]*?\]\s*\})'
-        inline_matches = re.findall(inline_pattern, response_text)
+        start_idx = response_text.find('{"actions"')
+        if start_idx == -1:
+            start_idx = response_text.find('{ "actions"')
         
-        for match in inline_matches:
-            _parse_action_json(match, actions)
-        
-        if inline_matches:
-            clean_message = re.sub(inline_pattern, '', response_text).strip()
+        if start_idx != -1:
+            remaining = response_text[start_idx:]
+            depth = 0
+            end_idx = -1
+            in_string = False
+            escape_next = False
+            
+            for i, char in enumerate(remaining):
+                if escape_next:
+                    escape_next = False
+                    continue
+                if char == '\\':
+                    escape_next = True
+                    continue
+                if char == '"' and not escape_next:
+                    in_string = not in_string
+                    continue
+                if in_string:
+                    continue
+                if char == '{':
+                    depth += 1
+                elif char == '}':
+                    depth -= 1
+                    if depth == 0:
+                        end_idx = i + 1
+                        break
+            
+            if end_idx > 0:
+                json_text = remaining[:end_idx]
+                _parse_action_json(json_text, actions)
+                if actions:
+                    clean_message = response_text[:start_idx].strip()
     
     return clean_message, actions
 
