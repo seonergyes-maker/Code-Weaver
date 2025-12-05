@@ -31,6 +31,8 @@ def find_main_class(files: dict) -> Optional[str]:
     return None
 
 
+JAVA_TARGET_VERSION = "8"
+
 def compile_java(code: str) -> dict:
     class_name = find_class_name(code)
     
@@ -40,7 +42,7 @@ def compile_java(code: str) -> dict:
             f.write(code)
         
         classpath = get_classpath()
-        compile_cmd = ['javac', '-encoding', 'UTF-8']
+        compile_cmd = ['javac', '-encoding', 'UTF-8', '--release', JAVA_TARGET_VERSION]
         if classpath:
             compile_cmd.extend(['-cp', classpath])
         compile_cmd.append(java_file)
@@ -182,7 +184,7 @@ def run_java(code: str) -> dict:
             f.write(code)
         
         classpath = get_classpath()
-        compile_cmd = ['javac', '-encoding', 'UTF-8']
+        compile_cmd = ['javac', '-encoding', 'UTF-8', '--release', JAVA_TARGET_VERSION]
         if classpath:
             compile_cmd.extend(['-cp', classpath])
         compile_cmd.append(java_file)
@@ -267,7 +269,7 @@ def compile_multi_file(files: dict) -> dict:
             java_files.append(file_path)
         
         classpath = get_classpath()
-        compile_cmd = ['javac', '-encoding', 'UTF-8']
+        compile_cmd = ['javac', '-encoding', 'UTF-8', '--release', JAVA_TARGET_VERSION]
         if classpath:
             compile_cmd.extend(['-cp', classpath])
         compile_cmd.extend(java_files)
@@ -330,7 +332,7 @@ def run_multi_file(files: dict, main_class: Optional[str] = None) -> dict:
         java_files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.java')]
         
         classpath = get_classpath()
-        compile_cmd = ['javac', '-encoding', 'UTF-8']
+        compile_cmd = ['javac', '-encoding', 'UTF-8', '--release', JAVA_TARGET_VERSION]
         if classpath:
             compile_cmd.extend(['-cp', classpath])
         compile_cmd.extend(java_files)
@@ -419,7 +421,7 @@ def create_multi_jar(files: dict, jar_name: Optional[str] = None, main_class: Op
         java_files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.java')]
         
         classpath = get_classpath()
-        compile_cmd = ['javac', '-encoding', 'UTF-8']
+        compile_cmd = ['javac', '-encoding', 'UTF-8', '--release', JAVA_TARGET_VERSION]
         if classpath:
             compile_cmd.extend(['-cp', classpath])
         compile_cmd.extend(java_files)
