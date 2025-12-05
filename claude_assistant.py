@@ -383,17 +383,17 @@ def _parse_action_json(json_str: str, actions: list):
 def chat_with_actions(messages: list, current_code: str = "", project_files: dict = None) -> tuple:
     """
     Chat with Claude and get file actions.
-    Returns: (response_text, actions_list)
+    Returns: (response_text, actions_list, needs_continuation)
     """
     context = ""
-    if current_code.strip():
-        context = f"\n\nCódigo Java actual del usuario:\n```java\n{current_code}\n```"
     
-    if project_files:
-        files_info = "\n\nArchivos en el proyecto:\n"
-        for fname in project_files.keys():
-            files_info += f"- {fname}\n"
-        context += files_info
+    if project_files and len(project_files) > 0:
+        context = "\n\n=== PROYECTO COMPLETO (todos los archivos) ===\n"
+        for fname, code in project_files.items():
+            context += f"\n--- {fname} ---\n```java\n{code}\n```\n"
+        context += "=== FIN DEL PROYECTO ===\n"
+    elif current_code.strip():
+        context = f"\n\nCódigo Java actual:\n```java\n{current_code}\n```"
     
     system_message = SYSTEM_PROMPT_WITH_ACTIONS + context
     
@@ -426,4 +426,39 @@ def chat_with_actions(messages: list, current_code: str = "", project_files: dic
         else:
             clean_message += "\n\n⚠️ No se pudo procesar la acción. Intenta pedir el archivo de nuevo."
     
-    return clean_message, actions
+    needs_continuation = detect_continuation(clean_message)
+    
+    return clean_message, actions, needs_continuation
+
+
+def detect_continuation(message: str) -> bool:
+    """
+    Detecta si Claude indica que hay más archivos por crear.
+    """
+    continuation_patterns = [
+        "continuar con",
+        "siguiente archivo",
+        "próximo archivo",
+        "crear el siguiente",
+        "crear los demás",
+        "crear los otros",
+        "¿creo el siguiente",
+        "¿quieres que cree",
+        "¿deseas que cree",
+        "¿procedo con",
+        "falta crear",
+        "faltan crear",
+        "ahora crearé",
+        "a continuación",
+        "el siguiente será",
+        "también necesitamos",
+        "también necesitas",
+    ]
+    
+    message_lower = message.lower()
+    for pattern in continuation_patterns:
+        if pattern in message_lower:
+            return True
+    return False
+
+

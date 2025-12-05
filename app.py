@@ -581,38 +581,75 @@ with col_chat:
         
         with st.spinner("Claude está pensando..."):
             try:
-                response, actions = chat_with_actions(
+                all_applied_actions = []
+                max_continuations = 10
+                continuation_count = 0
+                
+                response, actions, needs_continuation = chat_with_actions(
                     st.session_state.chat_messages,
                     get_all_code(),
                     st.session_state.files
                 )
                 
-                applied_actions = []
-                for action in actions:
-                    filename = action.get("file", "")
-                    content = action.get("content", "")
-                    action_type = action.get("type", "create")
+                while True:
+                    actions_in_this_round = 0
+                    for action in actions:
+                        filename = action.get("file", "")
+                        content = action.get("content", "")
+                        action_type = action.get("type", "create")
+                        
+                        if not filename.endswith(".java") or "/" in filename or "\\" in filename:
+                            continue
+                        if len(content) > 50000:
+                            continue
+                        
+                        st.session_state.files[st.session_state.current_file] = st.session_state.code
+                        st.session_state.files[filename] = content
+                        st.session_state.current_file = filename
+                        st.session_state.code = content
+                        
+                        action_label = "creado" if action_type == "create" else "modificado"
+                        all_applied_actions.append(f"**{filename}** {action_label}")
+                        actions_in_this_round += 1
                     
-                    if not filename.endswith(".java") or "/" in filename or "\\" in filename:
-                        continue
-                    if len(content) > 50000:
-                        continue
+                    should_continue = (
+                        needs_continuation and 
+                        continuation_count < max_continuations and 
+                        actions_in_this_round > 0
+                    )
                     
-                    st.session_state.files[st.session_state.current_file] = st.session_state.code
-                    st.session_state.files[filename] = content
-                    st.session_state.current_file = filename
-                    st.session_state.code = content
-                    
-                    action_label = "creado" if action_type == "create" else "modificado"
-                    applied_actions.append(f"**{filename}** {action_label}")
+                    if should_continue:
+                        continuation_count += 1
+                        st.toast(f"Continuando automáticamente... ({continuation_count})")
+                        
+                        st.session_state.chat_messages.append({
+                            "role": "assistant",
+                            "content": response
+                        })
+                        st.session_state.chat_messages.append({
+                            "role": "user",
+                            "content": "Continúa con el siguiente archivo."
+                        })
+                        
+                        response, actions, needs_continuation = chat_with_actions(
+                            st.session_state.chat_messages,
+                            get_all_code(),
+                            st.session_state.files
+                        )
+                    else:
+                        break
                 
-                if applied_actions:
-                    actions_msg = "\n\n---\n📁 " + " | ".join(applied_actions)
-                    response += actions_msg
+                final_response = response
+                
+                if all_applied_actions:
+                    actions_msg = "\n\n---\n📁 " + " | ".join(all_applied_actions)
+                    if continuation_count > 0:
+                        actions_msg += f"\n\n*({continuation_count + 1} archivos procesados automáticamente)*"
+                    final_response += actions_msg
                 
                 st.session_state.chat_messages.append({
                     "role": "assistant",
-                    "content": response
+                    "content": final_response
                 })
             except Exception as e:
                 st.session_state.chat_messages.append({
