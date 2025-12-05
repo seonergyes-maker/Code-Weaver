@@ -229,6 +229,7 @@ with st.sidebar:
         if st.button("📥 Importar Proyecto", use_container_width=True):
             st.session_state.files[st.session_state.current_file] = st.session_state.code
             imported_count = 0
+            skipped_count = 0
             imported_files = {}
             
             for uploaded_file in uploaded_files:
@@ -238,18 +239,35 @@ with st.sidebar:
                         with zipfile.ZipFile(zip_bytes, 'r') as zip_ref:
                             for file_info in zip_ref.filelist:
                                 if file_info.filename.endswith('.java') and not file_info.is_dir():
-                                    filename = os.path.basename(file_info.filename)
-                                    if filename:
+                                    base_filename = os.path.basename(file_info.filename)
+                                    if not base_filename:
+                                        continue
+                                    final_filename = base_filename
+                                    if final_filename in imported_files or final_filename in st.session_state.files:
+                                        clean_path = file_info.filename.replace('/', '_').replace('\\', '_')
+                                        final_filename = clean_path
+                                        if final_filename in imported_files or final_filename in st.session_state.files:
+                                            skipped_count += 1
+                                            continue
+                                    try:
                                         content = zip_ref.read(file_info.filename).decode('utf-8')
-                                        imported_files[filename] = content
+                                        imported_files[final_filename] = content
                                         imported_count += 1
+                                    except UnicodeDecodeError:
+                                        skipped_count += 1
                     except Exception as e:
                         st.error(f"Error al leer ZIP: {e}")
                 elif uploaded_file.name.endswith('.java'):
                     filename = uploaded_file.name
-                    content = uploaded_file.read().decode('utf-8')
-                    imported_files[filename] = content
-                    imported_count += 1
+                    if filename in imported_files or filename in st.session_state.files:
+                        skipped_count += 1
+                        continue
+                    try:
+                        content = uploaded_file.read().decode('utf-8')
+                        imported_files[filename] = content
+                        imported_count += 1
+                    except UnicodeDecodeError:
+                        skipped_count += 1
             
             if imported_count > 0:
                 st.session_state.files.update(imported_files)
@@ -257,8 +275,13 @@ with st.sidebar:
                 st.session_state.current_file = first_imported
                 st.session_state.code = st.session_state.files[first_imported]
                 st.session_state.current_project_name = "Proyecto Importado"
-                st.success(f"✅ {imported_count} archivo(s) importado(s)")
+                msg = f"✅ {imported_count} archivo(s) importado(s)"
+                if skipped_count > 0:
+                    msg += f" ({skipped_count} omitido(s))"
+                st.success(msg)
                 st.rerun()
+            else:
+                st.warning("No se encontraron archivos .java para importar")
     
     st.markdown("---")
     st.markdown("**Gestión de Proyectos**")

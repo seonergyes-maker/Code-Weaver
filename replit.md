@@ -59,3 +59,4 @@ streamlit run app.py --server.port 5000
   - Autocompletado de línea inteligente con Claude AI
   - Gestor de dependencias para librerías externas (Maven Central)
   - Soporte para librerías comunes: Gson, Guava, Jackson, OkHttp, etc.
+  - Importación de proyectos existentes (.java y .zip)
