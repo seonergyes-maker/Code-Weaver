@@ -293,31 +293,45 @@ def parse_file_actions(response_text: str) -> tuple:
     actions = []
     clean_message = response_text
     
-    json_pattern = r'```json\s*(\{[\s\S]*?"actions"[\s\S]*?\})\s*```'
-    matches = re.findall(json_pattern, response_text, re.IGNORECASE)
+    json_fenced_pattern = r'```json\s*(\{[\s\S]*?"actions"[\s\S]*?\})\s*```'
+    matches = re.findall(json_fenced_pattern, response_text, re.IGNORECASE)
     
-    for match in matches:
-        try:
-            data = json.loads(match)
-            if "actions" in data and isinstance(data["actions"], list):
-                for action in data["actions"]:
-                    if isinstance(action, dict):
-                        action_type = action.get("type", "")
-                        filename = action.get("file", "")
-                        content = action.get("content", "")
-                        
-                        if action_type in ["create", "modify"] and filename.endswith(".java") and content:
-                            actions.append({
-                                "type": action_type,
-                                "file": filename,
-                                "content": content
-                            })
-        except json.JSONDecodeError:
-            continue
-    
-    clean_message = re.sub(json_pattern, '', response_text, flags=re.IGNORECASE).strip()
+    if matches:
+        for match in matches:
+            _parse_action_json(match, actions)
+        clean_message = re.sub(json_fenced_pattern, '', response_text, flags=re.IGNORECASE).strip()
+    else:
+        inline_pattern = r'(\{"actions"\s*:\s*\[[\s\S]*?\]\s*\})'
+        inline_matches = re.findall(inline_pattern, response_text)
+        
+        for match in inline_matches:
+            _parse_action_json(match, actions)
+        
+        if inline_matches:
+            clean_message = re.sub(inline_pattern, '', response_text).strip()
     
     return clean_message, actions
+
+
+def _parse_action_json(json_str: str, actions: list):
+    """Helper to parse action JSON and append valid actions to list."""
+    try:
+        data = json.loads(json_str)
+        if "actions" in data and isinstance(data["actions"], list):
+            for action in data["actions"]:
+                if isinstance(action, dict):
+                    action_type = action.get("type", "")
+                    filename = action.get("file", "")
+                    content = action.get("content", "")
+                    
+                    if action_type in ["create", "modify"] and filename.endswith(".java") and content:
+                        actions.append({
+                            "type": action_type,
+                            "file": filename,
+                            "content": content
+                        })
+    except json.JSONDecodeError:
+        pass
 
 
 @retry(
