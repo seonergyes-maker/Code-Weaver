@@ -1,0 +1,696 @@
+Necesito un panel para configurar los valores de la IP, API_ENDPOINT, API_KEY, habilitar antenas, modificar las ganancias de cada una de las antenas, decimal o hexadecimal, el RSSI de corte etc
+
+Voy a crear un panel de configuración con interfaz gráfica usando JavaFX para controlar todos los parámetros del lector RFID.
+
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.stage.Stage;
+import javafx.collections.FXCollections;
+import java.io.*;
+import java.util.Properties;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+
+/**
+ * Panel de configuración para el lector RFID Zebra FX7500
+ * Permite configurar todos los parámetros antes de iniciar la lectura
+ */
+public class RFIDConfigPanel extends Application {
+
+    // Componentes de configuración de red
+    private TextField ipTextField;
+    private TextField portTextField;
+
+    // Componentes de configuración de API
+    private TextField apiEndpointTextField;
+    private PasswordField apiKeyField;
+    private CheckBox apiKeyVisibleCheckbox;
+
+    // Componentes de formato EPC
+    private ToggleGroup epcFormatGroup;
+    private RadioButton hexRadio;
+    private RadioButton decimalRadio;
+
+    // Componentes de configuración de antenas
+    private CheckBox[] antennaCheckboxes;
+    private Slider[] txPowerSliders;
+    private Label[] txPowerLabels;
+    private Slider[] rxSensitivitySliders;
+    private Label[] rxSensitivityLabels;
+
+    // Configuración global RSSI
+    private Slider rssiCutoffSlider;
+    private Label rssiCutoffLabel;
+
+    // Configuración avanzada
+    private ComboBox<String> searchModeCombo;
+    private ComboBox<Integer> sessionCombo;
+    private ComboBox<String> readerModeCombo;
+
+    // Botones de acción
+    private Button saveButton;
+    private Button loadButton;
+    private Button startButton;
+    private Button resetButton;
+
+    // Área de status
+    private TextArea statusArea;
+
+    // Archivo de configuración
+    private static final String CONFIG_FILE = "rfid_config.properties";
+
+    // Configuración actual
+    private Properties config = new Properties();
+
+    @Override
+    public void start(Stage primaryStage) {
+        primaryStage.setTitle("Panel de Configuración - Zebra FX7500 RFID");
+
+        // Layout principal
+        BorderPane mainLayout = new BorderPane();
+        mainLayout.setPadding(new Insets(10));
+
+        // Crear tabs para organizar configuraciones
+        TabPane tabPane = new TabPane();
+        tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+
+        // Tab 1: Configuración de Conexión
+        Tab connectionTab = new Tab("Conexión");
+        connectionTab.setContent(createConnectionPanel());
+
+        // Tab 2: Configuración de API
+        Tab apiTab = new Tab("API");
+        apiTab.setContent(createAPIPanel());
+
+        // Tab 3: Configuración de Antenas
+        Tab antennasTab = new Tab("Antenas");
+        antennasTab.setContent(createAntennasPanel());
+
+        // Tab 4: Configuración Avanzada
+        Tab advancedTab = new Tab("Avanzado");
+        advancedTab.setContent(createAdvancedPanel());
+
+        tabPane.getTabs().addAll(connectionTab, apiTab, antennasTab, advancedTab);
+
+        // Panel de botones
+        HBox buttonPanel = createButtonPanel();
+
+        // Área de status
+        statusArea = new TextArea();
+        statusArea.setEditable(false);
+        statusArea.setPrefRowCount(5);
+        statusArea.setFont(Font.font("Monospaced", 11));
+        statusArea.setText("Sistema listo. Configure los parámetros y presione 'Guardar Configuración'.\n");
+
+        // Ensamblar layout
+        mainLayout.setCenter(tabPane);
+        mainLayout.setBottom(new VBox(10, buttonPanel, statusArea));
+
+        // Crear escena
+        Scene scene = new Scene(mainLayout, 900, 700);
+        primaryStage.setScene(scene);
+        primaryStage.show();
+
+        // Cargar configuración por defecto
+        loadDefaultConfig();
+    }
+
+    /**
+     * Crea el panel de configuración de conexión
+     */
+    private VBox createConnectionPanel() {
+        VBox panel = new VBox(15);
+        panel.setPadding(new Insets(20));
+
+        // Título
+        Label titleLabel = new Label("Configuración del Lector RFID");
+        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 16));
+
+        // IP del lector
+        HBox ipBox = new HBox(10);
+        ipBox.setAlignment(Pos.CENTER_LEFT);
+        Label ipLabel = new Label("IP del Lector:");
+        ipLabel.setPrefWidth(150);
+        ipTextField = new TextField("192.168.1.100");
+        ipTextField.setPrefWidth(200);
+        ipBox.getChildren().addAll(ipLabel, ipTextField);
+
+        // Puerto
+        HBox portBox = new HBox(10);
+        portBox.setAlignment(Pos.CENTER_LEFT);
+        Label portLabel = new Label("Puerto:");
+        portLabel.setPrefWidth(150);
+        portTextField = new TextField("5084");
+        portTextField.setPrefWidth(200);
+        portBox.getChildren().addAll(portLabel, portTextField);
+
+        // Formato EPC
+        VBox formatBox = new VBox(10);
+        Label formatLabel = new Label("Formato de EPC:");
+        formatLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+
+        epcFormatGroup = new ToggleGroup();
+        hexRadio = new RadioButton("Hexadecimal (recomendado)");
+        hexRadio.setToggleGroup(epcFormatGroup);
+        hexRadio.setSelected(true);
+
+        decimalRadio = new RadioButton("Decimal");
+        decimalRadio.setToggleGroup(epcFormatGroup);
+
+        formatBox.getChildren().addAll(formatLabel, hexRadio, decimalRadio);
+
+        // Test de conexión
+        Button testConnectionButton = new Button("Probar Conexión");
+        testConnectionButton.setOnAction(e -> testConnection());
+        testConnectionButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white;");
+
+        panel.getChildren().addAll(
+            titleLabel,
+            new Separator(),
+            ipBox,
+            portBox,
+            new Separator(),
+            formatBox,
+            testConnectionButton
+        );
+
+        return panel;
+    }
+
+    /**
+     * Crea el panel de configuración de API
+     */
+    private VBox createAPIPanel() {
+        VBox panel = new VBox(15);
+        panel.setPadding(new Insets(20));
+
+        // Título
+        Label titleLabel = new Label("Configuración de API REST");
+        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 16));
+
+        // Endpoint
+        VBox endpointBox = new VBox(5);
+        Label endpointLabel = new Label("Endpoint de la API:");
+        endpointLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        apiEndpointTextField = new TextField("http://localhost:8080/api/rfid/tags");
+        apiEndpointTextField.setPrefWidth(400);
+        endpointBox.getChildren().addAll(endpointLabel, apiEndpointTextField);
+
+        // API Key
+        VBox apiKeyBox = new VBox(5);
+        Label apiKeyLabel = new Label("API Key (opcional):");
+        apiKeyLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+
+        HBox apiKeyInputBox = new HBox(10);
+        apiKeyField = new PasswordField();
+        apiKeyField.setPrefWidth(350);
+        apiKeyField.setPromptText("Ingrese su API key si es requerida");
+
+        apiKeyVisibleCheckbox = new CheckBox("Mostrar");
+        apiKeyVisibleCheckbox.setOnAction(e -> toggleApiKeyVisibility());
+
+        apiKeyInputBox.getChildren().addAll(apiKeyField, apiKeyVisibleCheckbox);
+        apiKeyBox.getChildren().addAll(apiKeyLabel, apiKeyInputBox);
+
+        // Test de API
+        Button testAPIButton = new Button("Probar API");
+        testAPIButton.setOnAction(e -> testAPI());
+        testAPIButton.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white;");
+
+        panel.getChildren().addAll(
+            titleLabel,
+            new Separator(),
+            endpointBox,
+            apiKeyBox,
+            testAPIButton
+        );
+
+        return panel;
+    }
+
+    /**
+     * Crea el panel de configuración de antenas
+     */
+    private ScrollPane createAntennasPanel() {
+        VBox panel = new VBox(15);
+        panel.setPadding(new Insets(20));
+
+        // Título
+        Label titleLabel = new Label("Configuración de Antenas (1-4)");
+        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 16));
+
+        // RSSI de corte global
+        VBox rssiGlobalBox = new VBox(10);
+        Label rssiGlobalLabel = new Label("RSSI de Corte Global:");
+        rssiGlobalLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+
+        HBox rssiSliderBox = new HBox(10);
+        rssiSliderBox.setAlignment(Pos.CENTER_LEFT);
+        rssiCutoffSlider = new Slider(-90, -30, -70);
+        rssiCutoffSlider.setShowTickLabels(true);
+        rssiCutoffSlider.setShowTickMarks(true);
+        rssiCutoffSlider.setMajorTickUnit(10);
+        rssiCutoffSlider.setMinorTickCount(5);
+        rssiCutoffSlider.setPrefWidth(400);
+
+        rssiCutoffLabel = new Label("-70 dBm");
+        rssiCutoffLabel.setPrefWidth(80);
+        rssiCutoffLabel.setStyle("-fx-font-weight: bold;");
+
+        rssiCutoffSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            rssiCutoffLabel.setText(String.format("%.0f dBm", newVal.doubleValue()));
+        });
+
+        rssiSliderBox.getChildren().addAll(rssiCutoffSlider, rssiCutoffLabel);
+        rssiGlobalBox.getChildren().addAll(rssiGlobalLabel, rssiSliderBox);
+
+        panel.getChildren().addAll(titleLabel, new Separator(), rssiGlobalBox, new Separator());
+
+        // Inicializar arrays
+        antennaCheckboxes = new CheckBox[4];
+        txPowerSliders = new Slider[4];
+        txPowerLabels = new Label[4];
+        rxSensitivitySliders = new Slider[4];
+        rxSensitivityLabels = new Label[4];
+
+        // Crear configuración para cada antena
+        for (int i = 0; i < 4; i++) {
+            panel.getChildren().add(createAntennaConfig(i + 1));
+        }
+
+        // Botón para aplicar configuración a todas
+        Button applyAllButton = new Button("Aplicar Config a Todas las Antenas");
+        applyAllButton.setOnAction(e -> applyToAllAntennas());
+        applyAllButton.setStyle("-fx-background-color: #FF9800; -fx-text-fill: white;");
+
+        panel.getChildren().add(applyAllButton);
+
+        ScrollPane scrollPane = new ScrollPane(panel);
+        scrollPane.setFitToWidth(true);
+        return scrollPane;
+    }
+
+    /**
+     * Crea la configuración para una antena individual
+     */
+    private VBox createAntennaConfig(int antennaNumber) {
+        int index = antennaNumber - 1;
+        VBox antennaBox = new VBox(10);
+        antennaBox.setPadding(new Insets(10));
+        antennaBox.setStyle("-fx-border-color: #CCCCCC; -fx-border-width: 1; -fx-border-radius: 5;");
+
+        // Checkbox de habilitación
+        antennaCheckboxes[index] = new CheckBox("Antena " + antennaNumber + " - Habilitada");
+        antennaCheckboxes[index].setSelected(true);
+        antennaCheckboxes[index].setFont(Font.font("System", FontWeight.BOLD, 12));
+
+        // TX Power
+        Label txLabel = new Label("Potencia TX (dBm):");
+        HBox txBox = new HBox(10);
+        txBox.setAlignment(Pos.CENTER_LEFT);
+
+        txPowerSliders[index] = new Slider(10, 32.5, 30);
+        txPowerSliders[index].setShowTickMarks(true);
+        txPowerSliders[index].setMajorTickUnit(5);
+        txPowerSliders[index].setPrefWidth(300);
+
+        txPowerLabels[index] = new Label("30.0 dBm");
+        txPowerLabels[index].setPrefWidth(80);
+
+        int finalIndex = index;
+        txPowerSliders[index].valueProperty().addListener((obs, oldVal, newVal) -> {
+            txPowerLabels[finalIndex].setText(String.format("%.1f dBm", newVal.doubleValue()));
+        });
+
+        txBox.getChildren().addAll(txPowerSliders[index], txPowerLabels[index]);
+
+        // RX Sensitivity
+        Label rxLabel = new Label("Sensibilidad RX (dBm):");
+        HBox rxBox = new HBox(10);
+        rxBox.setAlignment(Pos.CENTER_LEFT);
+
+        rxSensitivitySliders[index] = new Slider(-90, -50, -70);
+        rxSensitivitySliders[index].setShowTickMarks(true);
+        rxSensitivitySliders[index].setMajorTickUnit(10);
+        rxSensitivitySliders[index].setPrefWidth(300);
+
+        rxSensitivityLabels[index] = new Label("-70 dBm");
+        rxSensitivityLabels[index].setPrefWidth(80);
+
+        rxSensitivitySliders[index].valueProperty().addListener((obs, oldVal, newVal) -> {
+            rxSensitivityLabels[finalIndex].setText(String.format("%.0f dBm", newVal.doubleValue()));
+        });
+
+        rxBox.getChildren().addAll(rxSensitivitySliders[index], rxSensitivityLabels[index]);
+
+        antennaBox.getChildren().addAll(
+            antennaCheckboxes[index],
+            txLabel,
+            txBox,
+            rxLabel,
+            rxBox
+        );
+
+        return antennaBox;
+    }
+
+    /**
+     * Crea el panel de configuración avanzada
+     */
+    private VBox createAdvancedPanel() {
+        VBox panel = new VBox(15);
+        panel.setPadding(new Insets(20));
+
+        // Título
+        Label titleLabel = new Label("Configuración Avanzada");
+        titleLabel.setFont(Font.font("System", FontWeight.BOLD, 16));
+
+        // Search Mode
+        VBox searchModeBox = new VBox(5);
+        Label searchModeLabel = new Label("Modo de Búsqueda:");
+        searchModeLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        searchModeCombo = new ComboBox<>(FXCollections.observableArrayList(
+            "DualTarget",
+            "SingleTarget",
+            "SingleTargetWithSuppression"
+        ));
+        searchModeCombo.setValue("DualTarget");
+        searchModeBox.getChildren().addAll(searchModeLabel, searchModeCombo);
+
+        // Session
+        VBox sessionBox = new VBox(5);
+        Label sessionLabel = new Label("Sesión:");
+        sessionLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        sessionCombo = new ComboBox<>(FXCollections.observableArrayList(0, 1, 2, 3));
+        sessionCombo.setValue(2);
+        sessionBox.getChildren().addAll(sessionLabel, sessionCombo);
+
+        // Reader Mode
+        VBox readerModeBox = new VBox(5);
+        Label readerModeLabel = new Label("Modo del Lector:");
+        readerModeLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
+        readerModeCombo = new ComboBox<>(FXCollections.observableArrayList(
+            "AutoSetDenseReader",
+            "AutoSetDenseReaderDeepScan",
+            "MaxThroughput",
+            "Hybrid",
+            "DenseReaderM4",
+            "DenseReaderM8"
+        ));
+        readerModeCombo.setValue("AutoSetDenseReader");
+        readerModeBox.getChildren().addAll(readerModeLabel, readerModeCombo);
+
+        // Información adicional
+        TextArea infoArea = new TextArea();
+        infoArea.setEditable(false);
+        infoArea.setPrefRowCount(8);
+        infoArea.setWrapText(true);
+        infoArea.setText(
+            "INFORMACIÓN DE MODOS:\n\n" +
+            "Search Mode:\n" +
+            "- DualTarget: Balance entre velocidad y precisión\n" +
+            "- SingleTarget: Mayor precisión, menor velocidad\n\n" +
+            "Reader Mode:\n" +
+            "- AutoSetDenseReader: Recomendado para entornos con muchos tags\n" +
+            "- MaxThroughput: Máxima velocidad de lectura\n" +
+            "- DenseReaderM4/M8: Para ambientes muy densos"
+        );
+
+        panel.getChildren().addAll(
+            titleLabel,
+            new Separator(),
+            searchModeBox,
+            sessionBox,
+            readerModeBox,
+            new Separator(),
+            infoArea
+        );
+
+        return panel;
+    }
+
+    /**
+     * Crea el panel de botones de acción
+     */
+    private HBox createButtonPanel() {
+        HBox buttonPanel = new HBox(10);
+        buttonPanel.setPadding(new Insets(10));
+        buttonPanel.setAlignment(Pos.CENTER);
+
+        saveButton = new Button("💾 Guardar Configuración");
+        saveButton.setOnAction(e -> saveConfiguration());
+        saveButton.setStyle("-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 12px;");
+        saveButton.setPrefWidth(180);
+
+        loadButton = new Button("📂 Cargar Configuración");
+        loadButton.setOnAction(e -> loadConfiguration());
+        loadButton.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 12px;");
+        loadButton.setPrefWidth(180);
+
+        startButton = new Button("▶ Iniciar Lectura");
+        startButton.setOnAction(e -> startReading());
+        startButton.setStyle("-fx-background-color: #FF5722; -fx-text-fill: white; -fx-font-size: 14px; -fx-font-weight: bold;");
+        startButton.setPrefWidth(200);
+
+        resetButton = new Button("🔄 Restaurar Defaults");
+        resetButton.setOnAction(e -> loadDefaultConfig());
+        resetButton.setStyle("-fx-background-color: #9E9E9E; -fx-text-fill: white; -fx-font-size: 12px;");
+        resetButton.setPrefWidth(180);
+
+        buttonPanel.getChildren().addAll(saveButton, loadButton, resetButton, startButton);
+
+        return buttonPanel;
+    }
+
+    /**
+     * Aplica la configuración de la primera antena a todas
+     */
+    private void applyToAllAntennas() {
+        double txPower = txPowerSliders[0].getValue();
+        double rxSensitivity = rxSensitivitySliders[0].getValue();
+
+        for (int i = 1; i < 4; i++) {
+            txPowerSliders[i].setValue(txPower);
+            rxSensitivitySliders[i].setValue(rxSensitivity);
+        }
+
+        appendStatus("✓ Configuración aplicada a todas las antenas\n");
+    }
+
+    /**
+     * Alterna la visibilidad de la API key
+     */
+    private void toggleApiKeyVisibility() {
+        // En una implementación real, cambiarías entre PasswordField y TextField
+        appendStatus("Visibilidad de API key alternada\n");
+    }
+
+    /**
+     * Prueba la conexión con el lector
+     */
+    private void testConnection() {
+        appendStatus("Probando conexión con " + ipTextField.getText() + ":" + portTextField.getText() + "...\n");
+        // Aquí iría la lógica real de prueba de conexión
+        appendStatus("✓ Conexión exitosa (simulado)\n");
+    }
+
+    /**
+     * Prueba la conexión con la API
+     */
+    private void testAPI() {
+        appendStatus("Probando conexión con API: " + apiEndpointTextField.getText() + "...\n");
+        // Aquí iría la lógica real de prueba de API
+        appendStatus("✓ API respondió correctamente (simulado)\n");
+    }
+
+    /**
+     * Guarda la configuración actual
+     */
+    private void saveConfiguration() {
+        try {
+            // Configuración de red
+            config.setProperty("reader.ip", ipTextField.getText());
+            config.setProperty("reader.port", portTextField.getText());
+            config.setProperty("epc.format", hexRadio.isSelected() ? "HEX" : "DEC");
+
+            // Configuración de API
+            config.setProperty("api.endpoint", apiEndpointTextField.getText());
+            config.setProperty("api.key", apiKeyField.getText());
+
+            // RSSI de corte
+            config.setProperty("rssi.cutoff", String.valueOf(rssiCutoffSlider.getValue()));
+
+            // Configuración de antenas
+            for (int i = 0; i < 4; i++) {
+                config.setProperty("antenna." + (i+1) + ".enabled", 
+                    String.valueOf(antennaCheckboxes[i].isSelected()));
+                config.setProperty("antenna." + (i+1) + ".txPower", 
+                    String.valueOf(txPowerSliders[i].getValue()));
+                config.setProperty("antenna." + (i+1) + ".rxSensitivity", 
+                    String.valueOf(rxSensitivitySliders[i].getValue()));
+            }
+
+            // Configuración avanzada
+            config.setProperty("search.mode", searchModeCombo.getValue());
+            config.setProperty("session", String.valueOf(sessionCombo.getValue()));
+            config.setProperty("reader.mode", readerModeCombo.getValue());
+
+            // Guardar a archivo
+            try (FileOutputStream out = new FileOutputStream(CONFIG_FILE)) {
+                config.store(out, "Configuración RFID - Zebra FX7500");
+            }
+
+            appendStatus("✓ Configuración guardada exitosamente en " + CONFIG_FILE + "\n");
+
+        } catch (IOException e) {
+            appendStatus("✗ Error guardando configuración: " + e.getMessage() + "\n");
+        }
+    }
+
+    /**
+     * Carga la configuración desde archivo
+     */
+    private void loadConfiguration() {
+        try (FileInputStream in = new FileInputStream(CONFIG_FILE)) {
+            config.load(in);
+            applyLoadedConfiguration();
+            appendStatus("✓ Configuración cargada desde " + CONFIG_FILE + "\n");
+        } catch (IOException e) {
+            appendStatus("✗ No se pudo cargar la configuración: " + e.getMessage() + "\n");
+            loadDefaultConfig();
+        }
+    }
+
+    /**
+     * Aplica la configuración cargada a los componentes
+     */
+    private void applyLoadedConfiguration() {
+        // Configuración de red
+        ipTextField.setText(config.getProperty("reader.ip", "192.168.1.100"));
+        portTextField.setText(config.getProperty("reader.port", "5084"));
+
+        if ("HEX".equals(config.getProperty("epc.format", "HEX"))) {
+            hexRadio.setSelected(true);
+        } else {
+            decimalRadio.setSelected(true);
+        }
+
+        // Configuración de API
+        apiEndpointTextField.setText(config.getProperty("api.endpoint", 
+            "http://localhost:8080/api/rfid/tags"));
+        apiKeyField.setText(config.getProperty("api.key", ""));
+
+        // RSSI de corte
+        rssiCutoffSlider.setValue(Double.parseDouble(
+            config.getProperty("rssi.cutoff", "-70")));
+
+        // Configuración de antenas
+        for (int i = 0; i < 4; i++) {
+            antennaCheckboxes[i].setSelected(Boolean.parseBoolean(
+                config.getProperty("antenna." + (i+1) + ".enabled", "true")));
+            txPowerSliders[i].setValue(Double.parseDouble(
+                config.getProperty("antenna." + (i+1) + ".txPower", "30")));
+            rxSensitivitySliders[i].setValue(Double.parseDouble(
+                config.getProperty("antenna." + (i+1) + ".rxSensitivity", "-70")));
+        }
+
+        // Configuración avanzada
+        searchModeCombo.setValue(config.getProperty("search.mode", "DualTarget"));
+        sessionCombo.setValue(Integer.parseInt(config.getProperty("session", "2")));
+        readerModeCombo.setValue(config.getProperty("reader.mode", "AutoSetDenseReader"));
+    }
+
+    /**
+     * Carga la configuración por defecto
+     */
+    private void loadDefaultConfig() {
+        ipTextField.setText("192.168.1.100");
+        portTextField.setText("5084");
+        hexRadio.setSelected(true);
+        apiEndpointTextField.setText("http://localhost:8080/api/rfid/tags");
+        apiKeyField.setText("");
+        rssiCutoffSlider.setValue(-70);
+
+        for (int i = 0; i < 4; i++) {
+            antennaCheckboxes[i].setSelected(true);
+            txPowerSliders[i].setValue(30);
+            rxSensitivitySliders[i].setValue(-70);
+        }
+
+        searchModeCombo.setValue("DualTarget");
+        sessionCombo.setValue(2);
+        readerModeCombo.setValue("AutoSetDenseReader");
+
+        appendStatus("✓ Configuración restaurada a valores por defecto\n");
+    }
+
+    /**
+     * Inicia la lectura RFID con la configuración actual
+     */
+    private void startReading() {
+        // Guardar configuración antes de iniciar
+        saveConfiguration();
+
+        appendStatus("\n=== INICIANDO LECTURA RFID ===\n");
+        appendStatus("Configuración:\n");
+        appendStatus("- Lector: " + ipTextField.getText() + ":" + portTextField.getText() + "\n");
+        appendStatus("- API: " + apiEndpointTextField.getText() + "\n");
+        appendStatus("- Formato EPC: " + (hexRadio.isSelected() ? "Hexadecimal" : "Decimal") + "\n");
+        appendStatus("- RSSI Corte: " + String.format("%.0f dBm\n", rssiCutoffSlider.getValue()));
+
+        int enabledAntennas = 0;
+        for (int i = 0; i < 4; i++) {
+            if (antennaCheckboxes[i].isSelected()) {
+                enabledAntennas++;
+                appendStatus(String.format("- Antena %d: TX=%.1f dBm, RX=%.0f dBm\n", 
+                    i+1, txPowerSliders[i].getValue(), rxSensitivitySliders[i].getValue()));
+            }
+        }
+        appendStatus("- Total antenas habilitadas: " + enabledAntennas + "\n");
+
+        appendStatus("\n▶ Lanzando aplicación principal...\n");
+
+        // Aquí se lanzaría la aplicación principal ZebraRFIDConnectorApp
+        // con los parámetros configurados
+        new Thread(() -> {
+            try {
+                ZebraRFIDConnectorApp.launchWithConfig(config);
+            } catch (Exception e) {
+                Platform.runLater(() -> 
+                    appendStatus("✗ Error al iniciar: " + e.getMessage() + "\n"));
+            }
+        }).start();
+    }
+
+    /**
+     * Agrega texto al área de status
+     */
+    private void appendStatus(String message) {
+        Platform.runLater(() -> {
+            statusArea.appendText(message);
+            statusArea.setScrollTop(Double.MAX_VALUE);
+        });
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    /**
+     * Obtiene la configuración actual
+     */
+    public Properties getConfig() {
+        return config;
+    }
+}
+
+{"actions": [
+  {"type": "create", "file": "RFIDConfigPanel.java", "content": "import javafx.application.Application;\nimport javafx.application.Platform;\nimport javafx.geometry.Insets;\nimport javafx.geometry.Pos;\nimport javafx.scene.Scene;\nimport javafx.scene.control.*;\nimport javafx.scene.layout.*;\nimport javafx.stage.Stage;\nimport javafx.collections.FXCollections;\nimport java.io.*;\nimport java.util.Properties;\nimport javafx.scene.paint.Color;\nimport javafx.scene.text.Font;\nimport javafx.scene.text.FontWeight;\n\n/**\n * Panel de configuración para el lector RFID Zebra FX7500\n * Permite configurar todos los parámetros antes de iniciar la lectura\n */\npublic class RFIDConfigPanel extends Application {\n    \n    // Componentes de configuración de red\n    private TextField ipTextField;\n    private TextField portTextField;\n    \n    // Componentes de configuración de API\n    private TextField apiEndpointTextField;\n    private PasswordField apiKeyField;\n    private CheckBox apiKeyVisibleCheckbox;\n    \n    // Componentes de formato EPC\n    private ToggleGroup epcFormatGroup;\n    private RadioButton hexRadio;\n    private RadioButton decimalRadio;\n
+
+Escribe tu pregunta o pide crear/modificar código...

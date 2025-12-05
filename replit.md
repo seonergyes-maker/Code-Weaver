@@ -13,7 +13,7 @@ Una aplicación web tipo IDE que permite desarrollar aplicaciones Java con asist
   - Explicar errores de compilación
   - Sugerir mejoras al código
   - Responder preguntas sobre Java
-  - **Crear y modificar archivos** directamente desde el chat
+  - **Crear y modificar archivos** automáticamente desde el chat (sin confirmación)
 
 ## Project Structure
 ```

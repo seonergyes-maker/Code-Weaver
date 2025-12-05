@@ -534,57 +534,6 @@ with col_editor:
 with col_chat:
     st.markdown("### Chat con Claude AI")
     
-    if st.session_state.pending_actions:
-        with st.expander("📝 Acciones Pendientes", expanded=True):
-            for i, action in enumerate(st.session_state.pending_actions):
-                filename = action.get("file", "")
-                content = action.get("content", "")
-                action_type_raw = action.get("type", "create")
-                
-                if not filename.endswith(".java") or "/" in filename or "\\" in filename:
-                    st.warning(f"Archivo inválido: {filename}")
-                    if st.button(f"❌ Descartar", key=f"dismiss_invalid_{i}"):
-                        st.session_state.pending_actions.pop(i)
-                        st.rerun()
-                    continue
-                
-                if len(content) > 50000:
-                    st.warning(f"Archivo muy grande: {filename}")
-                    if st.button(f"❌ Descartar", key=f"dismiss_large_{i}"):
-                        st.session_state.pending_actions.pop(i)
-                        st.rerun()
-                    continue
-                
-                file_exists = filename in st.session_state.files
-                if action_type_raw == "create" and file_exists:
-                    action_label = "Sobrescribir"
-                    action_icon = "⚠️"
-                elif action_type_raw == "modify" and not file_exists:
-                    action_label = "Crear"
-                    action_icon = "📄"
-                else:
-                    action_label = "Crear" if action_type_raw == "create" else "Modificar"
-                    action_icon = "📄" if action_type_raw == "create" else "✏️"
-                
-                st.markdown(f"**{action_icon} {action_label}:** `{filename}`")
-                with st.expander(f"Ver código", expanded=False):
-                    st.code(content[:500] + ("..." if len(content) > 500 else ""), language="java")
-                col_apply, col_dismiss = st.columns(2)
-                with col_apply:
-                    if st.button(f"✅ Aplicar", key=f"apply_{i}", use_container_width=True):
-                        st.session_state.files[st.session_state.current_file] = st.session_state.code
-                        st.session_state.files[filename] = content
-                        st.session_state.current_file = filename
-                        st.session_state.code = content
-                        st.session_state.pending_actions.pop(i)
-                        st.session_state.console_output = f"✅ Archivo '{filename}' {action_label.lower()}"
-                        st.rerun()
-                with col_dismiss:
-                    if st.button(f"❌ Descartar", key=f"dismiss_{i}", use_container_width=True):
-                        st.session_state.pending_actions.pop(i)
-                        st.rerun()
-                st.markdown("---")
-    
     if st.session_state.ai_notifications:
         with st.expander("Respuestas de Acciones Rápidas", expanded=True):
             for notif in st.session_state.ai_notifications[-3:]:
@@ -594,7 +543,7 @@ with col_chat:
                 st.session_state.ai_notifications = []
                 st.rerun()
     
-    has_extras = st.session_state.ai_notifications or st.session_state.pending_actions
+    has_extras = st.session_state.ai_notifications
     chat_container = st.container(height=300 if has_extras else 400)
     
     with chat_container:
@@ -603,11 +552,11 @@ with col_chat:
             *Hola! Soy tu asistente de desarrollo Java.*
             
             Puedo ayudarte a:
-            - **Crear archivos nuevos**: "Crea una clase Usuario con nombre y email"
+            - **Crear archivos**: "Crea una clase Usuario con nombre y email"
             - **Modificar código**: "Agrega un método para validar email"
-            - Explicar errores y responder preguntas
+            - **Explicar errores** y responder preguntas sobre Java
             
-            *Claude puede crear y modificar archivos directamente!*
+            *Los cambios se aplican automáticamente al proyecto!*
             """)
         else:
             for msg in st.session_state.chat_messages:
@@ -629,12 +578,34 @@ with col_chat:
                     get_all_code(),
                     st.session_state.files
                 )
+                
+                applied_actions = []
+                for action in actions:
+                    filename = action.get("file", "")
+                    content = action.get("content", "")
+                    action_type = action.get("type", "create")
+                    
+                    if not filename.endswith(".java") or "/" in filename or "\\" in filename:
+                        continue
+                    if len(content) > 50000:
+                        continue
+                    
+                    st.session_state.files[st.session_state.current_file] = st.session_state.code
+                    st.session_state.files[filename] = content
+                    st.session_state.current_file = filename
+                    st.session_state.code = content
+                    
+                    action_label = "creado" if action_type == "create" else "modificado"
+                    applied_actions.append(f"**{filename}** {action_label}")
+                
+                if applied_actions:
+                    actions_msg = "\n\n---\n📁 " + " | ".join(applied_actions)
+                    response += actions_msg
+                
                 st.session_state.chat_messages.append({
                     "role": "assistant",
                     "content": response
                 })
-                if actions:
-                    st.session_state.pending_actions.extend(actions)
             except Exception as e:
                 st.session_state.chat_messages.append({
                     "role": "assistant",
