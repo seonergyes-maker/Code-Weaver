@@ -14,6 +14,10 @@ from claude_assistant import (
     complete_line
 )
 from database import save_project, load_project, list_projects, delete_project
+from dependency_manager import (
+    download_library, download_custom_library, list_installed_libraries,
+    remove_library, get_available_libraries, COMMON_LIBRARIES
+)
 
 st.set_page_config(
     page_title="Java IDE con Claude AI",
@@ -253,10 +257,59 @@ with st.sidebar:
                         st.rerun()
     
     st.markdown("---")
+    st.markdown("**Librerías Externas**")
+    
+    installed_libs = list_installed_libraries()
+    if installed_libs:
+        st.caption(f"{len(installed_libs)} librería(s) instalada(s)")
+        with st.expander("Ver librerías instaladas"):
+            for lib in installed_libs:
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    st.text(lib)
+                with col2:
+                    if st.button("❌", key=f"rm_{lib}"):
+                        result = remove_library(lib)
+                        if result['success']:
+                            st.rerun()
+    else:
+        st.caption("Sin librerías instaladas")
+    
+    lib_options = list(COMMON_LIBRARIES.keys())
+    selected_lib = st.selectbox("Agregar librería:", ["-- Seleccionar --"] + lib_options, key="lib_select")
+    
+    if st.button("📦 Instalar Librería", use_container_width=True):
+        if selected_lib and selected_lib != "-- Seleccionar --":
+            with st.spinner(f"Descargando {selected_lib}..."):
+                result = download_library(selected_lib)
+                if result['success']:
+                    st.success(result['message'])
+                    st.rerun()
+                else:
+                    st.error(result['error'])
+    
+    with st.expander("Librería personalizada (Maven)"):
+        custom_group = st.text_input("Group ID:", placeholder="com.example", key="custom_group")
+        custom_artifact = st.text_input("Artifact ID:", placeholder="mi-libreria", key="custom_artifact")
+        custom_version = st.text_input("Versión:", placeholder="1.0.0", key="custom_version")
+        if st.button("Instalar personalizada", use_container_width=True):
+            if custom_group and custom_artifact and custom_version:
+                with st.spinner("Descargando..."):
+                    result = download_custom_library(custom_group, custom_artifact, custom_version)
+                    if result['success']:
+                        st.success(result['message'])
+                        st.rerun()
+                    else:
+                        st.error(result['error'])
+            else:
+                st.warning("Completa todos los campos")
+    
+    st.markdown("---")
     st.markdown("**Información**")
     java_version = get_java_version()
     st.code(java_version, language=None)
     st.caption(f"Archivos: {len(st.session_state.files)}")
+    st.caption(f"Librerías: {len(installed_libs)}")
     
     st.markdown("---")
     if st.button("Limpiar Chat", use_container_width=True):

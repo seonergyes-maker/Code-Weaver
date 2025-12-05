@@ -5,6 +5,7 @@ import shutil
 import re
 from pathlib import Path
 from typing import Optional
+from dependency_manager import get_classpath, LIBS_DIR
 
 
 def find_class_name(code: str) -> str:
@@ -249,9 +250,15 @@ def compile_multi_file(files: dict) -> dict:
                 f.write(code)
             java_files.append(file_path)
         
+        classpath = get_classpath()
+        compile_cmd = ['javac', '-encoding', 'UTF-8']
+        if classpath:
+            compile_cmd.extend(['-cp', classpath])
+        compile_cmd.extend(java_files)
+        
         try:
             result = subprocess.run(
-                ['javac', '-encoding', 'UTF-8'] + java_files,
+                compile_cmd,
                 capture_output=True,
                 text=True,
                 timeout=60
@@ -306,9 +313,15 @@ def run_multi_file(files: dict, main_class: Optional[str] = None) -> dict:
         
         java_files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.java')]
         
+        classpath = get_classpath()
+        compile_cmd = ['javac', '-encoding', 'UTF-8']
+        if classpath:
+            compile_cmd.extend(['-cp', classpath])
+        compile_cmd.extend(java_files)
+        
         try:
             compile_result = subprocess.run(
-                ['javac', '-encoding', 'UTF-8'] + java_files,
+                compile_cmd,
                 capture_output=True,
                 text=True,
                 timeout=60
@@ -321,8 +334,12 @@ def run_multi_file(files: dict, main_class: Optional[str] = None) -> dict:
                     'main_class': main_class
                 }
             
+            run_classpath = temp_dir
+            if classpath:
+                run_classpath = temp_dir + os.pathsep + classpath
+            
             run_result = subprocess.run(
-                ['java', '-Xmx128m', '-Xms32m', '-cp', temp_dir, main_class],
+                ['java', '-Xmx128m', '-Xms32m', '-cp', run_classpath, main_class],
                 capture_output=True,
                 text=True,
                 timeout=30
@@ -385,9 +402,15 @@ def create_multi_jar(files: dict, jar_name: Optional[str] = None, main_class: Op
         
         java_files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.java')]
         
+        classpath = get_classpath()
+        compile_cmd = ['javac', '-encoding', 'UTF-8']
+        if classpath:
+            compile_cmd.extend(['-cp', classpath])
+        compile_cmd.extend(java_files)
+        
         try:
             compile_result = subprocess.run(
-                ['javac', '-encoding', 'UTF-8'] + java_files,
+                compile_cmd,
                 capture_output=True,
                 text=True,
                 timeout=60

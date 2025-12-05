@@ -57,3 +57,5 @@ streamlit run app.py --server.port 5000
   - Soporte multi-archivo para proyectos Java
   - Persistencia de proyectos en base de datos PostgreSQL
   - Autocompletado de línea inteligente con Claude AI
+  - Gestor de dependencias para librerías externas (Maven Central)
+  - Soporte para librerías comunes: Gson, Guava, Jackson, OkHttp, etc.
