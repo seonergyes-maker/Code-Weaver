@@ -13,7 +13,8 @@ from claude_assistant import (
     generate_java_code, 
     explain_error, 
     suggest_improvements,
-    complete_line
+    complete_line,
+    chat_with_actions
 )
 from database import save_project, load_project, list_projects, delete_project
 from dependency_manager import (
@@ -107,6 +108,8 @@ if 'current_project_name' not in st.session_state:
     st.session_state.current_project_name = "Proyecto Sin Guardar"
 if 'saved_projects' not in st.session_state:
     st.session_state.saved_projects = list_projects()
+if 'pending_actions' not in st.session_state:
+    st.session_state.pending_actions = []
 
 def get_all_code():
     return "\n\n// --- Archivo: ".join([f"{name} ---\n{code}" for name, code in st.session_state.files.items()])
@@ -531,6 +534,57 @@ with col_editor:
 with col_chat:
     st.markdown("### Chat con Claude AI")
     
+    if st.session_state.pending_actions:
+        with st.expander("📝 Acciones Pendientes", expanded=True):
+            for i, action in enumerate(st.session_state.pending_actions):
+                filename = action.get("file", "")
+                content = action.get("content", "")
+                action_type_raw = action.get("type", "create")
+                
+                if not filename.endswith(".java") or "/" in filename or "\\" in filename:
+                    st.warning(f"Archivo inválido: {filename}")
+                    if st.button(f"❌ Descartar", key=f"dismiss_invalid_{i}"):
+                        st.session_state.pending_actions.pop(i)
+                        st.rerun()
+                    continue
+                
+                if len(content) > 50000:
+                    st.warning(f"Archivo muy grande: {filename}")
+                    if st.button(f"❌ Descartar", key=f"dismiss_large_{i}"):
+                        st.session_state.pending_actions.pop(i)
+                        st.rerun()
+                    continue
+                
+                file_exists = filename in st.session_state.files
+                if action_type_raw == "create" and file_exists:
+                    action_label = "Sobrescribir"
+                    action_icon = "⚠️"
+                elif action_type_raw == "modify" and not file_exists:
+                    action_label = "Crear"
+                    action_icon = "📄"
+                else:
+                    action_label = "Crear" if action_type_raw == "create" else "Modificar"
+                    action_icon = "📄" if action_type_raw == "create" else "✏️"
+                
+                st.markdown(f"**{action_icon} {action_label}:** `{filename}`")
+                with st.expander(f"Ver código", expanded=False):
+                    st.code(content[:500] + ("..." if len(content) > 500 else ""), language="java")
+                col_apply, col_dismiss = st.columns(2)
+                with col_apply:
+                    if st.button(f"✅ Aplicar", key=f"apply_{i}", use_container_width=True):
+                        st.session_state.files[st.session_state.current_file] = st.session_state.code
+                        st.session_state.files[filename] = content
+                        st.session_state.current_file = filename
+                        st.session_state.code = content
+                        st.session_state.pending_actions.pop(i)
+                        st.session_state.console_output = f"✅ Archivo '{filename}' {action_label.lower()}"
+                        st.rerun()
+                with col_dismiss:
+                    if st.button(f"❌ Descartar", key=f"dismiss_{i}", use_container_width=True):
+                        st.session_state.pending_actions.pop(i)
+                        st.rerun()
+                st.markdown("---")
+    
     if st.session_state.ai_notifications:
         with st.expander("Respuestas de Acciones Rápidas", expanded=True):
             for notif in st.session_state.ai_notifications[-3:]:
@@ -540,7 +594,8 @@ with col_chat:
                 st.session_state.ai_notifications = []
                 st.rerun()
     
-    chat_container = st.container(height=350 if st.session_state.ai_notifications else 400)
+    has_extras = st.session_state.ai_notifications or st.session_state.pending_actions
+    chat_container = st.container(height=300 if has_extras else 400)
     
     with chat_container:
         if not st.session_state.chat_messages:
@@ -548,18 +603,18 @@ with col_chat:
             *Hola! Soy tu asistente de desarrollo Java.*
             
             Puedo ayudarte a:
-            - Escribir y mejorar código
-            - Explicar errores
-            - Responder preguntas sobre Java
+            - **Crear archivos nuevos**: "Crea una clase Usuario con nombre y email"
+            - **Modificar código**: "Agrega un método para validar email"
+            - Explicar errores y responder preguntas
             
-            *Escribe tu pregunta abajo...*
+            *Claude puede crear y modificar archivos directamente!*
             """)
         else:
             for msg in st.session_state.chat_messages:
                 with st.chat_message(msg["role"]):
                     st.markdown(msg["content"])
     
-    user_input = st.chat_input("Escribe tu pregunta sobre Java...")
+    user_input = st.chat_input("Escribe tu pregunta o pide crear/modificar código...")
     
     if user_input:
         st.session_state.chat_messages.append({
@@ -569,14 +624,17 @@ with col_chat:
         
         with st.spinner("Claude está pensando..."):
             try:
-                response = chat_with_claude(
+                response, actions = chat_with_actions(
                     st.session_state.chat_messages,
-                    get_all_code()
+                    get_all_code(),
+                    st.session_state.files
                 )
                 st.session_state.chat_messages.append({
                     "role": "assistant",
                     "content": response
                 })
+                if actions:
+                    st.session_state.pending_actions.extend(actions)
             except Exception as e:
                 st.session_state.chat_messages.append({
                     "role": "assistant",

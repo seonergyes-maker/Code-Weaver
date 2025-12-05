@@ -10,6 +10,9 @@ client = Anthropic(
     base_url=AI_INTEGRATIONS_ANTHROPIC_BASE_URL
 )
 
+import json
+import re
+
 SYSTEM_PROMPT = """Eres un experto desarrollador Java. Tu rol es ayudar a los usuarios a:
 1. Escribir código Java limpio y eficiente
 2. Explicar errores de compilación y cómo solucionarlos
@@ -18,6 +21,35 @@ SYSTEM_PROMPT = """Eres un experto desarrollador Java. Tu rol es ayudar a los us
 5. Responder preguntas técnicas sobre Java
 
 Siempre proporciona código bien formateado y comentado cuando sea relevante.
+Responde en español a menos que el usuario escriba en otro idioma."""
+
+SYSTEM_PROMPT_WITH_ACTIONS = """Eres un experto desarrollador Java trabajando en un IDE. Tu rol es ayudar a los usuarios a:
+1. Escribir código Java limpio y eficiente
+2. Explicar errores de compilación y cómo solucionarlos
+3. Sugerir mejoras y buenas prácticas
+4. Generar código nuevo basado en descripciones
+5. Modificar archivos existentes cuando se solicite
+
+IMPORTANTE: Cuando el usuario te pida crear o modificar código, DEBES incluir un bloque de acciones al final de tu respuesta.
+
+El formato es:
+```json
+{"actions": [
+  {"type": "create", "file": "NombreClase.java", "content": "código completo aquí"},
+  {"type": "modify", "file": "NombreExistente.java", "content": "código completo modificado"}
+]}
+```
+
+Tipos de acción:
+- "create": Crea un nuevo archivo .java
+- "modify": Reemplaza el contenido de un archivo existente
+
+Reglas:
+- El nombre del archivo DEBE terminar en .java
+- El contenido debe ser código Java completo y funcional
+- Solo incluye acciones cuando el usuario pida crear o modificar código
+- Para preguntas o explicaciones, NO incluyas el bloque de acciones
+
 Responde en español a menos que el usuario escriba en otro idioma."""
 
 
@@ -251,3 +283,87 @@ Completa esta línea de forma inteligente:"""
         completion = completion[1:-1]
     
     return completion
+
+
+def parse_file_actions(response_text: str) -> tuple:
+    """
+    Parse Claude's response to extract file actions and clean message.
+    Returns: (clean_message, actions_list)
+    """
+    actions = []
+    clean_message = response_text
+    
+    json_pattern = r'```json\s*(\{[\s\S]*?"actions"[\s\S]*?\})\s*```'
+    matches = re.findall(json_pattern, response_text, re.IGNORECASE)
+    
+    for match in matches:
+        try:
+            data = json.loads(match)
+            if "actions" in data and isinstance(data["actions"], list):
+                for action in data["actions"]:
+                    if isinstance(action, dict):
+                        action_type = action.get("type", "")
+                        filename = action.get("file", "")
+                        content = action.get("content", "")
+                        
+                        if action_type in ["create", "modify"] and filename.endswith(".java") and content:
+                            actions.append({
+                                "type": action_type,
+                                "file": filename,
+                                "content": content
+                            })
+        except json.JSONDecodeError:
+            continue
+    
+    clean_message = re.sub(json_pattern, '', response_text, flags=re.IGNORECASE).strip()
+    
+    return clean_message, actions
+
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=2, max=64),
+    retry=retry_if_exception(is_rate_limit_error),
+    reraise=True
+)
+def chat_with_actions(messages: list, current_code: str = "", project_files: dict = None) -> tuple:
+    """
+    Chat with Claude and get file actions.
+    Returns: (response_text, actions_list)
+    """
+    context = ""
+    if current_code.strip():
+        context = f"\n\nCódigo Java actual del usuario:\n```java\n{current_code}\n```"
+    
+    if project_files:
+        files_info = "\n\nArchivos en el proyecto:\n"
+        for fname in project_files.keys():
+            files_info += f"- {fname}\n"
+        context += files_info
+    
+    system_message = SYSTEM_PROMPT_WITH_ACTIONS + context
+    
+    formatted_messages = []
+    for msg in messages:
+        formatted_messages.append({
+            "role": msg["role"],
+            "content": msg["content"]
+        })
+    
+    if formatted_messages and formatted_messages[0]["role"] != "user":
+        formatted_messages.insert(0, {
+            "role": "user",
+            "content": "Hola, necesito ayuda con Java."
+        })
+    
+    response = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=8192,
+        system=system_message,
+        messages=formatted_messages
+    )
+    
+    response_text = response.content[0].text
+    clean_message, actions = parse_file_actions(response_text)
+    
+    return clean_message, actions
