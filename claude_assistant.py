@@ -35,8 +35,7 @@ IMPORTANTE: Cuando el usuario te pida crear o modificar código, DEBES incluir u
 El formato es:
 ```json
 {"actions": [
-  {"type": "create", "file": "NombreClase.java", "content": "código completo aquí"},
-  {"type": "modify", "file": "NombreExistente.java", "content": "código completo modificado"}
+  {"type": "create", "file": "NombreClase.java", "content": "código completo aquí"}
 ]}
 ```
 
@@ -44,11 +43,14 @@ Tipos de acción:
 - "create": Crea un nuevo archivo .java
 - "modify": Reemplaza el contenido de un archivo existente
 
-Reglas:
+Reglas CRÍTICAS:
+- SOLO UN ARCHIVO POR RESPUESTA para evitar cortes
+- Si el usuario pide múltiples archivos, crea el primero y ofrece crear los demás
 - El nombre del archivo DEBE terminar en .java
 - El contenido debe ser código Java completo y funcional
 - Solo incluye acciones cuando el usuario pida crear o modificar código
 - Para preguntas o explicaciones, NO incluyas el bloque de acciones
+- Mantén las clases concisas (máximo 500 líneas)
 
 Responde en español a menos que el usuario escriba en otro idioma."""
 
@@ -401,12 +403,18 @@ def chat_with_actions(messages: list, current_code: str = "", project_files: dic
     
     response = client.messages.create(
         model="claude-sonnet-4-5",
-        max_tokens=8192,
+        max_tokens=16384,
         system=system_message,
         messages=formatted_messages
     )
     
     response_text = response.content[0].text
     clean_message, actions = parse_file_actions(response_text)
+    
+    if not actions and '{"actions"' in response_text:
+        if response.stop_reason == "max_tokens":
+            clean_message = "La respuesta fue cortada por ser muy larga. Por favor, pide crear un archivo a la vez."
+        else:
+            clean_message += "\n\n⚠️ No se pudo procesar la acción. Intenta pedir el archivo de nuevo."
     
     return clean_message, actions
