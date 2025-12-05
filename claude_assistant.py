@@ -163,3 +163,91 @@ Proporciona ejemplos de código mejorado cuando sea relevante.""",
     )
     
     return response.content[0].text
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=16),
+    retry=retry_if_exception(is_rate_limit_error),
+    reraise=True
+)
+def get_code_completions(code: str, cursor_line: int, cursor_col: int) -> list:
+    lines = code.split('\n')
+    current_line = lines[cursor_line] if cursor_line < len(lines) else ""
+    context_start = max(0, cursor_line - 10)
+    context_end = min(len(lines), cursor_line + 5)
+    context = '\n'.join(lines[context_start:context_end])
+    
+    response = client.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=1024,
+        system="""Eres un asistente de autocompletado de código Java.
+Dado el contexto del código y la posición del cursor, sugiere completaciones relevantes.
+Responde SOLO con un JSON array de objetos con formato:
+[{"label": "nombreMétodo()", "insertText": "nombreMétodo()", "detail": "descripción breve"}]
+Máximo 5 sugerencias. Sin explicaciones adicionales, solo el JSON.""",
+        messages=[{
+            "role": "user",
+            "content": f"""Código Java (línea actual: {cursor_line + 1}, columna: {cursor_col}):
+```java
+{context}
+```
+Línea actual: `{current_line}`
+Cursor en columna {cursor_col}.
+
+Dame sugerencias de autocompletado para esta posición."""
+        }]
+    )
+    
+    import json
+    text = response.content[0].text.strip()
+    
+    if text.startswith('['):
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+    
+    start = text.find('[')
+    end = text.rfind(']') + 1
+    if start != -1 and end > start:
+        try:
+            return json.loads(text[start:end])
+        except json.JSONDecodeError:
+            pass
+    
+    return []
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=16),
+    retry=retry_if_exception(is_rate_limit_error),
+    reraise=True
+)
+def complete_line(code: str, partial_line: str) -> str:
+    response = client.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=512,
+        system="""Eres un asistente de autocompletado de código Java.
+Completa la línea de código de forma inteligente basándote en el contexto.
+Responde SOLO con el texto que completa la línea, sin explicaciones.
+Si la línea está completa, responde con una cadena vacía.""",
+        messages=[{
+            "role": "user",
+            "content": f"""Contexto del código:
+```java
+{code[-1500:] if len(code) > 1500 else code}
+```
+
+Línea parcial a completar: `{partial_line}`
+
+Completa esta línea de forma inteligente:"""
+        }]
+    )
+    
+    completion = response.content[0].text.strip()
+    if completion.startswith('`') and completion.endswith('`'):
+        completion = completion[1:-1]
+    
+    return completion

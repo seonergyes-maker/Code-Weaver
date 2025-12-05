@@ -54,3 +54,6 @@ streamlit run app.py --server.port 5000
   - Interfaz de chat interactivo
   - Límites de memoria y tiempo para ejecución Java
   - Separación de notificaciones AI del historial de chat
+  - Soporte multi-archivo para proyectos Java
+  - Persistencia de proyectos en base de datos PostgreSQL
+  - Autocompletado de línea inteligente con Claude AI

@@ -4,6 +4,7 @@ import os
 import shutil
 import re
 from pathlib import Path
+from typing import Optional
 
 
 def find_class_name(code: str) -> str:
@@ -14,6 +15,19 @@ def find_class_name(code: str) -> str:
     if match:
         return match.group(1)
     return "Main"
+
+
+def find_all_classes(code: str) -> list:
+    matches = re.findall(r'(?:public\s+)?class\s+(\w+)', code)
+    return matches if matches else ["Main"]
+
+
+def find_main_class(files: dict) -> Optional[str]:
+    for filename, code in files.items():
+        if 'public static void main' in code:
+            class_name = find_class_name(code)
+            return class_name
+    return None
 
 
 def compile_java(code: str) -> dict:
@@ -219,3 +233,222 @@ def get_java_version() -> str:
         return version_info.split('\n')[0] if version_info else 'Java no disponible'
     except Exception as e:
         return f'Error al obtener versión: {e}'
+
+
+def compile_multi_file(files: dict) -> dict:
+    if not files:
+        return {'success': False, 'error': 'No hay archivos para compilar'}
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        java_files = []
+        for filename, code in files.items():
+            if not filename.endswith('.java'):
+                filename = f"{filename}.java"
+            file_path = os.path.join(temp_dir, filename)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+            java_files.append(file_path)
+        
+        try:
+            result = subprocess.run(
+                ['javac', '-encoding', 'UTF-8'] + java_files,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            if result.returncode != 0:
+                return {
+                    'success': False,
+                    'error': result.stderr
+                }
+            
+            class_files = list(Path(temp_dir).glob('*.class'))
+            return {
+                'success': True,
+                'message': f'Compilación exitosa: {len(class_files)} archivos .class generados',
+                'class_count': len(class_files),
+                'temp_dir': temp_dir
+            }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': 'Tiempo de compilación agotado (60 segundos)'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+
+def run_multi_file(files: dict, main_class: Optional[str] = None) -> dict:
+    if not files:
+        return {'success': False, 'error': 'No hay archivos para ejecutar'}
+    
+    if main_class is None:
+        main_class = find_main_class(files)
+    
+    if main_class is None:
+        return {
+            'success': False,
+            'error': 'No se encontró método main. Asegúrate de tener "public static void main(String[] args)" en alguna clase.'
+        }
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        for filename, code in files.items():
+            if not filename.endswith('.java'):
+                filename = f"{filename}.java"
+            file_path = os.path.join(temp_dir, filename)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+        
+        java_files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.java')]
+        
+        try:
+            compile_result = subprocess.run(
+                ['javac', '-encoding', 'UTF-8'] + java_files,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            if compile_result.returncode != 0:
+                return {
+                    'success': False,
+                    'error': f'Error de compilación:\n{compile_result.stderr}',
+                    'main_class': main_class
+                }
+            
+            run_result = subprocess.run(
+                ['java', '-Xmx128m', '-Xms32m', '-cp', temp_dir, main_class],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            output = run_result.stdout
+            if run_result.stderr:
+                output += f'\n[stderr]\n{run_result.stderr}'
+            
+            return {
+                'success': run_result.returncode == 0,
+                'output': output if output else '(Sin salida)',
+                'return_code': run_result.returncode,
+                'main_class': main_class
+            }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': 'Tiempo de ejecución agotado (30 segundos)',
+                'main_class': main_class
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'main_class': main_class
+            }
+
+
+def create_multi_jar(files: dict, jar_name: Optional[str] = None, main_class: Optional[str] = None) -> dict:
+    if not files:
+        return {'success': False, 'error': 'No hay archivos para empaquetar'}
+    
+    if main_class is None:
+        main_class = find_main_class(files)
+    
+    if main_class is None:
+        return {
+            'success': False,
+            'error': 'No se encontró método main para el JAR ejecutable.'
+        }
+    
+    if jar_name is None:
+        jar_name = f"{main_class}.jar"
+    
+    if not jar_name.endswith('.jar'):
+        jar_name += '.jar'
+    
+    output_dir = os.path.join(os.getcwd(), 'output')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        for filename, code in files.items():
+            if not filename.endswith('.java'):
+                filename = f"{filename}.java"
+            file_path = os.path.join(temp_dir, filename)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+        
+        java_files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.java')]
+        
+        try:
+            compile_result = subprocess.run(
+                ['javac', '-encoding', 'UTF-8'] + java_files,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            if compile_result.returncode != 0:
+                return {
+                    'success': False,
+                    'error': f'Error de compilación:\n{compile_result.stderr}',
+                    'main_class': main_class
+                }
+            
+            manifest_file = os.path.join(temp_dir, 'MANIFEST.MF')
+            with open(manifest_file, 'w') as f:
+                f.write('Manifest-Version: 1.0\n')
+                f.write(f'Main-Class: {main_class}\n')
+                f.write('\n')
+            
+            jar_path = os.path.join(output_dir, jar_name)
+            
+            class_files = [f for f in os.listdir(temp_dir) if f.endswith('.class')]
+            
+            jar_result = subprocess.run(
+                ['jar', 'cfm', jar_path, manifest_file] + class_files,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=temp_dir
+            )
+            
+            if jar_result.returncode != 0:
+                return {
+                    'success': False,
+                    'error': f'Error al crear JAR:\n{jar_result.stderr}',
+                    'main_class': main_class
+                }
+            
+            if os.path.exists(jar_path):
+                return {
+                    'success': True,
+                    'message': f'JAR creado exitosamente: {jar_name} ({len(class_files)} clases)',
+                    'jar_path': jar_path,
+                    'jar_name': jar_name,
+                    'main_class': main_class
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': 'No se pudo crear el archivo JAR',
+                    'main_class': main_class
+                }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': 'Tiempo de operación agotado',
+                'main_class': main_class
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'main_class': main_class
+            }

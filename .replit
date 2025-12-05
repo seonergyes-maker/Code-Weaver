@@ -9,7 +9,7 @@ deploymentTarget = "autoscale"
 run = ["streamlit", "run", "app.py", "--server.port", "5000"]
 
 [agent]
-integrations = ["python_anthropic_ai_integrations:1.0.0"]
+integrations = ["python_anthropic_ai_integrations:1.0.0", "streamlit_database:1.0.0"]
 
 [workflows]
 runButton = "Project"
