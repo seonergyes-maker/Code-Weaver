@@ -3,7 +3,8 @@ import requests
 import json
 from typing import Optional
 
-LIBS_DIR = os.path.join(os.getcwd(), 'libs')
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LIBS_DIR = os.path.join(SCRIPT_DIR, 'libs')
 
 COMMON_LIBRARIES = {
     'gson': {
