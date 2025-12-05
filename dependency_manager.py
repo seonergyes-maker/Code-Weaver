@@ -240,3 +240,74 @@ def get_classpath() -> str:
 
 def get_available_libraries() -> dict:
     return COMMON_LIBRARIES
+
+
+IMPORT_TO_LIBRARY = {
+    'com.google.gson': 'gson',
+    'org.apache.commons.lang3': 'commons-lang3',
+    'org.apache.commons.io': 'commons-io',
+    'com.fasterxml.jackson': 'jackson-databind',
+    'org.slf4j': 'slf4j-api',
+    'ch.qos.logback': 'logback-classic',
+    'org.junit': 'junit',
+    'junit.framework': 'junit',
+    'lombok': 'lombok',
+    'com.google.common': 'guava',
+    'okhttp3': 'okhttp',
+    'org.apache.http': 'httpclient',
+    'com.mysql': 'mysql-connector',
+    'org.postgresql': 'postgresql',
+    'org.sqlite': 'sqlite-jdbc',
+}
+
+
+def detect_required_libraries(code_files: dict) -> list:
+    """Detect required libraries from import statements in code."""
+    required = set()
+    
+    all_code = '\n'.join(code_files.values()) if isinstance(code_files, dict) else code_files
+    
+    import re
+    import_pattern = r'import\s+([\w.]+)'
+    imports = re.findall(import_pattern, all_code)
+    
+    for imp in imports:
+        for prefix, lib_name in IMPORT_TO_LIBRARY.items():
+            if imp.startswith(prefix):
+                required.add(lib_name)
+                break
+    
+    return list(required)
+
+
+def install_detected_dependencies(code_files: dict) -> dict:
+    """Detect and install required libraries. Returns status dict."""
+    required = detect_required_libraries(code_files)
+    
+    if not required:
+        return {'success': True, 'installed': [], 'message': 'No se detectaron dependencias externas'}
+    
+    installed = []
+    errors = []
+    
+    for lib_name in required:
+        result = download_library(lib_name)
+        if result['success']:
+            if 'ya está instalada' not in result.get('message', ''):
+                installed.append(lib_name)
+        else:
+            errors.append(f"{lib_name}: {result.get('error', 'Error desconocido')}")
+    
+    if errors:
+        return {
+            'success': False,
+            'installed': installed,
+            'errors': errors,
+            'message': f"Instaladas: {installed}. Errores: {errors}"
+        }
+    
+    return {
+        'success': True,
+        'installed': installed,
+        'message': f"Dependencias instaladas: {', '.join(installed)}" if installed else "Todas las dependencias ya estaban instaladas"
+    }

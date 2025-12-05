@@ -19,7 +19,8 @@ from claude_assistant import (
 from database import save_project, load_project, list_projects, delete_project
 from dependency_manager import (
     download_library, download_custom_library, list_installed_libraries,
-    remove_library, get_available_libraries, COMMON_LIBRARIES
+    remove_library, get_available_libraries, COMMON_LIBRARIES,
+    install_detected_dependencies
 )
 
 st.set_page_config(
@@ -461,15 +462,22 @@ with col_editor:
     with btn_col1:
         if st.button("Compilar Todo", type="primary", use_container_width=True):
             st.session_state.files[st.session_state.current_file] = st.session_state.code
+            
+            with st.spinner("Detectando dependencias..."):
+                dep_result = install_detected_dependencies(st.session_state.files)
+                dep_msg = ""
+                if dep_result.get('installed'):
+                    dep_msg = f"📦 {dep_result['message']}\n\n"
+            
             with st.spinner("Compilando..."):
                 if len(st.session_state.files) == 1:
                     result = compile_java(list(st.session_state.files.values())[0])
                 else:
                     result = compile_multi_file(st.session_state.files)
                 if result['success']:
-                    st.session_state.console_output = f"✅ {result['message']}"
+                    st.session_state.console_output = f"{dep_msg}✅ {result['message']}"
                 else:
-                    st.session_state.console_output = f"❌ Error de compilación:\n{result['error']}"
+                    st.session_state.console_output = f"{dep_msg}❌ Error de compilación:\n{result['error']}"
     
     with btn_col2:
         if st.button("Ejecutar", use_container_width=True):
