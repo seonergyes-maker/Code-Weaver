@@ -61,3 +61,5 @@ streamlit run app.py --server.port 5000
   - Gestor de dependencias para librerías externas (Maven Central)
   - Soporte para librerías comunes: Gson, Guava, Jackson, OkHttp, etc.
   - Importación de proyectos existentes (.java y .zip)
+  - **NUEVO: Contexto completo del proyecto** - Claude ahora recibe TODOS los archivos del proyecto en cada conversación
+  - **NUEVO: Bucle automático multi-archivo** - Cuando Claude indica que hay más archivos por crear, el sistema continúa automáticamente hasta 10 archivos sin intervención del usuario
