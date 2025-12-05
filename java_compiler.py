@@ -39,9 +39,15 @@ def compile_java(code: str) -> dict:
         with open(java_file, 'w', encoding='utf-8') as f:
             f.write(code)
         
+        classpath = get_classpath()
+        compile_cmd = ['javac', '-encoding', 'UTF-8']
+        if classpath:
+            compile_cmd.extend(['-cp', classpath])
+        compile_cmd.append(java_file)
+        
         try:
             result = subprocess.run(
-                ['javac', '-encoding', 'UTF-8', java_file],
+                compile_cmd,
                 capture_output=True,
                 text=True,
                 timeout=30
@@ -175,9 +181,15 @@ def run_java(code: str) -> dict:
         with open(java_file, 'w', encoding='utf-8') as f:
             f.write(code)
         
+        classpath = get_classpath()
+        compile_cmd = ['javac', '-encoding', 'UTF-8']
+        if classpath:
+            compile_cmd.extend(['-cp', classpath])
+        compile_cmd.append(java_file)
+        
         try:
             compile_result = subprocess.run(
-                ['javac', '-encoding', 'UTF-8', java_file],
+                compile_cmd,
                 capture_output=True,
                 text=True,
                 timeout=30
@@ -190,8 +202,12 @@ def run_java(code: str) -> dict:
                     'class_name': class_name
                 }
             
+            run_classpath = temp_dir
+            if classpath:
+                run_classpath = temp_dir + os.pathsep + classpath
+            
             run_result = subprocess.run(
-                ['java', '-Xmx128m', '-Xms32m', '-cp', temp_dir, class_name],
+                ['java', '-Xmx128m', '-Xms32m', '-cp', run_classpath, class_name],
                 capture_output=True,
                 text=True,
                 timeout=30
