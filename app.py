@@ -1,6 +1,8 @@
 import streamlit as st
 from streamlit_ace import st_ace
 import os
+import zipfile
+import io
 
 from java_compiler import (
     compile_java, create_jar, run_java, get_java_version,
@@ -215,6 +217,48 @@ with st.sidebar:
                 st.warning("El archivo ya existe")
         else:
             st.warning("Escribe un nombre para el archivo")
+    
+    uploaded_files = st.file_uploader(
+        "📂 Importar proyecto",
+        type=['java', 'zip'],
+        accept_multiple_files=True,
+        key="java_uploader",
+        help="Sube archivos .java o un .zip con tu proyecto"
+    )
+    if uploaded_files:
+        if st.button("📥 Importar Proyecto", use_container_width=True):
+            st.session_state.files[st.session_state.current_file] = st.session_state.code
+            imported_count = 0
+            imported_files = {}
+            
+            for uploaded_file in uploaded_files:
+                if uploaded_file.name.endswith('.zip'):
+                    try:
+                        zip_bytes = io.BytesIO(uploaded_file.read())
+                        with zipfile.ZipFile(zip_bytes, 'r') as zip_ref:
+                            for file_info in zip_ref.filelist:
+                                if file_info.filename.endswith('.java') and not file_info.is_dir():
+                                    filename = os.path.basename(file_info.filename)
+                                    if filename:
+                                        content = zip_ref.read(file_info.filename).decode('utf-8')
+                                        imported_files[filename] = content
+                                        imported_count += 1
+                    except Exception as e:
+                        st.error(f"Error al leer ZIP: {e}")
+                elif uploaded_file.name.endswith('.java'):
+                    filename = uploaded_file.name
+                    content = uploaded_file.read().decode('utf-8')
+                    imported_files[filename] = content
+                    imported_count += 1
+            
+            if imported_count > 0:
+                st.session_state.files.update(imported_files)
+                first_imported = list(imported_files.keys())[0]
+                st.session_state.current_file = first_imported
+                st.session_state.code = st.session_state.files[first_imported]
+                st.session_state.current_project_name = "Proyecto Importado"
+                st.success(f"✅ {imported_count} archivo(s) importado(s)")
+                st.rerun()
     
     st.markdown("---")
     st.markdown("**Gestión de Proyectos**")
