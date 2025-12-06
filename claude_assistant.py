@@ -1366,3 +1366,204 @@ def get_available_templates() -> list:
     ]
 
 
+# ============================================================================
+# AGENT ARCHITECTURE INTEGRATION
+# ============================================================================
+
+_coordinator = None
+
+def get_coordinator():
+    """Get or create the coordinator agent singleton."""
+    global _coordinator
+    if _coordinator is None:
+        from agents.coordinator import CoordinatorAgent
+        _coordinator = CoordinatorAgent()
+    return _coordinator
+
+
+def chat_with_agents(
+    user_message: str,
+    project_files: dict = None,
+    chat_history: list = None,
+    error_message: str = None,
+    target_file: str = None,
+    use_agents: bool = True
+) -> tuple:
+    """
+    Enhanced chat function that uses the agent/subagent architecture.
+    
+    This is the main entry point for the new agent-based chat system.
+    It analyzes user intent and routes to specialized subagents.
+    
+    Args:
+        user_message: The user's message
+        project_files: All project files {filename: code}
+        chat_history: Previous conversation messages
+        error_message: Compilation/runtime error to fix (triggers ErrorFixer)
+        target_file: Specific file to operate on
+        use_agents: If False, falls back to legacy chat_with_actions
+    
+    Returns:
+        tuple: (response_text, actions_list, needs_continuation, metadata)
+        metadata includes: agent_used, intent, confidence
+    """
+    if not use_agents:
+        response, actions, needs_cont = chat_with_actions(
+            chat_history or [{"role": "user", "content": user_message}],
+            "",
+            project_files
+        )
+        return response, actions, needs_cont, {"agent_used": "legacy", "intent": "unknown"}
+    
+    try:
+        coordinator = get_coordinator()
+        result = coordinator.route_request(
+            user_message=user_message,
+            project_files=project_files,
+            chat_history=chat_history,
+            error_message=error_message,
+            target_file=target_file
+        )
+        
+        return (
+            result.get("response", ""),
+            result.get("actions", []),
+            result.get("needs_continuation", False),
+            {
+                "agent_used": result.get("agent", "unknown"),
+                "intent": result.get("intent", "unknown"),
+                "confidence": result.get("intent_confidence", 0.0),
+                "remaining_files": result.get("remaining_files", [])
+            }
+        )
+    except Exception as e:
+        response, actions, needs_cont = chat_with_actions(
+            chat_history or [{"role": "user", "content": user_message}],
+            "",
+            project_files
+        )
+        return response, actions, needs_cont, {"agent_used": "legacy_fallback", "error": str(e)}
+
+
+def auto_fix_with_agents(error_message: str, project_files: dict) -> tuple:
+    """
+    Fix compilation errors using the agent architecture.
+    
+    Args:
+        error_message: The compilation error
+        project_files: All project files
+    
+    Returns:
+        tuple: (explanation, actions, needs_continuation)
+    """
+    try:
+        coordinator = get_coordinator()
+        result = coordinator.fix_compilation_error(error_message, project_files)
+        return (
+            result.get("response", ""),
+            result.get("actions", []),
+            result.get("needs_continuation", False)
+        )
+    except Exception as e:
+        return auto_fix_error(error_message, project_files)
+
+
+def generate_tests_with_agents(class_name: str, project_files: dict) -> tuple:
+    """
+    Generate JUnit tests using the agent architecture.
+    
+    Args:
+        class_name: Name of the class to test (without .java)
+        project_files: All project files
+    
+    Returns:
+        tuple: (response, actions)
+    """
+    try:
+        coordinator = get_coordinator()
+        result = coordinator.generate_tests_for_class(class_name, project_files)
+        return result.get("response", ""), result.get("actions", [])
+    except Exception as e:
+        filename = f"{class_name}.java"
+        if filename in project_files:
+            test_code = generate_junit_tests(project_files[filename], class_name)
+            return "Tests generados:", [{"type": "create", "file": f"{class_name}Test.java", "content": test_code}]
+        return f"Error: {str(e)}", []
+
+
+def generate_docs_with_agents(filename: str, project_files: dict) -> tuple:
+    """
+    Generate JavaDoc using the agent architecture.
+    
+    Args:
+        filename: The file to document
+        project_files: All project files
+    
+    Returns:
+        tuple: (response, actions)
+    """
+    try:
+        coordinator = get_coordinator()
+        result = coordinator.generate_javadoc(filename, project_files)
+        return result.get("response", ""), result.get("actions", [])
+    except Exception as e:
+        if filename in project_files:
+            doc_code = generate_javadoc(project_files[filename])
+            return "JavaDoc generado:", [{"type": "modify", "file": filename, "content": doc_code}]
+        return f"Error: {str(e)}", []
+
+
+def plan_project_with_agents(description: str, project_files: dict = None) -> dict:
+    """
+    Plan a project using the Architect agent.
+    
+    Args:
+        description: What to build
+        project_files: Existing project files
+    
+    Returns:
+        dict with architecture plan
+    """
+    try:
+        coordinator = get_coordinator()
+        result = coordinator.plan_project(description, project_files)
+        return result.get("plan", result)
+    except Exception as e:
+        return architect_analyze(description, project_files or {})
+
+
+def continue_generation_with_agents(
+    previous_response: str,
+    project_files: dict,
+    remaining_files: list = None
+) -> tuple:
+    """
+    Continue generating files in a multi-file task.
+    
+    Args:
+        previous_response: The previous AI response
+        project_files: Updated project files
+        remaining_files: List of remaining files to create
+    
+    Returns:
+        tuple: (response, actions, needs_continuation, metadata)
+    """
+    try:
+        coordinator = get_coordinator()
+        result = coordinator.continue_generation(previous_response, project_files, remaining_files)
+        return (
+            result.get("response", ""),
+            result.get("actions", []),
+            result.get("needs_continuation", False),
+            {"remaining_files": result.get("remaining_files", [])}
+        )
+    except Exception as e:
+        messages = [
+            {"role": "user", "content": "Continúa con el siguiente archivo."},
+            {"role": "assistant", "content": previous_response},
+            {"role": "user", "content": "Continúa, por favor."}
+        ]
+        response, actions, needs_cont = chat_with_actions(messages, "", project_files)
+        return response, actions, needs_cont, {}
+
+
