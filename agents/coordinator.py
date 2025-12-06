@@ -126,6 +126,13 @@ class CoordinatorAgent:
             dict with {response, actions, needs_continuation, agent_used, intent}
         """
         project_files = project_files or {}
+        chat_history = chat_history or []
+        
+        # Check if user wants to start executing a previous plan
+        if self._is_start_command(user_message):
+            plan = self._extract_plan_from_history(chat_history)
+            if plan and plan.get("files_needed"):
+                return self._execute_plan(plan, project_files)
         
         project_summary = f"Archivos: {', '.join(project_files.keys())}" if project_files else "Proyecto vacío"
         
@@ -339,6 +346,108 @@ a menos que se te pida explícitamente crear o modificar código."""
             "actions": [],
             "agent": "DocGenerator"
         }
+    
+    def _is_start_command(self, message: str) -> bool:
+        """Check if the message is a command to start executing a plan."""
+        msg_lower = message.strip().lower()
+        start_commands = [
+            "comienza", "comenzar", "empieza", "empezar",
+            "inicia", "iniciar", "start", "go", "hazlo",
+            "adelante", "procede", "crea los archivos",
+            "crear archivos", "genera", "generar",
+            "continua", "continúa", "siguiente", "next",
+            "sigue", "seguir"
+        ]
+        return any(cmd in msg_lower for cmd in start_commands)
+    
+    def _extract_plan_from_history(self, chat_history: list) -> dict:
+        """Extract the most recent plan from chat history."""
+        for msg in reversed(chat_history):
+            if msg.get("role") == "assistant":
+                content = msg.get("content", "")
+                # Look for plan indicators in the message
+                if "Archivos a Crear" in content or "files_needed" in content:
+                    # Try to extract structured plan from formatted response
+                    return self._parse_plan_from_response(content)
+        return None
+    
+    def _parse_plan_from_response(self, content: str) -> dict:
+        """Parse a plan from a formatted assistant response."""
+        plan = {"files_needed": [], "implementation_plan": []}
+        
+        # Extract file names from "**N. FileName.java**" pattern
+        import re
+        file_matches = re.findall(r'\*\*\d+\.\s+(\w+\.java)\*\*', content)
+        
+        # Also try to extract purpose from the lines after file name
+        lines = content.split('\n')
+        current_file = None
+        
+        for i, line in enumerate(lines):
+            match = re.match(r'\*\*\d+\.\s+(\w+\.java)\*\*', line)
+            if match:
+                current_file = {"name": match.group(1), "purpose": "", "dependencies": []}
+                # Look for purpose in next lines
+                for j in range(i+1, min(i+4, len(lines))):
+                    if "Propósito:" in lines[j]:
+                        current_file["purpose"] = lines[j].split("Propósito:")[-1].strip()
+                        break
+                    elif lines[j].strip().startswith("-") and ":" not in lines[j]:
+                        current_file["purpose"] = lines[j].strip("- ").strip()
+                        break
+                plan["files_needed"].append(current_file)
+        
+        # If pattern didn't work, use the simple file names
+        if not plan["files_needed"] and file_matches:
+            plan["files_needed"] = [{"name": f, "purpose": ""} for f in file_matches]
+        
+        return plan if plan["files_needed"] else None
+    
+    def _execute_plan(self, plan: dict, project_files: dict) -> dict:
+        """Execute a plan by creating the files one by one."""
+        files_needed = plan.get("files_needed", [])
+        
+        if not files_needed:
+            return {
+                "response": "No hay archivos pendientes por crear.",
+                "actions": [],
+                "agent": "Coordinator"
+            }
+        
+        # Create the first file
+        first_file = files_needed[0]
+        file_name = first_file.get("name", "Archivo.java")
+        purpose = first_file.get("purpose", "")
+        
+        # Build a detailed prompt for code generation
+        prompt = f"Crea el archivo {file_name}"
+        if purpose:
+            prompt += f": {purpose}"
+        
+        # Add context about the overall plan
+        if len(files_needed) > 1:
+            other_files = ", ".join([f.get("name", "") for f in files_needed[1:5]])
+            prompt += f"\n\nEste archivo es parte de un proyecto que también incluirá: {other_files}"
+        
+        result = self.code_writer.generate_code(prompt, project_files)
+        
+        remaining = files_needed[1:] if len(files_needed) > 1 else []
+        
+        # Build response message
+        if remaining:
+            result["response"] = f"✅ **Creando {file_name}**\n\n{result.get('response', '')}"
+            result["response"] += f"\n\n---\n📋 *Archivos restantes: {len(remaining)}*\n"
+            result["response"] += "*Escribe 'continúa' para crear el siguiente archivo.*"
+            result["needs_continuation"] = True
+            result["remaining_files"] = remaining
+        else:
+            result["response"] = f"✅ **Archivo creado: {file_name}**\n\n{result.get('response', '')}"
+            result["needs_continuation"] = False
+        
+        result["agent"] = "Coordinator→CodeWriter"
+        result["intent"] = "EXECUTE_PLAN"
+        
+        return result
     
     def plan_project(self, description: str, project_files: dict = None) -> dict:
         """
