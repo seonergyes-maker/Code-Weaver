@@ -22,7 +22,13 @@ from claude_assistant import (
     generate_junit_tests,
     generate_javadoc,
     get_code_template,
-    get_available_templates
+    get_available_templates,
+    chat_with_agents,
+    auto_fix_with_agents,
+    generate_tests_with_agents,
+    generate_docs_with_agents,
+    plan_project_with_agents,
+    continue_generation_with_agents
 )
 from database import save_project, load_project, list_projects, delete_project, update_chat_history, load_project_by_name
 from dependency_manager import (
@@ -121,6 +127,10 @@ if 'pending_actions' not in st.session_state:
     st.session_state.pending_actions = []
 if 'auto_fix_enabled' not in st.session_state:
     st.session_state.auto_fix_enabled = True
+if 'agent_mode_enabled' not in st.session_state:
+    st.session_state.agent_mode_enabled = True
+if 'remaining_files' not in st.session_state:
+    st.session_state.remaining_files = []
 if 'last_error' not in st.session_state:
     st.session_state.last_error = None
 if 'show_architect_modal' not in st.session_state:
@@ -251,6 +261,12 @@ with st.sidebar:
         "🔧 Auto-corrección de errores",
         value=st.session_state.auto_fix_enabled,
         help="Cuando está activo, Claude analizará y corregirá automáticamente los errores de compilación"
+    )
+    
+    st.session_state.agent_mode_enabled = st.toggle(
+        "🤖 Modo Agente Inteligente",
+        value=st.session_state.agent_mode_enabled,
+        help="Usa arquitectura de subagentes especializados (CodeWriter, ErrorFixer, TestGen, DocGen, Architect)"
     )
     
     st.markdown("---")
@@ -1094,10 +1110,16 @@ with col_editor:
                     if st.session_state.auto_fix_enabled:
                         with st.spinner("🔧 Claude está analizando y corrigiendo el error..."):
                             try:
-                                explanation, fix_actions, needs_more = auto_fix_error(
-                                    error_msg, 
-                                    st.session_state.files
-                                )
+                                if st.session_state.agent_mode_enabled:
+                                    explanation, fix_actions, needs_more = auto_fix_with_agents(
+                                        error_msg, 
+                                        st.session_state.files
+                                    )
+                                else:
+                                    explanation, fix_actions, needs_more = auto_fix_error(
+                                        error_msg, 
+                                        st.session_state.files
+                                    )
                                 
                                 fixed_files = []
                                 for action in fix_actions:
@@ -1278,12 +1300,22 @@ with col_chat:
                 all_applied_actions = []
                 max_continuations = 10
                 continuation_count = 0
+                metadata = {}
                 
-                response, actions, needs_continuation = chat_with_actions(
-                    st.session_state.chat_messages,
-                    get_all_code(),
-                    st.session_state.files
-                )
+                if st.session_state.agent_mode_enabled:
+                    response, actions, needs_continuation, metadata = chat_with_agents(
+                        user_message=user_input,
+                        project_files=st.session_state.files,
+                        chat_history=st.session_state.chat_messages,
+                        use_agents=True
+                    )
+                    st.session_state.remaining_files = metadata.get("remaining_files", [])
+                else:
+                    response, actions, needs_continuation = chat_with_actions(
+                        st.session_state.chat_messages,
+                        get_all_code(),
+                        st.session_state.files
+                    )
                 
                 while True:
                     actions_in_this_round = 0
@@ -1348,11 +1380,19 @@ with col_chat:
                             "content": "Continúa con el siguiente archivo."
                         })
                         
-                        response, actions, needs_continuation = chat_with_actions(
-                            st.session_state.chat_messages,
-                            get_all_code(),
-                            st.session_state.files
-                        )
+                        if st.session_state.agent_mode_enabled:
+                            response, actions, needs_continuation, metadata = continue_generation_with_agents(
+                                response,
+                                st.session_state.files,
+                                st.session_state.remaining_files
+                            )
+                            st.session_state.remaining_files = metadata.get("remaining_files", [])
+                        else:
+                            response, actions, needs_continuation = chat_with_actions(
+                                st.session_state.chat_messages,
+                                get_all_code(),
+                                st.session_state.files
+                            )
                     else:
                         break
                 
@@ -1367,6 +1407,12 @@ with col_chat:
                     
                     if dep_result.get('installed'):
                         actions_msg += f"\n\n📦 **Librerías instaladas automáticamente:** {', '.join(dep_result['installed'])}"
+                    
+                    if st.session_state.agent_mode_enabled and metadata:
+                        agent_used = metadata.get("agent_used", "")
+                        intent = metadata.get("intent", "")
+                        if agent_used and agent_used != "unknown":
+                            actions_msg += f"\n\n🤖 *Agente: {agent_used}*"
                     
                     final_response += actions_msg
                 
