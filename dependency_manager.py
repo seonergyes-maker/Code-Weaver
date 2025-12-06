@@ -12,6 +12,36 @@ COMMON_LIBRARIES = {
         'artifact': 'gson',
         'version': '2.10.1'
     },
+    'javafx-base': {
+        'group': 'org.openjfx',
+        'artifact': 'javafx-base',
+        'version': '21'
+    },
+    'javafx-controls': {
+        'group': 'org.openjfx',
+        'artifact': 'javafx-controls',
+        'version': '21'
+    },
+    'javafx-graphics': {
+        'group': 'org.openjfx',
+        'artifact': 'javafx-graphics',
+        'version': '21'
+    },
+    'javafx-fxml': {
+        'group': 'org.openjfx',
+        'artifact': 'javafx-fxml',
+        'version': '21'
+    },
+    'javafx-media': {
+        'group': 'org.openjfx',
+        'artifact': 'javafx-media',
+        'version': '21'
+    },
+    'javafx-web': {
+        'group': 'org.openjfx',
+        'artifact': 'javafx-web',
+        'version': '21'
+    },
     'commons-lang3': {
         'group': 'org.apache.commons',
         'artifact': 'commons-lang3',
@@ -259,12 +289,28 @@ IMPORT_TO_LIBRARY = {
     'com.mysql': 'mysql-connector',
     'org.postgresql': 'postgresql',
     'org.sqlite': 'sqlite-jdbc',
+    'javafx.application': 'javafx-base',
+    'javafx.stage': 'javafx-graphics',
+    'javafx.scene': 'javafx-controls',
+    'javafx.geometry': 'javafx-graphics',
+    'javafx.fxml': 'javafx-fxml',
+    'javafx.media': 'javafx-media',
+    'javafx.web': 'javafx-web',
+    'javafx.beans': 'javafx-base',
+    'javafx.collections': 'javafx-base',
+    'javafx.concurrent': 'javafx-graphics',
+    'javafx.css': 'javafx-graphics',
+    'javafx.event': 'javafx-base',
+    'javafx.util': 'javafx-base',
 }
+
+JAVAFX_MODULES = ['javafx-base', 'javafx-controls', 'javafx-graphics', 'javafx-fxml']
 
 
 def detect_required_libraries(code_files: dict) -> list:
     """Detect required libraries from import statements in code."""
     required = set()
+    has_javafx = False
     
     all_code = '\n'.join(code_files.values()) if isinstance(code_files, dict) else code_files
     
@@ -276,7 +322,13 @@ def detect_required_libraries(code_files: dict) -> list:
         for prefix, lib_name in IMPORT_TO_LIBRARY.items():
             if imp.startswith(prefix):
                 required.add(lib_name)
+                if imp.startswith('javafx.'):
+                    has_javafx = True
                 break
+    
+    if has_javafx:
+        for module in JAVAFX_MODULES:
+            required.add(module)
     
     return list(required)
 
