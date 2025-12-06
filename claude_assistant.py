@@ -721,3 +721,648 @@ def detect_continuation(message: str) -> bool:
     return False
 
 
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=2, max=64),
+    retry=retry_if_exception(is_rate_limit_error),
+    reraise=True
+)
+def generate_junit_tests(class_code: str, class_name: str) -> str:
+    """
+    Genera tests JUnit para una clase Java.
+    Returns: código de la clase de test
+    """
+    response = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=8192,
+        system="""Eres un experto en testing de Java con JUnit 5.
+Tu trabajo es generar tests unitarios completos y útiles.
+
+Reglas:
+1. Usa JUnit 5 (org.junit.jupiter.api.*)
+2. Incluye tests para todos los métodos públicos
+3. Añade casos de borde y casos de error
+4. Usa nombres descriptivos para los tests (@DisplayName)
+5. Incluye assertions claras y útiles
+6. Agrupa tests relacionados con @Nested si es apropiado
+
+Devuelve SOLO el código Java del test, sin explicaciones.""",
+        messages=[{
+            "role": "user",
+            "content": f"""Genera tests JUnit 5 completos para esta clase:
+
+```java
+{class_code}
+```
+
+La clase de test debe llamarse {class_name}Test."""
+        }]
+    )
+    
+    text = response.content[0].text
+    
+    if "```java" in text:
+        start = text.find("```java") + 7
+        end = text.find("```", start)
+        if end != -1:
+            return text[start:end].strip()
+    elif "```" in text:
+        start = text.find("```") + 3
+        end = text.find("```", start)
+        if end != -1:
+            return text[start:end].strip()
+    
+    return text.strip()
+
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=2, max=64),
+    retry=retry_if_exception(is_rate_limit_error),
+    reraise=True
+)
+def generate_javadoc(code: str) -> str:
+    """
+    Genera documentación JavaDoc para el código.
+    Returns: código con JavaDoc añadido
+    """
+    response = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=16384,
+        system="""Eres un experto en documentación Java.
+Tu trabajo es añadir documentación JavaDoc completa y profesional.
+
+Reglas:
+1. Documenta TODAS las clases, métodos y campos públicos
+2. Usa @param para parámetros, @return para retornos, @throws para excepciones
+3. Incluye descripciones claras y útiles
+4. Añade @author y @version a las clases
+5. Documenta constructores y métodos heredados
+6. Usa ejemplos de uso cuando sea útil
+
+Devuelve el código COMPLETO con JavaDoc añadido, sin explicaciones.""",
+        messages=[{
+            "role": "user",
+            "content": f"""Añade documentación JavaDoc completa a este código:
+
+```java
+{code}
+```"""
+        }]
+    )
+    
+    text = response.content[0].text
+    
+    if "```java" in text:
+        start = text.find("```java") + 7
+        end = text.find("```", start)
+        if end != -1:
+            return text[start:end].strip()
+    elif "```" in text:
+        start = text.find("```") + 3
+        end = text.find("```", start)
+        if end != -1:
+            return text[start:end].strip()
+    
+    return text.strip()
+
+
+def get_code_template(pattern_name: str) -> dict:
+    """
+    Devuelve una plantilla de código para un patrón de diseño.
+    Returns: dict con {name, description, files: [{name, code}]}
+    """
+    templates = {
+        "singleton": {
+            "name": "Singleton",
+            "description": "Garantiza una única instancia de una clase",
+            "files": [{
+                "name": "Singleton.java",
+                "code": '''/**
+ * Patrón Singleton - Garantiza una única instancia
+ * Thread-safe usando inicialización estática
+ */
+public class Singleton {
+    
+    private static final Singleton INSTANCE = new Singleton();
+    
+    private Singleton() {
+        // Constructor privado
+    }
+    
+    public static Singleton getInstance() {
+        return INSTANCE;
+    }
+    
+    public void doSomething() {
+        System.out.println("Singleton en acción");
+    }
+    
+    public static void main(String[] args) {
+        Singleton s1 = Singleton.getInstance();
+        Singleton s2 = Singleton.getInstance();
+        System.out.println("Misma instancia: " + (s1 == s2));
+        s1.doSomething();
+    }
+}'''
+            }]
+        },
+        "factory": {
+            "name": "Factory Method",
+            "description": "Crea objetos sin especificar la clase exacta",
+            "files": [
+                {
+                    "name": "Product.java",
+                    "code": '''/**
+ * Interfaz base para productos
+ */
+public interface Product {
+    void use();
+    String getDescription();
+}'''
+                },
+                {
+                    "name": "ConcreteProductA.java",
+                    "code": '''/**
+ * Implementación concreta del producto A
+ */
+public class ConcreteProductA implements Product {
+    
+    @Override
+    public void use() {
+        System.out.println("Usando Producto A");
+    }
+    
+    @Override
+    public String getDescription() {
+        return "Soy el Producto A";
+    }
+}'''
+                },
+                {
+                    "name": "ConcreteProductB.java",
+                    "code": '''/**
+ * Implementación concreta del producto B
+ */
+public class ConcreteProductB implements Product {
+    
+    @Override
+    public void use() {
+        System.out.println("Usando Producto B");
+    }
+    
+    @Override
+    public String getDescription() {
+        return "Soy el Producto B";
+    }
+}'''
+                },
+                {
+                    "name": "ProductFactory.java",
+                    "code": '''/**
+ * Factory para crear productos
+ */
+public class ProductFactory {
+    
+    public enum ProductType {
+        TYPE_A, TYPE_B
+    }
+    
+    public static Product createProduct(ProductType type) {
+        switch (type) {
+            case TYPE_A:
+                return new ConcreteProductA();
+            case TYPE_B:
+                return new ConcreteProductB();
+            default:
+                throw new IllegalArgumentException("Tipo de producto desconocido");
+        }
+    }
+    
+    public static void main(String[] args) {
+        Product productA = ProductFactory.createProduct(ProductType.TYPE_A);
+        Product productB = ProductFactory.createProduct(ProductType.TYPE_B);
+        
+        productA.use();
+        productB.use();
+        
+        System.out.println(productA.getDescription());
+        System.out.println(productB.getDescription());
+    }
+}'''
+                }
+            ]
+        },
+        "observer": {
+            "name": "Observer",
+            "description": "Notifica cambios a múltiples objetos",
+            "files": [
+                {
+                    "name": "Observer.java",
+                    "code": '''/**
+ * Interfaz para observadores
+ */
+public interface Observer {
+    void update(String message);
+}'''
+                },
+                {
+                    "name": "Subject.java",
+                    "code": '''import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Sujeto observable que notifica a sus observadores
+ */
+public class Subject {
+    
+    private List<Observer> observers = new ArrayList<>();
+    private String state;
+    
+    public void attach(Observer observer) {
+        observers.add(observer);
+    }
+    
+    public void detach(Observer observer) {
+        observers.remove(observer);
+    }
+    
+    public void setState(String state) {
+        this.state = state;
+        notifyAllObservers();
+    }
+    
+    public String getState() {
+        return state;
+    }
+    
+    private void notifyAllObservers() {
+        for (Observer observer : observers) {
+            observer.update(state);
+        }
+    }
+}'''
+                },
+                {
+                    "name": "ConcreteObserver.java",
+                    "code": '''/**
+ * Implementación concreta del observador
+ */
+public class ConcreteObserver implements Observer {
+    
+    private String name;
+    
+    public ConcreteObserver(String name) {
+        this.name = name;
+    }
+    
+    @Override
+    public void update(String message) {
+        System.out.println(name + " recibió: " + message);
+    }
+    
+    public static void main(String[] args) {
+        Subject subject = new Subject();
+        
+        Observer obs1 = new ConcreteObserver("Observador 1");
+        Observer obs2 = new ConcreteObserver("Observador 2");
+        Observer obs3 = new ConcreteObserver("Observador 3");
+        
+        subject.attach(obs1);
+        subject.attach(obs2);
+        subject.attach(obs3);
+        
+        subject.setState("Primer cambio");
+        subject.setState("Segundo cambio");
+        
+        subject.detach(obs2);
+        subject.setState("Tercer cambio (sin obs2)");
+    }
+}'''
+                }
+            ]
+        },
+        "mvc": {
+            "name": "MVC (Model-View-Controller)",
+            "description": "Separa datos, presentación y lógica de control",
+            "files": [
+                {
+                    "name": "Model.java",
+                    "code": '''/**
+ * Modelo - Representa los datos y la lógica de negocio
+ */
+public class Model {
+    
+    private String data;
+    
+    public String getData() {
+        return data;
+    }
+    
+    public void setData(String data) {
+        this.data = data;
+    }
+    
+    public String processData() {
+        return data != null ? data.toUpperCase() : "";
+    }
+}'''
+                },
+                {
+                    "name": "View.java",
+                    "code": '''/**
+ * Vista - Presenta los datos al usuario
+ */
+public class View {
+    
+    public void displayData(String data) {
+        System.out.println("=== Vista ===");
+        System.out.println("Datos: " + data);
+        System.out.println("=============");
+    }
+    
+    public void displayError(String error) {
+        System.out.println("[ERROR] " + error);
+    }
+    
+    public void displaySuccess(String message) {
+        System.out.println("[OK] " + message);
+    }
+}'''
+                },
+                {
+                    "name": "Controller.java",
+                    "code": '''/**
+ * Controlador - Maneja la interacción entre Modelo y Vista
+ */
+public class Controller {
+    
+    private Model model;
+    private View view;
+    
+    public Controller(Model model, View view) {
+        this.model = model;
+        this.view = view;
+    }
+    
+    public void setData(String data) {
+        if (data == null || data.isEmpty()) {
+            view.displayError("Los datos no pueden estar vacíos");
+            return;
+        }
+        model.setData(data);
+        view.displaySuccess("Datos actualizados");
+    }
+    
+    public void displayData() {
+        String processedData = model.processData();
+        view.displayData(processedData);
+    }
+    
+    public static void main(String[] args) {
+        Model model = new Model();
+        View view = new View();
+        Controller controller = new Controller(model, view);
+        
+        controller.setData("Hola Mundo MVC");
+        controller.displayData();
+        
+        controller.setData("");  // Error
+        controller.setData("Nuevo dato");
+        controller.displayData();
+    }
+}'''
+                }
+            ]
+        },
+        "builder": {
+            "name": "Builder",
+            "description": "Construye objetos complejos paso a paso",
+            "files": [{
+                "name": "Person.java",
+                "code": '''/**
+ * Patrón Builder - Construye objetos complejos paso a paso
+ */
+public class Person {
+    
+    private final String firstName;
+    private final String lastName;
+    private final int age;
+    private final String email;
+    private final String phone;
+    private final String address;
+    
+    private Person(Builder builder) {
+        this.firstName = builder.firstName;
+        this.lastName = builder.lastName;
+        this.age = builder.age;
+        this.email = builder.email;
+        this.phone = builder.phone;
+        this.address = builder.address;
+    }
+    
+    public static class Builder {
+        private final String firstName;
+        private final String lastName;
+        private int age;
+        private String email;
+        private String phone;
+        private String address;
+        
+        public Builder(String firstName, String lastName) {
+            this.firstName = firstName;
+            this.lastName = lastName;
+        }
+        
+        public Builder age(int age) {
+            this.age = age;
+            return this;
+        }
+        
+        public Builder email(String email) {
+            this.email = email;
+            return this;
+        }
+        
+        public Builder phone(String phone) {
+            this.phone = phone;
+            return this;
+        }
+        
+        public Builder address(String address) {
+            this.address = address;
+            return this;
+        }
+        
+        public Person build() {
+            return new Person(this);
+        }
+    }
+    
+    @Override
+    public String toString() {
+        return String.format("Person{name='%s %s', age=%d, email='%s', phone='%s', address='%s'}",
+            firstName, lastName, age, email, phone, address);
+    }
+    
+    public static void main(String[] args) {
+        Person person1 = new Person.Builder("Juan", "Pérez")
+            .age(30)
+            .email("juan@example.com")
+            .phone("555-1234")
+            .address("Calle Principal 123")
+            .build();
+        
+        Person person2 = new Person.Builder("María", "García")
+            .age(25)
+            .email("maria@example.com")
+            .build();
+        
+        System.out.println(person1);
+        System.out.println(person2);
+    }
+}'''
+            }]
+        },
+        "strategy": {
+            "name": "Strategy",
+            "description": "Define una familia de algoritmos intercambiables",
+            "files": [
+                {
+                    "name": "PaymentStrategy.java",
+                    "code": '''/**
+ * Interfaz de estrategia de pago
+ */
+public interface PaymentStrategy {
+    void pay(double amount);
+    String getDescription();
+}'''
+                },
+                {
+                    "name": "CreditCardPayment.java",
+                    "code": '''/**
+ * Estrategia de pago con tarjeta de crédito
+ */
+public class CreditCardPayment implements PaymentStrategy {
+    
+    private String cardNumber;
+    private String name;
+    
+    public CreditCardPayment(String cardNumber, String name) {
+        this.cardNumber = cardNumber;
+        this.name = name;
+    }
+    
+    @Override
+    public void pay(double amount) {
+        System.out.printf("Pagando $%.2f con tarjeta %s%n", 
+            amount, cardNumber.substring(cardNumber.length() - 4));
+    }
+    
+    @Override
+    public String getDescription() {
+        return "Tarjeta de crédito: " + name;
+    }
+}'''
+                },
+                {
+                    "name": "PayPalPayment.java",
+                    "code": '''/**
+ * Estrategia de pago con PayPal
+ */
+public class PayPalPayment implements PaymentStrategy {
+    
+    private String email;
+    
+    public PayPalPayment(String email) {
+        this.email = email;
+    }
+    
+    @Override
+    public void pay(double amount) {
+        System.out.printf("Pagando $%.2f via PayPal (%s)%n", amount, email);
+    }
+    
+    @Override
+    public String getDescription() {
+        return "PayPal: " + email;
+    }
+}'''
+                },
+                {
+                    "name": "ShoppingCart.java",
+                    "code": '''import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Carrito de compras que usa estrategias de pago
+ */
+public class ShoppingCart {
+    
+    private List<Double> items = new ArrayList<>();
+    private PaymentStrategy paymentStrategy;
+    
+    public void addItem(double price) {
+        items.add(price);
+    }
+    
+    public void setPaymentStrategy(PaymentStrategy strategy) {
+        this.paymentStrategy = strategy;
+    }
+    
+    public double getTotal() {
+        return items.stream().mapToDouble(Double::doubleValue).sum();
+    }
+    
+    public void checkout() {
+        if (paymentStrategy == null) {
+            System.out.println("Error: Selecciona un método de pago");
+            return;
+        }
+        double total = getTotal();
+        System.out.println("Método: " + paymentStrategy.getDescription());
+        paymentStrategy.pay(total);
+        System.out.println("¡Compra completada!");
+    }
+    
+    public static void main(String[] args) {
+        ShoppingCart cart = new ShoppingCart();
+        cart.addItem(100.00);
+        cart.addItem(50.50);
+        cart.addItem(25.00);
+        
+        System.out.println("Total: $" + cart.getTotal());
+        
+        // Pagar con tarjeta
+        cart.setPaymentStrategy(new CreditCardPayment("4111111111111111", "Juan Pérez"));
+        cart.checkout();
+        
+        System.out.println();
+        
+        // Cambiar a PayPal
+        cart.setPaymentStrategy(new PayPalPayment("juan@email.com"));
+        cart.checkout();
+    }
+}'''
+                }
+            ]
+        }
+    }
+    
+    return templates.get(pattern_name.lower(), None)
+
+
+def get_available_templates() -> list:
+    """
+    Devuelve lista de plantillas disponibles.
+    """
+    return [
+        {"id": "singleton", "name": "Singleton", "desc": "Única instancia de una clase"},
+        {"id": "factory", "name": "Factory Method", "desc": "Crea objetos sin especificar la clase"},
+        {"id": "observer", "name": "Observer", "desc": "Notifica cambios a múltiples objetos"},
+        {"id": "mvc", "name": "MVC", "desc": "Separa datos, vista y controlador"},
+        {"id": "builder", "name": "Builder", "desc": "Construye objetos paso a paso"},
+        {"id": "strategy", "name": "Strategy", "desc": "Algoritmos intercambiables"},
+    ]
+
+

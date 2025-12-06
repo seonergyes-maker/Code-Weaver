@@ -18,7 +18,11 @@ from claude_assistant import (
     auto_fix_error,
     architect_analyze,
     analyze_execution,
-    search_in_project
+    search_in_project,
+    generate_junit_tests,
+    generate_javadoc,
+    get_code_template,
+    get_available_templates
 )
 from database import save_project, load_project, list_projects, delete_project, update_chat_history, load_project_by_name
 from dependency_manager import (
@@ -123,6 +127,8 @@ if 'show_architect_modal' not in st.session_state:
     st.session_state.show_architect_modal = False
 if 'architect_plan' not in st.session_state:
     st.session_state.architect_plan = None
+if 'show_templates_modal' not in st.session_state:
+    st.session_state.show_templates_modal = False
 
 def get_all_code():
     return "\n\n// --- Archivo: ".join([f"{name} ---\n{code}" for name, code in st.session_state.files.items()])
@@ -246,6 +252,104 @@ with st.sidebar:
         value=st.session_state.auto_fix_enabled,
         help="Cuando está activo, Claude analizará y corregirá automáticamente los errores de compilación"
     )
+    
+    st.markdown("---")
+    st.markdown("**Herramientas de Desarrollo**")
+    
+    if st.button("🧪 Generar Tests JUnit", use_container_width=True, help="Crea tests unitarios para la clase actual"):
+        current_code = st.session_state.files.get(st.session_state.current_file, "")
+        if current_code.strip():
+            class_name = st.session_state.current_file.replace('.java', '')
+            with st.spinner("Generando tests..."):
+                try:
+                    test_code = generate_junit_tests(current_code, class_name)
+                    if not test_code or len(test_code) < 50:
+                        st.error("No se pudo generar código de test válido. Intenta de nuevo.")
+                    elif "class" not in test_code:
+                        st.error("El test generado no contiene una definición de clase válida. Intenta de nuevo.")
+                    elif "@Test" not in test_code and "org.junit" not in test_code:
+                        st.error("El test generado no contiene anotaciones JUnit. Intenta de nuevo.")
+                    else:
+                        test_filename = f"{class_name}Test.java"
+                        st.session_state.files[test_filename] = test_code
+                        st.session_state.ai_notifications.append({
+                            "type": "generation",
+                            "content": f"**Tests generados:** `{test_filename}`\n\nSe crearon tests JUnit 5 para la clase `{class_name}`. Necesitarás JUnit 5 en tu classpath para ejecutarlos."
+                        })
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        else:
+            st.warning("Escribe código primero")
+    
+    if st.button("📚 Generar JavaDoc", use_container_width=True, help="Añade documentación profesional al código"):
+        current_code = st.session_state.files.get(st.session_state.current_file, "")
+        if current_code.strip():
+            with st.spinner("Generando documentación..."):
+                try:
+                    documented_code = generate_javadoc(current_code)
+                    if not documented_code or len(documented_code) < len(current_code) * 0.5:
+                        st.error("Error al generar documentación. El código original no fue modificado.")
+                    elif "class" not in documented_code:
+                        st.error("La documentación generada parece inválida. El código original no fue modificado.")
+                    else:
+                        backup_filename = f"{st.session_state.current_file}.backup"
+                        st.session_state.files[backup_filename] = current_code
+                        st.session_state.files[st.session_state.current_file] = documented_code
+                        st.session_state.code = documented_code
+                        st.session_state.ai_notifications.append({
+                            "type": "documentation",
+                            "content": f"**JavaDoc añadido a** `{st.session_state.current_file}`\n\nSe agregó documentación completa. Se creó un backup en `{backup_filename}` por seguridad."
+                        })
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        else:
+            st.warning("Escribe código primero")
+    
+    if st.button("📋 Plantillas de Código", use_container_width=True, help="Patrones de diseño listos para usar"):
+        st.session_state.show_templates_modal = True
+    
+    if st.button("📦 Exportar Proyecto", use_container_width=True, help="Descarga todo el proyecto como .zip"):
+        if st.session_state.files:
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for filename, content in st.session_state.files.items():
+                    zip_file.writestr(filename, content)
+                
+                libs_path = "libs"
+                if os.path.exists(libs_path):
+                    for lib_file in os.listdir(libs_path):
+                        if lib_file.endswith('.jar'):
+                            lib_path = os.path.join(libs_path, lib_file)
+                            zip_file.write(lib_path, f"libs/{lib_file}")
+                
+                project_name = st.session_state.get('current_project_name', 'JavaProject').replace(" ", "_")
+                readme_content = f"""# {project_name}
+
+## Archivos Java
+{chr(10).join([f"- {f}" for f in st.session_state.files.keys()])}
+
+## Compilación
+javac *.java
+
+## Ejecución
+java Main
+
+Generado por Java IDE con Claude AI
+"""
+                zip_file.writestr("README.md", readme_content)
+            
+            zip_buffer.seek(0)
+            st.download_button(
+                label="⬇️ Descargar ZIP",
+                data=zip_buffer.getvalue(),
+                file_name=f"{project_name}.zip",
+                mime="application/zip",
+                use_container_width=True
+            )
+        else:
+            st.warning("No hay archivos para exportar")
     
     st.markdown("---")
     st.markdown("**Archivos del Proyecto**")
@@ -579,6 +683,56 @@ if st.session_state.get('show_architect_modal', False):
                 for rec in plan['recommendations']:
                     st.markdown(f"- {rec}")
         
+        st.markdown("---")
+
+if st.session_state.get('show_templates_modal', False):
+    with st.container():
+        st.markdown("### 📋 Plantillas de Código")
+        st.markdown("*Patrones de diseño listos para usar en tu proyecto*")
+        
+        templates = get_available_templates()
+        
+        template_cols = st.columns(3)
+        for idx, template in enumerate(templates):
+            with template_cols[idx % 3]:
+                if st.button(
+                    f"**{template['name']}**\n{template['desc']}", 
+                    key=f"template_{template['id']}",
+                    use_container_width=True
+                ):
+                    template_data = get_code_template(template['id'])
+                    if template_data:
+                        files_added = []
+                        for file_info in template_data['files']:
+                            filename = file_info['name']
+                            if filename not in st.session_state.files:
+                                st.session_state.files[filename] = file_info['code']
+                                files_added.append(filename)
+                            else:
+                                base = filename.replace('.java', '')
+                                counter = 1
+                                new_name = f"{base}{counter}.java"
+                                while new_name in st.session_state.files:
+                                    counter += 1
+                                    new_name = f"{base}{counter}.java"
+                                st.session_state.files[new_name] = file_info['code']
+                                files_added.append(new_name)
+                        
+                        if files_added:
+                            st.session_state.current_file = files_added[0]
+                            st.session_state.code = st.session_state.files[files_added[0]]
+                            st.session_state.ai_notifications.append({
+                                "type": "template",
+                                "content": f"**Plantilla {template_data['name']} añadida:**\n\n{template_data['description']}\n\nArchivos creados: {', '.join([f'`{f}`' for f in files_added])}"
+                            })
+                        
+                        st.session_state.show_templates_modal = False
+                        st.rerun()
+        
+        st.markdown("---")
+        if st.button("Cerrar", use_container_width=True, key="close_templates"):
+            st.session_state.show_templates_modal = False
+            st.rerun()
         st.markdown("---")
 
 col_editor, col_chat = st.columns([3, 2])
