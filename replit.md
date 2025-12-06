@@ -73,3 +73,4 @@ streamlit run app.py --server.port 5000
   - **FASE 3: Documentación Automática** - Genera JavaDoc profesional para métodos y clases
   - **FASE 3: Plantillas de Código** - Templates para patrones de diseño (Singleton, Factory, Observer, MVC, Builder, Strategy)
   - **FASE 3: Exportar Proyecto** - Descarga todo el proyecto como .zip con archivos, librerías y README
+  - **Fat JAR** - Los archivos JAR generados incluyen automáticamente todas las librerías dependientes (Gson, Jackson, etc.)

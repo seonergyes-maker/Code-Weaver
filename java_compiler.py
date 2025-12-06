@@ -3,9 +3,99 @@ import tempfile
 import os
 import shutil
 import re
+import zipfile
 from pathlib import Path
 from typing import Optional
 from dependency_manager import get_classpath, LIBS_DIR
+
+
+def get_dependency_jars() -> list:
+    """Returns list of all JAR files in the libs directory."""
+    jars = []
+    if os.path.exists(LIBS_DIR):
+        for f in os.listdir(LIBS_DIR):
+            if f.endswith('.jar'):
+                jars.append(os.path.join(LIBS_DIR, f))
+    return jars
+
+
+def create_fat_jar(class_dir: str, jar_path: str, main_class: str) -> dict:
+    """
+    Creates a fat JAR that includes all compiled classes and dependency JARs.
+    
+    Args:
+        class_dir: Directory containing compiled .class files
+        jar_path: Output path for the JAR file
+        main_class: The main class name for the manifest
+    
+    Returns:
+        dict with success status and message
+    """
+    try:
+        added_entries = set()
+        
+        with zipfile.ZipFile(jar_path, 'w', zipfile.ZIP_DEFLATED) as jar:
+            manifest_content = f"""Manifest-Version: 1.0
+Main-Class: {main_class}
+Created-By: Java IDE con Claude AI
+
+"""
+            jar.writestr('META-INF/MANIFEST.MF', manifest_content)
+            added_entries.add('META-INF/MANIFEST.MF')
+            added_entries.add('META-INF/')
+            
+            for root, dirs, files in os.walk(class_dir):
+                for file in files:
+                    if file.endswith('.class'):
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.relpath(file_path, class_dir)
+                        if arcname not in added_entries:
+                            jar.write(file_path, arcname)
+                            added_entries.add(arcname)
+            
+            dependency_jars = get_dependency_jars()
+            libs_included = []
+            
+            for dep_jar in dependency_jars:
+                try:
+                    with zipfile.ZipFile(dep_jar, 'r') as dep:
+                        for item in dep.namelist():
+                            if item.startswith('META-INF/'):
+                                if item.endswith('.SF') or item.endswith('.DSA') or item.endswith('.RSA'):
+                                    continue
+                                if item == 'META-INF/MANIFEST.MF':
+                                    continue
+                            
+                            if item not in added_entries and not item.endswith('/'):
+                                try:
+                                    data = dep.read(item)
+                                    jar.writestr(item, data)
+                                    added_entries.add(item)
+                                except Exception:
+                                    pass
+                    
+                    libs_included.append(os.path.basename(dep_jar))
+                except Exception as e:
+                    pass
+        
+        if libs_included:
+            return {
+                'success': True,
+                'libs_included': libs_included,
+                'message': f'Fat JAR creado con {len(libs_included)} librerías incluidas'
+            }
+        else:
+            return {
+                'success': True,
+                'libs_included': [],
+                'message': 'JAR creado (sin dependencias externas)'
+            }
+            
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
 
 
 def find_class_name(code: str) -> str:
@@ -108,9 +198,15 @@ def create_jar(code: str, jar_name: str = None) -> dict:
         with open(java_file, 'w', encoding='utf-8') as f:
             f.write(code)
         
+        classpath = get_classpath()
+        compile_cmd = ['javac', '-encoding', 'UTF-8', '--release', JAVA_TARGET_VERSION]
+        if classpath:
+            compile_cmd.extend(['-cp', classpath])
+        compile_cmd.append(java_file)
+        
         try:
             compile_result = subprocess.run(
-                ['javac', '-encoding', 'UTF-8', java_file],
+                compile_cmd,
                 capture_output=True,
                 text=True,
                 timeout=30
@@ -123,36 +219,28 @@ def create_jar(code: str, jar_name: str = None) -> dict:
                     'class_name': class_name
                 }
             
-            manifest_file = os.path.join(temp_dir, 'MANIFEST.MF')
-            with open(manifest_file, 'w') as f:
-                f.write(f'Manifest-Version: 1.0\n')
-                f.write(f'Main-Class: {class_name}\n')
-                f.write('\n')
-            
             jar_path = os.path.join(output_dir, jar_name)
             
-            jar_result = subprocess.run(
-                ['jar', 'cfm', jar_path, manifest_file, f'{class_name}.class'],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                cwd=temp_dir
-            )
+            fat_jar_result = create_fat_jar(temp_dir, jar_path, class_name)
             
-            if jar_result.returncode != 0:
+            if not fat_jar_result['success']:
                 return {
                     'success': False,
-                    'error': f'Error al crear JAR:\n{jar_result.stderr}',
+                    'error': f"Error al crear JAR: {fat_jar_result.get('error', 'Error desconocido')}",
                     'class_name': class_name
                 }
             
             if os.path.exists(jar_path):
+                libs_msg = ""
+                if fat_jar_result.get('libs_included'):
+                    libs_msg = f" (incluye: {', '.join(fat_jar_result['libs_included'])})"
                 return {
                     'success': True,
-                    'message': f'JAR creado exitosamente: {jar_name}',
+                    'message': f'JAR creado exitosamente: {jar_name}{libs_msg}',
                     'jar_path': jar_path,
                     'jar_name': jar_name,
-                    'class_name': class_name
+                    'class_name': class_name,
+                    'libs_included': fat_jar_result.get('libs_included', [])
                 }
             else:
                 return {
@@ -441,38 +529,31 @@ def create_multi_jar(files: dict, jar_name: Optional[str] = None, main_class: Op
                     'main_class': main_class
                 }
             
-            manifest_file = os.path.join(temp_dir, 'MANIFEST.MF')
-            with open(manifest_file, 'w') as f:
-                f.write('Manifest-Version: 1.0\n')
-                f.write(f'Main-Class: {main_class}\n')
-                f.write('\n')
-            
             jar_path = os.path.join(output_dir, jar_name)
             
             class_files = [f for f in os.listdir(temp_dir) if f.endswith('.class')]
             
-            jar_result = subprocess.run(
-                ['jar', 'cfm', jar_path, manifest_file] + class_files,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                cwd=temp_dir
-            )
+            fat_jar_result = create_fat_jar(temp_dir, jar_path, main_class)
             
-            if jar_result.returncode != 0:
+            if not fat_jar_result['success']:
                 return {
                     'success': False,
-                    'error': f'Error al crear JAR:\n{jar_result.stderr}',
+                    'error': f"Error al crear JAR: {fat_jar_result.get('error', 'Error desconocido')}",
                     'main_class': main_class
                 }
             
             if os.path.exists(jar_path):
+                libs_msg = ""
+                libs_included = fat_jar_result.get('libs_included', [])
+                if libs_included:
+                    libs_msg = f" + {len(libs_included)} librerías"
                 return {
                     'success': True,
-                    'message': f'JAR creado exitosamente: {jar_name} ({len(class_files)} clases)',
+                    'message': f'JAR creado exitosamente: {jar_name} ({len(class_files)} clases{libs_msg})',
                     'jar_path': jar_path,
                     'jar_name': jar_name,
-                    'main_class': main_class
+                    'main_class': main_class,
+                    'libs_included': libs_included
                 }
             else:
                 return {
