@@ -35,6 +35,22 @@ class BaseAgent:
         self.system_prompt = system_prompt
         self.model = model
     
+    def _extract_text_from_response(self, response) -> str:
+        """Safely extract text from Anthropic response, handling various block types."""
+        if not response.content:
+            return ""
+        
+        text_parts = []
+        for block in response.content:
+            if hasattr(block, 'text'):
+                text_parts.append(block.text)
+            elif hasattr(block, 'type') and block.type == 'text':
+                text_parts.append(getattr(block, 'text', ''))
+            else:
+                text_parts.append(str(block))
+        
+        return '\n'.join(text_parts) if text_parts else ""
+    
     @retry(
         stop=stop_after_attempt(5),
         wait=wait_exponential(multiplier=1, min=2, max=64),
@@ -59,7 +75,7 @@ class BaseAgent:
             messages=[{"role": "user", "content": user_message}]
         )
         
-        response_text = response.content[0].text
+        response_text = self._extract_text_from_response(response)
         clean_message, actions = self.parse_actions(response_text)
         needs_continuation = self.detect_continuation(clean_message)
         

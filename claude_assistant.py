@@ -1437,12 +1437,20 @@ def chat_with_agents(
             }
         )
     except Exception as e:
-        response, actions, needs_cont = chat_with_actions(
-            chat_history or [{"role": "user", "content": user_message}],
-            "",
-            project_files
-        )
-        return response, actions, needs_cont, {"agent_used": "legacy_fallback", "error": str(e)}
+        try:
+            response, actions, needs_cont = chat_with_actions(
+                chat_history or [{"role": "user", "content": user_message}],
+                "",
+                project_files
+            )
+            return response, actions, needs_cont, {"agent_used": "legacy_fallback", "error": str(e)}
+        except Exception as fallback_error:
+            return (
+                f"Error processing request: {str(e)}. Fallback also failed: {str(fallback_error)}",
+                [],
+                False,
+                {"agent_used": "error", "error": str(e), "fallback_error": str(fallback_error)}
+            )
 
 
 def auto_fix_with_agents(error_message: str, project_files: dict) -> tuple:
@@ -1465,7 +1473,14 @@ def auto_fix_with_agents(error_message: str, project_files: dict) -> tuple:
             result.get("needs_continuation", False)
         )
     except Exception as e:
-        return auto_fix_error(error_message, project_files)
+        try:
+            return auto_fix_error(error_message, project_files)
+        except Exception as fallback_error:
+            return (
+                f"Error fixing code: {str(e)}. Fallback also failed: {str(fallback_error)}",
+                [],
+                False
+            )
 
 
 def generate_tests_with_agents(class_name: str, project_files: dict) -> tuple:

@@ -20,6 +20,19 @@ Una aplicación web tipo IDE que permite desarrollar aplicaciones Java con asist
 ├── app.py              # Aplicación principal Streamlit
 ├── claude_assistant.py # Integración con Claude AI (Anthropic)
 ├── java_compiler.py    # Funciones de compilación Java y generación JAR
+├── database.py         # Persistencia de proyectos en PostgreSQL
+├── dependency_manager.py # Gestor de librerías externas (Maven Central)
+├── agents/             # Arquitectura de agentes inteligentes
+│   ├── __init__.py
+│   ├── base_agent.py   # Clase base para todos los agentes
+│   ├── prompts.py      # Prompts compartidos
+│   ├── coordinator.py  # Agente coordinador (routing)
+│   └── subagents/      # Subagentes especializados
+│       ├── code_writer.py      # Genera código nuevo
+│       ├── error_fixer.py      # Corrige errores
+│       ├── test_generator.py   # Crea tests JUnit
+│       ├── doc_generator.py    # Genera JavaDoc
+│       └── architect.py        # Planifica proyectos
 ├── output/             # Directorio para archivos JAR generados
 └── .streamlit/
     └── config.toml     # Configuración del servidor Streamlit
@@ -83,3 +96,13 @@ streamlit run app.py --server.port 5000
     - Al compilar, ejecutar o crear JAR, detecta imports y descarga las librerías
     - Cuando Claude genera código, las dependencias se instalan automáticamente
     - Soporta: Gson, Jackson, Guava, OkHttp, MySQL, PostgreSQL, Commons, SLF4J, etc.
+  - **NUEVO: Arquitectura de Agente con Subagentes** - Sistema inteligente de IA con especialización:
+    - **CoordinatorAgent**: Analiza la intención del usuario y enruta a subagentes especializados
+    - **CodeWriterAgent**: Genera código nuevo optimizado
+    - **ErrorFixerAgent**: Corrige errores de compilación/ejecución
+    - **TestGeneratorAgent**: Crea tests JUnit 5
+    - **DocGeneratorAgent**: Genera documentación JavaDoc
+    - **ArchitectAgent**: Planifica proyectos multi-archivo
+    - Toggle "Modo Agente Inteligente" en la barra lateral para activar/desactivar
+    - Clasificación automática de intención con modelo rápido (Haiku)
+    - Fallback a modo legacy si hay errores

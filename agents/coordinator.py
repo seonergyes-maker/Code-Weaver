@@ -40,6 +40,22 @@ class CoordinatorAgent:
         self.doc_generator = DocGeneratorAgent()
         self.architect = ArchitectAgent()
     
+    def _extract_text_from_response(self, response) -> str:
+        """Safely extract text from Anthropic response, handling various block types."""
+        if not response.content:
+            return ""
+        
+        text_parts = []
+        for block in response.content:
+            if hasattr(block, 'text'):
+                text_parts.append(block.text)
+            elif hasattr(block, 'type') and block.type == 'text':
+                text_parts.append(getattr(block, 'text', ''))
+            else:
+                text_parts.append(str(block))
+        
+        return '\n'.join(text_parts) if text_parts else ""
+    
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=16),
@@ -53,32 +69,40 @@ class CoordinatorAgent:
         Returns:
             dict with {intent, confidence, details}
         """
-        context = ""
-        if project_context:
-            context = f"\n\nContexto del proyecto:\n{project_context}"
-        
-        response = client.messages.create(
-            model="claude-haiku-4-5",
-            max_tokens=512,
-            system=INTENT_CLASSIFIER_PROMPT + context,
-            messages=[{"role": "user", "content": user_message}]
-        )
-        
-        response_text = response.content[0].text
-        
-        try:
-            if '{' in response_text:
-                start = response_text.find('{')
-                end = response_text.rfind('}') + 1
-                return json.loads(response_text[start:end])
-        except json.JSONDecodeError:
-            pass
-        
-        return {
+        default_intent = {
             "intent": "WRITE_CODE",
             "confidence": 0.5,
             "details": "Could not parse intent, defaulting to code writing"
         }
+        
+        context = ""
+        if project_context:
+            context = f"\n\nContexto del proyecto:\n{project_context}"
+        
+        try:
+            response = client.messages.create(
+                model="claude-haiku-4-5",
+                max_tokens=512,
+                system=INTENT_CLASSIFIER_PROMPT + context,
+                messages=[{"role": "user", "content": user_message}]
+            )
+            
+            response_text = self._extract_text_from_response(response)
+            
+            if not response_text:
+                return default_intent
+            
+            if '{' in response_text:
+                start = response_text.find('{')
+                end = response_text.rfind('}') + 1
+                if end > start:
+                    return json.loads(response_text[start:end])
+        except json.JSONDecodeError:
+            pass
+        except Exception:
+            pass
+        
+        return default_intent
     
     def route_request(
         self,
