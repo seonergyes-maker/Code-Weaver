@@ -358,117 +358,295 @@ Generado por Java IDE con Claude AI
             main_class = find_main_class(st.session_state.files) or "Main"
             jar_name = f"{main_class}.jar"
             
+            libs_installed = []
+            if os.path.exists("libs"):
+                libs_installed = [f for f in os.listdir("libs") if f.endswith('.jar')]
+            
             deploy_script = f'''#!/bin/bash
 # =============================================================================
-# Script de Instalación para Ubuntu/Debian
+# Script de Instalación AUTOMÁTICA para Ubuntu/Debian
 # Proyecto: {project_name}
 # Generado por Java IDE con Claude AI
+# 
+# USO: chmod +x install.sh && sudo ./install.sh
+# OPCIONES:
+#   --no-service    No crear servicio systemd
+#   --no-start      No iniciar automáticamente
+#   --uninstall     Desinstalar la aplicación
 # =============================================================================
 
 set -e
 
-# Colores para mensajes
+# Colores
 RED='\\033[0;31m'
 GREEN='\\033[0;32m'
 YELLOW='\\033[1;33m'
-NC='\\033[0m' # Sin color
+BLUE='\\033[0;34m'
+NC='\\033[0m'
 
-echo -e "${{GREEN}}=========================================${{NC}}"
-echo -e "${{GREEN}}  Instalador de {project_name}${{NC}}"
-echo -e "${{GREEN}}=========================================${{NC}}"
+APP_NAME="{project_name}"
+APP_DIR="/opt/$APP_NAME"
+JAR_NAME="{jar_name}"
+SERVICE_NAME="$APP_NAME"
+CREATE_SERVICE=true
+AUTO_START=true
 
-# Verificar si se ejecuta como root
-if [ "$EUID" -ne 0 ]; then
-    echo -e "${{YELLOW}}Nota: Algunas operaciones pueden requerir sudo${{NC}}"
-fi
+# Procesar argumentos
+for arg in "$@"; do
+    case $arg in
+        --no-service) CREATE_SERVICE=false ;;
+        --no-start) AUTO_START=false ;;
+        --uninstall)
+            echo -e "${{YELLOW}}Desinstalando $APP_NAME...${{NC}}"
+            sudo systemctl stop $SERVICE_NAME 2>/dev/null || true
+            sudo systemctl disable $SERVICE_NAME 2>/dev/null || true
+            sudo rm -f /etc/systemd/system/$SERVICE_NAME.service
+            sudo rm -f /usr/local/bin/$APP_NAME
+            sudo rm -rf $APP_DIR
+            sudo systemctl daemon-reload
+            echo -e "${{GREEN}}¡Desinstalación completada!${{NC}}"
+            exit 0
+            ;;
+    esac
+done
 
-# 1. Actualizar sistema
-echo -e "\\n${{YELLOW}}[1/5] Actualizando sistema...${{NC}}"
-sudo apt-get update -qq
+echo -e "${{BLUE}}╔══════════════════════════════════════════════════════════════╗${{NC}}"
+echo -e "${{BLUE}}║${{NC}}  ${{GREEN}}Instalador Automático de $APP_NAME${{NC}}"
+echo -e "${{BLUE}}║${{NC}}  Generado por Java IDE con Claude AI"
+echo -e "${{BLUE}}╚══════════════════════════════════════════════════════════════╝${{NC}}"
 
-# 2. Instalar Java (OpenJDK 17)
-echo -e "\\n${{YELLOW}}[2/5] Verificando Java...${{NC}}"
-if ! command -v java &> /dev/null; then
-    echo "Java no encontrado. Instalando OpenJDK 17..."
-    sudo apt-get install -y openjdk-17-jre-headless
-else
-    java_version=$(java -version 2>&1 | head -n 1)
-    echo -e "${{GREEN}}Java ya instalado: $java_version${{NC}}"
-fi
-
-# 3. Crear directorio de aplicación
-echo -e "\\n${{YELLOW}}[3/5] Creando directorio de aplicación...${{NC}}"
-APP_DIR="/opt/{project_name}"
-sudo mkdir -p "$APP_DIR"
-sudo chown $USER:$USER "$APP_DIR"
-
-# 4. Copiar archivos
-echo -e "\\n${{YELLOW}}[4/5] Copiando archivos...${{NC}}"
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 
-# Copiar JAR si existe
-if [ -f "$SCRIPT_DIR/{jar_name}" ]; then
-    cp "$SCRIPT_DIR/{jar_name}" "$APP_DIR/"
-    echo "JAR copiado: {jar_name}"
-elif [ -f "$SCRIPT_DIR/output/{jar_name}" ]; then
-    cp "$SCRIPT_DIR/output/{jar_name}" "$APP_DIR/"
-    echo "JAR copiado desde output: {jar_name}"
+# ============================================================================
+# PASO 1: Verificar permisos root
+# ============================================================================
+echo -e "\\n${{YELLOW}}[1/7] Verificando permisos...${{NC}}"
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${{RED}}Este script necesita ejecutarse como root${{NC}}"
+    echo "Uso: sudo ./install.sh"
+    exit 1
+fi
+echo -e "${{GREEN}}✓ Ejecutando como root${{NC}}"
+
+# ============================================================================
+# PASO 2: Actualizar sistema e instalar dependencias
+# ============================================================================
+echo -e "\\n${{YELLOW}}[2/7] Actualizando sistema...${{NC}}"
+apt-get update -qq
+apt-get install -y -qq curl wget unzip > /dev/null
+echo -e "${{GREEN}}✓ Sistema actualizado${{NC}}"
+
+# ============================================================================
+# PASO 3: Instalar Java (OpenJDK 17)
+# ============================================================================
+echo -e "\\n${{YELLOW}}[3/7] Configurando Java...${{NC}}"
+if ! command -v java &> /dev/null; then
+    echo "Instalando OpenJDK 17..."
+    apt-get install -y openjdk-17-jre-headless > /dev/null
+    echo -e "${{GREEN}}✓ Java 17 instalado${{NC}}"
 else
-    echo -e "${{RED}}Advertencia: No se encontró {jar_name}${{NC}}"
-    echo "Asegúrate de generar el JAR primero y colocarlo junto a este script"
+    java_version=$(java -version 2>&1 | head -n 1)
+    echo -e "${{GREEN}}✓ Java detectado: $java_version${{NC}}"
 fi
 
-# 5. Crear script de ejecución
-echo -e "\\n${{YELLOW}}[5/5] Creando script de ejecución...${{NC}}"
-cat > "$APP_DIR/run.sh" << 'RUNEOF'
+# Verificar JAVA_HOME
+if [ -z "$JAVA_HOME" ]; then
+    export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+    echo "export JAVA_HOME=$JAVA_HOME" >> /etc/environment
+fi
+
+# ============================================================================
+# PASO 4: Crear estructura de directorios
+# ============================================================================
+echo -e "\\n${{YELLOW}}[4/7] Creando estructura de directorios...${{NC}}"
+mkdir -p "$APP_DIR"
+mkdir -p "$APP_DIR/logs"
+mkdir -p "$APP_DIR/config"
+mkdir -p "$APP_DIR/libs"
+echo -e "${{GREEN}}✓ Directorios creados en $APP_DIR${{NC}}"
+
+# ============================================================================
+# PASO 5: Copiar archivos de la aplicación
+# ============================================================================
+echo -e "\\n${{YELLOW}}[5/7] Copiando archivos...${{NC}}"
+
+# Buscar y copiar JAR
+JAR_FOUND=false
+for search_path in "$SCRIPT_DIR/$JAR_NAME" "$SCRIPT_DIR/output/$JAR_NAME" "$SCRIPT_DIR/*.jar"; do
+    if [ -f "$search_path" ] 2>/dev/null || ls $search_path 1>/dev/null 2>&1; then
+        if [ -f "$search_path" ]; then
+            cp "$search_path" "$APP_DIR/$JAR_NAME"
+        else
+            cp $search_path "$APP_DIR/" 2>/dev/null || true
+        fi
+        JAR_FOUND=true
+        break
+    fi
+done
+
+if [ "$JAR_FOUND" = false ]; then
+    echo -e "${{RED}}✗ No se encontró el archivo JAR${{NC}}"
+    echo "  Coloca $JAR_NAME junto a este script e intenta de nuevo"
+    exit 1
+fi
+echo -e "${{GREEN}}✓ JAR copiado${{NC}}"
+
+# Copiar librerías si existen
+if [ -d "$SCRIPT_DIR/libs" ]; then
+    cp -r "$SCRIPT_DIR/libs/"*.jar "$APP_DIR/libs/" 2>/dev/null || true
+    LIB_COUNT=$(ls -1 "$APP_DIR/libs/"*.jar 2>/dev/null | wc -l)
+    echo -e "${{GREEN}}✓ $LIB_COUNT librerías copiadas${{NC}}"
+fi
+
+# Copiar archivos de configuración si existen
+if [ -d "$SCRIPT_DIR/config" ]; then
+    cp -r "$SCRIPT_DIR/config/"* "$APP_DIR/config/" 2>/dev/null || true
+fi
+
+# ============================================================================
+# PASO 6: Crear scripts de ejecución
+# ============================================================================
+echo -e "\\n${{YELLOW}}[6/7] Configurando scripts de ejecución...${{NC}}"
+
+# Script principal de ejecución
+cat > "$APP_DIR/run.sh" << 'RUNSCRIPT'
 #!/bin/bash
-cd /opt/{project_name}
-java -jar {jar_name} "$@"
-RUNEOF
+APP_DIR="/opt/{project_name}"
+JAR="$APP_DIR/{jar_name}"
+LOG_DIR="$APP_DIR/logs"
+JAVA_OPTS="-Xmx512m -Xms128m"
+
+cd "$APP_DIR"
+
+# Construir classpath con librerías
+CLASSPATH="$JAR"
+if [ -d "$APP_DIR/libs" ]; then
+    for lib in "$APP_DIR/libs/"*.jar; do
+        [ -f "$lib" ] && CLASSPATH="$CLASSPATH:$lib"
+    done
+fi
+
+exec java $JAVA_OPTS -cp "$CLASSPATH" -jar "$JAR" "$@"
+RUNSCRIPT
 chmod +x "$APP_DIR/run.sh"
 
-# Crear enlace simbólico en /usr/local/bin
-sudo ln -sf "$APP_DIR/run.sh" "/usr/local/bin/{project_name}"
+# Script de control
+cat > "$APP_DIR/control.sh" << 'CONTROLSCRIPT'
+#!/bin/bash
+APP="{project_name}"
 
-# Crear servicio systemd (opcional)
-read -p "¿Deseas crear un servicio systemd para ejecución automática? (s/n): " create_service
-if [[ "$create_service" =~ ^[Ss]$ ]]; then
-    sudo tee /etc/systemd/system/{project_name}.service > /dev/null << SERVICEEOF
+case "$1" in
+    start)
+        sudo systemctl start $APP
+        echo "Iniciado $APP"
+        ;;
+    stop)
+        sudo systemctl stop $APP
+        echo "Detenido $APP"
+        ;;
+    restart)
+        sudo systemctl restart $APP
+        echo "Reiniciado $APP"
+        ;;
+    status)
+        sudo systemctl status $APP
+        ;;
+    logs)
+        journalctl -u $APP -f
+        ;;
+    *)
+        echo "Uso: $0 {{start|stop|restart|status|logs}}"
+        exit 1
+        ;;
+esac
+CONTROLSCRIPT
+chmod +x "$APP_DIR/control.sh"
+
+# Enlace simbólico global
+ln -sf "$APP_DIR/run.sh" "/usr/local/bin/$APP_NAME"
+echo -e "${{GREEN}}✓ Comando '$APP_NAME' disponible globalmente${{NC}}"
+
+# ============================================================================
+# PASO 7: Crear servicio systemd
+# ============================================================================
+if [ "$CREATE_SERVICE" = true ]; then
+    echo -e "\\n${{YELLOW}}[7/7] Configurando servicio systemd...${{NC}}"
+    
+    cat > /etc/systemd/system/$SERVICE_NAME.service << SERVICEEOF
 [Unit]
 Description={project_name} Java Application
+Documentation=https://github.com/user/{project_name}
 After=network.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=$USER
-WorkingDirectory=/opt/{project_name}
-ExecStart=/usr/bin/java -jar /opt/{project_name}/{jar_name}
+User=root
+Group=root
+WorkingDirectory=$APP_DIR
+ExecStart=/usr/bin/java -Xmx512m -jar $APP_DIR/$JAR_NAME
+ExecStop=/bin/kill -TERM \$MAINPID
 Restart=on-failure
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=$APP_NAME
+
+# Seguridad
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=$APP_DIR/logs $APP_DIR/config
 
 [Install]
 WantedBy=multi-user.target
 SERVICEEOF
 
-    sudo systemctl daemon-reload
-    sudo systemctl enable {project_name}
-    echo -e "${{GREEN}}Servicio creado. Usa: sudo systemctl start {project_name}${{NC}}"
+    systemctl daemon-reload
+    systemctl enable $SERVICE_NAME > /dev/null 2>&1
+    echo -e "${{GREEN}}✓ Servicio systemd configurado${{NC}}"
+    
+    if [ "$AUTO_START" = true ]; then
+        systemctl start $SERVICE_NAME
+        echo -e "${{GREEN}}✓ Servicio iniciado automáticamente${{NC}}"
+    fi
+else
+    echo -e "\\n${{YELLOW}}[7/7] Servicio systemd omitido (--no-service)${{NC}}"
 fi
 
-echo -e "\\n${{GREEN}}=========================================${{NC}}"
-echo -e "${{GREEN}}  ¡Instalación completada!${{NC}}"
-echo -e "${{GREEN}}=========================================${{NC}}"
+# ============================================================================
+# RESUMEN FINAL
+# ============================================================================
 echo ""
-echo "Comandos disponibles:"
-echo "  - Ejecutar: {project_name}"
-echo "  - O directamente: java -jar $APP_DIR/{jar_name}"
-if [[ "$create_service" =~ ^[Ss]$ ]]; then
-    echo "  - Iniciar servicio: sudo systemctl start {project_name}"
-    echo "  - Ver estado: sudo systemctl status {project_name}"
-    echo "  - Ver logs: journalctl -u {project_name} -f"
+echo -e "${{BLUE}}╔══════════════════════════════════════════════════════════════╗${{NC}}"
+echo -e "${{BLUE}}║${{NC}}  ${{GREEN}}¡INSTALACIÓN COMPLETADA EXITOSAMENTE!${{NC}}"
+echo -e "${{BLUE}}╚══════════════════════════════════════════════════════════════╝${{NC}}"
+echo ""
+echo -e "${{GREEN}}Directorio de instalación:${{NC}} $APP_DIR"
+echo ""
+echo -e "${{YELLOW}}Comandos disponibles:${{NC}}"
+echo "  $APP_NAME              - Ejecutar aplicación"
+echo "  $APP_NAME --help       - Ver ayuda (si está implementada)"
+echo ""
+if [ "$CREATE_SERVICE" = true ]; then
+    echo -e "${{YELLOW}}Control del servicio:${{NC}}"
+    echo "  sudo systemctl start $SERVICE_NAME     - Iniciar"
+    echo "  sudo systemctl stop $SERVICE_NAME      - Detener"
+    echo "  sudo systemctl restart $SERVICE_NAME   - Reiniciar"
+    echo "  sudo systemctl status $SERVICE_NAME    - Ver estado"
+    echo "  journalctl -u $SERVICE_NAME -f         - Ver logs en vivo"
+    echo ""
+    
+    # Mostrar estado actual
+    if systemctl is-active --quiet $SERVICE_NAME; then
+        echo -e "${{GREEN}}Estado actual: ● EJECUTÁNDOSE${{NC}}"
+    else
+        echo -e "${{YELLOW}}Estado actual: ○ Detenido${{NC}}"
+    fi
 fi
 echo ""
-echo "Directorio de instalación: $APP_DIR"
+echo -e "${{YELLOW}}Para desinstalar:${{NC}} sudo ./install.sh --uninstall"
+echo ""
 '''
             
             st.download_button(
