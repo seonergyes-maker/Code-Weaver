@@ -37,9 +37,9 @@ Tu rol:
 2. Explicar errores de compilación y cómo solucionarlos
 3. Sugerir mejoras y buenas prácticas
 4. Generar código nuevo basado en descripciones
-5. Modificar archivos existentes cuando se solicite
+5. Modificar, renombrar o eliminar archivos existentes cuando se solicite
 
-IMPORTANTE: Cuando el usuario te pida crear o modificar código, DEBES incluir un bloque de acciones al final de tu respuesta.
+IMPORTANTE: Cuando el usuario te pida crear, modificar, renombrar o eliminar código, DEBES incluir un bloque de acciones al final de tu respuesta.
 
 El formato es:
 ```json
@@ -48,9 +48,17 @@ El formato es:
 ]}
 ```
 
-Tipos de acción:
-- "create": Crea un nuevo archivo .java
-- "modify": Reemplaza el contenido de un archivo existente
+Tipos de acción disponibles:
+- "create": Crea un nuevo archivo .java (requiere: file, content)
+- "modify": Reemplaza el contenido de un archivo existente (requiere: file, content)
+- "delete": Elimina un archivo del proyecto (requiere: file)
+- "rename": Renombra un archivo (requiere: file, newName)
+
+Ejemplos:
+```json
+{"actions": [{"type": "delete", "file": "ArchivoViejo.java"}]}
+{"actions": [{"type": "rename", "file": "Viejo.java", "newName": "Nuevo.java"}]}
+```
 
 Reglas CRÍTICAS:
 - SOLO UN ARCHIVO POR RESPUESTA para evitar cortes
@@ -175,6 +183,59 @@ Por favor explica qué causó este error y cómo solucionarlo."""
     )
     
     return response.content[0].text
+
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=2, max=64),
+    retry=retry_if_exception(is_rate_limit_error),
+    reraise=True
+)
+def auto_fix_error(error_message: str, project_files: dict) -> tuple:
+    """
+    Analiza el error de compilación y genera una corrección automática.
+    Returns: (explanation, actions_list)
+    """
+    context = "\n\n=== PROYECTO COMPLETO ===\n"
+    for fname, code in project_files.items():
+        context += f"\n--- {fname} ---\n```java\n{code}\n```\n"
+    context += "=== FIN DEL PROYECTO ===\n"
+    
+    system_prompt = """Eres un experto en depuración de Java. Tu trabajo es:
+1. Analizar el error de compilación
+2. Identificar qué archivo(s) necesitan ser corregidos
+3. Proporcionar la corrección completa
+
+IMPORTANTE: DEBES incluir un bloque de acciones al final con el código corregido.
+
+Formato de respuesta:
+1. Explicación breve del error (2-3 líneas)
+2. Bloque de acción con la corrección:
+
+```json
+{"actions": [{"type": "modify", "file": "Archivo.java", "content": "código corregido completo"}]}
+```
+
+Reglas:
+- SOLO UN ARCHIVO POR RESPUESTA
+- El contenido debe ser el archivo COMPLETO corregido, no solo la línea
+- Si hay más archivos que corregir, menciona que continuarás con el siguiente"""
+
+    response = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=16384,
+        system=system_prompt + context,
+        messages=[{
+            "role": "user",
+            "content": f"Error de compilación:\n{error_message}\n\nCorrige el error y devuelve el archivo completo corregido."
+        }]
+    )
+    
+    response_text = response.content[0].text
+    clean_message, actions = parse_file_actions(response_text)
+    needs_continuation = detect_continuation(clean_message)
+    
+    return clean_message, actions, needs_continuation
 
 
 @retry(
@@ -362,14 +423,33 @@ def _parse_action_json(json_str: str, actions: list):
                 if isinstance(action, dict):
                     action_type = action.get("type", "")
                     filename = action.get("file", "")
-                    content = action.get("content", "")
                     
-                    if action_type in ["create", "modify"] and filename.endswith(".java") and content:
+                    if not filename.endswith(".java"):
+                        continue
+                    if "/" in filename or "\\" in filename:
+                        continue
+                    
+                    if action_type in ["create", "modify"]:
+                        content = action.get("content", "")
+                        if content:
+                            actions.append({
+                                "type": action_type,
+                                "file": filename,
+                                "content": content
+                            })
+                    elif action_type == "delete":
                         actions.append({
-                            "type": action_type,
-                            "file": filename,
-                            "content": content
+                            "type": "delete",
+                            "file": filename
                         })
+                    elif action_type == "rename":
+                        new_name = action.get("newName", "")
+                        if new_name and new_name.endswith(".java"):
+                            actions.append({
+                                "type": "rename",
+                                "file": filename,
+                                "newName": new_name
+                            })
     except json.JSONDecodeError:
         pass
 

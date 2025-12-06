@@ -14,9 +14,10 @@ from claude_assistant import (
     explain_error, 
     suggest_improvements,
     complete_line,
-    chat_with_actions
+    chat_with_actions,
+    auto_fix_error
 )
-from database import save_project, load_project, list_projects, delete_project
+from database import save_project, load_project, list_projects, delete_project, update_chat_history, load_project_by_name
 from dependency_manager import (
     download_library, download_custom_library, list_installed_libraries,
     remove_library, get_available_libraries, COMMON_LIBRARIES,
@@ -111,6 +112,10 @@ if 'saved_projects' not in st.session_state:
     st.session_state.saved_projects = list_projects()
 if 'pending_actions' not in st.session_state:
     st.session_state.pending_actions = []
+if 'auto_fix_enabled' not in st.session_state:
+    st.session_state.auto_fix_enabled = True
+if 'last_error' not in st.session_state:
+    st.session_state.last_error = None
 
 def get_all_code():
     return "\n\n// --- Archivo: ".join([f"{name} ---\n{code}" for name, code in st.session_state.files.items()])
@@ -175,6 +180,13 @@ with st.sidebar:
                 st.info("Escribe algo en la última línea primero")
         else:
             st.warning("Escribe código primero")
+    
+    st.markdown("---")
+    st.session_state.auto_fix_enabled = st.toggle(
+        "🔧 Auto-corrección de errores",
+        value=st.session_state.auto_fix_enabled,
+        help="Cuando está activo, Claude analizará y corregirá automáticamente los errores de compilación"
+    )
     
     st.markdown("---")
     st.markdown("**Archivos del Proyecto**")
@@ -297,7 +309,7 @@ with st.sidebar:
         if save_name:
             st.session_state.files[st.session_state.current_file] = st.session_state.code
             try:
-                save_project(save_name, st.session_state.files)
+                save_project(save_name, st.session_state.files, st.session_state.chat_messages)
                 st.session_state.current_project_name = save_name
                 st.session_state.saved_projects = list_projects()
                 st.success(f"Proyecto '{save_name}' guardado")
@@ -319,6 +331,7 @@ with st.sidebar:
                         st.session_state.current_file = list(loaded['files'].keys())[0]
                         st.session_state.code = st.session_state.files[st.session_state.current_file]
                         st.session_state.current_project_name = loaded['name']
+                        st.session_state.chat_messages = loaded.get('chat_history', [])
                         st.session_state.console_output = f"✅ Proyecto '{loaded['name']}' cargado"
                         st.rerun()
             with col2:
@@ -476,8 +489,73 @@ with col_editor:
                     result = compile_multi_file(st.session_state.files)
                 if result['success']:
                     st.session_state.console_output = f"{dep_msg}✅ {result['message']}"
+                    st.session_state.last_error = None
                 else:
-                    st.session_state.console_output = f"{dep_msg}❌ Error de compilación:\n{result['error']}"
+                    error_msg = result['error']
+                    st.session_state.console_output = f"{dep_msg}❌ Error de compilación:\n{error_msg}"
+                    st.session_state.last_error = error_msg
+                    
+                    if st.session_state.auto_fix_enabled:
+                        with st.spinner("🔧 Claude está analizando y corrigiendo el error..."):
+                            try:
+                                explanation, fix_actions, needs_more = auto_fix_error(
+                                    error_msg, 
+                                    st.session_state.files
+                                )
+                                
+                                fixed_files = []
+                                for action in fix_actions:
+                                    action_type = action.get("type", "")
+                                    filename = action.get("file", "")
+                                    
+                                    if not filename.endswith(".java") or "/" in filename or "\\" in filename:
+                                        continue
+                                    
+                                    if action_type in ["modify", "create"]:
+                                        content = action.get("content", "")
+                                        if content and len(content) < 50000:
+                                            st.session_state.files[filename] = content
+                                            if st.session_state.current_file == filename:
+                                                st.session_state.code = content
+                                            action_label = "corregido" if action_type == "modify" else "creado"
+                                            fixed_files.append(f"{filename} ({action_label})")
+                                    
+                                    elif action_type == "delete":
+                                        if filename in st.session_state.files:
+                                            del st.session_state.files[filename]
+                                            if st.session_state.current_file == filename:
+                                                remaining = list(st.session_state.files.keys())
+                                                if remaining:
+                                                    st.session_state.current_file = remaining[0]
+                                                    st.session_state.code = st.session_state.files[remaining[0]]
+                                            fixed_files.append(f"{filename} (eliminado)")
+                                    
+                                    elif action_type == "rename":
+                                        new_name = action.get("newName", "")
+                                        if new_name and filename in st.session_state.files:
+                                            content = st.session_state.files[filename]
+                                            del st.session_state.files[filename]
+                                            st.session_state.files[new_name] = content
+                                            if st.session_state.current_file == filename:
+                                                st.session_state.current_file = new_name
+                                            fixed_files.append(f"{filename} → {new_name}")
+                                
+                                if fixed_files:
+                                    st.session_state.console_output += f"\n\n🔧 **Claude corrigió automáticamente:** {', '.join(fixed_files)}\n\n{explanation}\n\n*Vuelve a compilar para verificar la corrección.*"
+                                    st.session_state.ai_notifications.append({
+                                        "type": "fix",
+                                        "content": f"**Corrección automática aplicada:**\n\n{explanation}"
+                                    })
+                                else:
+                                    st.session_state.ai_notifications.append({
+                                        "type": "error",
+                                        "content": f"**Análisis del error:**\n\n{explanation}"
+                                    })
+                            except Exception as e:
+                                st.session_state.ai_notifications.append({
+                                    "type": "error",
+                                    "content": f"No se pudo analizar el error automáticamente: {e}"
+                                })
     
     with btn_col2:
         if st.button("Ejecutar", use_container_width=True):
@@ -540,7 +618,15 @@ with col_editor:
                     )
 
 with col_chat:
-    st.markdown("### Chat con Claude AI")
+    chat_header_col1, chat_header_col2 = st.columns([3, 1])
+    with chat_header_col1:
+        st.markdown("### Chat con Claude AI")
+    with chat_header_col2:
+        if st.button("🗑️ Limpiar", key="clear_chat"):
+            st.session_state.chat_messages = []
+            if st.session_state.current_project_name != "Proyecto Sin Guardar":
+                update_chat_history(st.session_state.current_project_name, [])
+            st.rerun()
     
     if st.session_state.ai_notifications:
         with st.expander("Respuestas de Acciones Rápidas", expanded=True):
@@ -595,22 +681,45 @@ with col_chat:
                     actions_in_this_round = 0
                     for action in actions:
                         filename = action.get("file", "")
-                        content = action.get("content", "")
                         action_type = action.get("type", "create")
                         
                         if not filename.endswith(".java") or "/" in filename or "\\" in filename:
                             continue
-                        if len(content) > 50000:
-                            continue
                         
                         st.session_state.files[st.session_state.current_file] = st.session_state.code
-                        st.session_state.files[filename] = content
-                        st.session_state.current_file = filename
-                        st.session_state.code = content
                         
-                        action_label = "creado" if action_type == "create" else "modificado"
-                        all_applied_actions.append(f"**{filename}** {action_label}")
-                        actions_in_this_round += 1
+                        if action_type in ["create", "modify"]:
+                            content = action.get("content", "")
+                            if len(content) > 50000:
+                                continue
+                            st.session_state.files[filename] = content
+                            st.session_state.current_file = filename
+                            st.session_state.code = content
+                            action_label = "creado" if action_type == "create" else "modificado"
+                            all_applied_actions.append(f"**{filename}** {action_label}")
+                            actions_in_this_round += 1
+                        
+                        elif action_type == "delete":
+                            if filename in st.session_state.files:
+                                del st.session_state.files[filename]
+                                if st.session_state.current_file == filename:
+                                    remaining_files = list(st.session_state.files.keys())
+                                    if remaining_files:
+                                        st.session_state.current_file = remaining_files[0]
+                                        st.session_state.code = st.session_state.files[remaining_files[0]]
+                                all_applied_actions.append(f"**{filename}** eliminado")
+                                actions_in_this_round += 1
+                        
+                        elif action_type == "rename":
+                            new_name = action.get("newName", "")
+                            if new_name and filename in st.session_state.files:
+                                content = st.session_state.files[filename]
+                                del st.session_state.files[filename]
+                                st.session_state.files[new_name] = content
+                                if st.session_state.current_file == filename:
+                                    st.session_state.current_file = new_name
+                                all_applied_actions.append(f"**{filename}** → **{new_name}**")
+                                actions_in_this_round += 1
                     
                     should_continue = (
                         needs_continuation and 
@@ -656,6 +765,9 @@ with col_chat:
                     "role": "assistant",
                     "content": f"Error al conectar con Claude: {e}"
                 })
+        
+        if st.session_state.current_project_name != "Proyecto Sin Guardar":
+            update_chat_history(st.session_state.current_project_name, st.session_state.chat_messages)
         
         st.rerun()
 

@@ -18,6 +18,7 @@ class Project(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     files = Column(Text, nullable=False)
+    chat_history = Column(Text, nullable=True, default="[]")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -38,7 +39,7 @@ def get_db():
     return None
 
 
-def save_project(name: str, files: dict) -> int:
+def save_project(name: str, files: dict, chat_history: list = None) -> int:
     db = get_db()
     if not db:
         return -1
@@ -48,13 +49,16 @@ def save_project(name: str, files: dict) -> int:
         
         if existing:
             existing.files = json.dumps(files)
+            if chat_history is not None:
+                existing.chat_history = json.dumps(chat_history)
             existing.updated_at = datetime.utcnow()
             db.commit()
             return existing.id
         else:
             project = Project(
                 name=name,
-                files=json.dumps(files)
+                files=json.dumps(files),
+                chat_history=json.dumps(chat_history if chat_history else [])
             )
             db.add(project)
             db.commit()
@@ -75,10 +79,17 @@ def load_project(project_id: int) -> dict:
     try:
         project = db.query(Project).filter(Project.id == project_id).first()
         if project:
+            chat_hist = []
+            if project.chat_history:
+                try:
+                    chat_hist = json.loads(project.chat_history)
+                except (json.JSONDecodeError, TypeError):
+                    chat_hist = []
             return {
                 "id": project.id,
                 "name": project.name,
                 "files": json.loads(project.files),
+                "chat_history": chat_hist,
                 "created_at": project.created_at,
                 "updated_at": project.updated_at
             }
@@ -95,14 +106,40 @@ def load_project_by_name(name: str) -> dict:
     try:
         project = db.query(Project).filter(Project.name == name).first()
         if project:
+            chat_hist = []
+            if project.chat_history:
+                try:
+                    chat_hist = json.loads(project.chat_history)
+                except (json.JSONDecodeError, TypeError):
+                    chat_hist = []
             return {
                 "id": project.id,
                 "name": project.name,
                 "files": json.loads(project.files),
+                "chat_history": chat_hist,
                 "created_at": project.created_at,
                 "updated_at": project.updated_at
             }
         return None
+    finally:
+        db.close()
+
+
+def update_chat_history(project_name: str, chat_history: list) -> bool:
+    db = get_db()
+    if not db:
+        return False
+    
+    try:
+        project = db.query(Project).filter(Project.name == project_name).first()
+        if project:
+            project.chat_history = json.dumps(chat_history)
+            db.commit()
+            return True
+        return False
+    except Exception:
+        db.rollback()
+        return False
     finally:
         db.close()
 

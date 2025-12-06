@@ -63,3 +63,6 @@ streamlit run app.py --server.port 5000
   - Importación de proyectos existentes (.java y .zip)
   - **NUEVO: Contexto completo del proyecto** - Claude ahora recibe TODOS los archivos del proyecto en cada conversación
   - **NUEVO: Bucle automático multi-archivo** - Cuando Claude indica que hay más archivos por crear, el sistema continúa automáticamente hasta 10 archivos sin intervención del usuario
+  - **NUEVO: Acciones delete y rename** - Claude puede eliminar y renombrar archivos además de crearlos y modificarlos
+  - **NUEVO: Auto-corrección de errores** - Cuando hay un error de compilación, Claude automáticamente analiza y corrige el código (toggle en la barra lateral)
+  - **NUEVO: Historial de chat persistente** - El historial de conversación se guarda con cada proyecto en la base de datos
