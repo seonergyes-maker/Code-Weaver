@@ -134,7 +134,7 @@ def find_main_class(files: dict) -> Optional[str]:
     return None
 
 
-JAVA_TARGET_VERSION = "11"
+JAVA_TARGET_VERSION = "21"
 
 def compile_java(code: str) -> dict:
     class_name = find_class_name(code)
