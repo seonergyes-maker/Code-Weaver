@@ -5,8 +5,21 @@ import shutil
 import re
 import zipfile
 from pathlib import Path
-from typing import Optional
-from dependency_manager import get_classpath, LIBS_DIR
+from typing import Optional, Tuple
+from dependency_manager import get_classpath, LIBS_DIR, install_detected_dependencies, detect_required_libraries
+
+
+def auto_install_dependencies(files: dict) -> Tuple[bool, list, list]:
+    """
+    Automatically detect and install missing dependencies from code.
+    
+    Returns:
+        Tuple of (success, installed_libs, error_messages)
+    """
+    result = install_detected_dependencies(files)
+    installed = result.get('installed', [])
+    errors = result.get('errors', [])
+    return (result['success'], installed, errors)
 
 
 def get_dependency_jars() -> list:

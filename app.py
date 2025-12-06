@@ -1156,6 +1156,12 @@ with col_editor:
     with btn_col2:
         if st.button("Ejecutar", use_container_width=True):
             st.session_state.files[st.session_state.current_file] = st.session_state.code
+            
+            dep_result = install_detected_dependencies(st.session_state.files)
+            dep_msg = ""
+            if dep_result.get('installed'):
+                dep_msg = f"📦 Librerías instaladas automáticamente: {', '.join(dep_result['installed'])}\n\n"
+            
             with st.spinner("Ejecutando..."):
                 if len(st.session_state.files) == 1:
                     result = run_java(list(st.session_state.files.values())[0])
@@ -1164,26 +1170,32 @@ with col_editor:
                     result = run_multi_file(st.session_state.files)
                     class_info = result.get('main_class', 'Main')
                 if result['success']:
-                    st.session_state.console_output = f"▶️ Ejecución de {class_info}:\n\n{result['output']}"
+                    st.session_state.console_output = f"{dep_msg}▶️ Ejecución de {class_info}:\n\n{result['output']}"
                 elif 'error' in result:
-                    st.session_state.console_output = f"❌ Error:\n{result['error']}"
+                    st.session_state.console_output = f"{dep_msg}❌ Error:\n{result['error']}"
                 else:
-                    st.session_state.console_output = f"⚠️ Código de salida: {result['return_code']}\n{result.get('output', '')}"
+                    st.session_state.console_output = f"{dep_msg}⚠️ Código de salida: {result['return_code']}\n{result.get('output', '')}"
     
     with btn_col3:
         if st.button("Crear JAR", use_container_width=True):
             st.session_state.files[st.session_state.current_file] = st.session_state.code
+            
+            dep_result = install_detected_dependencies(st.session_state.files)
+            dep_msg = ""
+            if dep_result.get('installed'):
+                dep_msg = f"📦 Librerías instaladas: {', '.join(dep_result['installed'])}\n"
+            
             with st.spinner("Creando JAR..."):
                 if len(st.session_state.files) == 1:
                     result = create_jar(list(st.session_state.files.values())[0])
                 else:
                     result = create_multi_jar(st.session_state.files)
                 if result['success']:
-                    st.session_state.console_output = f"📦 {result['message']}"
+                    st.session_state.console_output = f"{dep_msg}📦 {result['message']}"
                     if result['jar_path'] not in st.session_state.jar_files:
                         st.session_state.jar_files.append(result['jar_path'])
                 else:
-                    st.session_state.console_output = f"❌ {result['error']}"
+                    st.session_state.console_output = f"{dep_msg}❌ {result['error']}"
     
     with btn_col4:
         if st.button("Limpiar Consola", use_container_width=True):
@@ -1347,9 +1359,15 @@ with col_chat:
                 final_response = response
                 
                 if all_applied_actions:
+                    dep_result = install_detected_dependencies(st.session_state.files)
+                    
                     actions_msg = "\n\n---\n📁 " + " | ".join(all_applied_actions)
                     if continuation_count > 0:
                         actions_msg += f"\n\n*({continuation_count + 1} archivos procesados automáticamente)*"
+                    
+                    if dep_result.get('installed'):
+                        actions_msg += f"\n\n📦 **Librerías instaladas automáticamente:** {', '.join(dep_result['installed'])}"
+                    
                     final_response += actions_msg
                 
                 st.session_state.chat_messages.append({

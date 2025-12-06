@@ -79,3 +79,7 @@ streamlit run app.py --server.port 5000
     - Creación de directorio de aplicación en /opt/
     - Enlace simbólico para ejecución desde cualquier lugar
     - Servicio systemd opcional para ejecución automática
+  - **NUEVO: Instalación Automática de Librerías** - El IDE detecta automáticamente las dependencias del código:
+    - Al compilar, ejecutar o crear JAR, detecta imports y descarga las librerías
+    - Cuando Claude genera código, las dependencias se instalan automáticamente
+    - Soporta: Gson, Jackson, Guava, OkHttp, MySQL, PostgreSQL, Commons, SLF4J, etc.
