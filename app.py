@@ -15,7 +15,10 @@ from claude_assistant import (
     suggest_improvements,
     complete_line,
     chat_with_actions,
-    auto_fix_error
+    auto_fix_error,
+    architect_analyze,
+    analyze_execution,
+    search_in_project
 )
 from database import save_project, load_project, list_projects, delete_project, update_chat_history, load_project_by_name
 from dependency_manager import (
@@ -116,6 +119,10 @@ if 'auto_fix_enabled' not in st.session_state:
     st.session_state.auto_fix_enabled = True
 if 'last_error' not in st.session_state:
     st.session_state.last_error = None
+if 'show_architect_modal' not in st.session_state:
+    st.session_state.show_architect_modal = False
+if 'architect_plan' not in st.session_state:
+    st.session_state.architect_plan = None
 
 def get_all_code():
     return "\n\n// --- Archivo: ".join([f"{name} ---\n{code}" for name, code in st.session_state.files.items()])
@@ -180,6 +187,58 @@ with st.sidebar:
                 st.info("Escribe algo en la última línea primero")
         else:
             st.warning("Escribe código primero")
+    
+    st.markdown("---")
+    st.markdown("**Herramientas Avanzadas**")
+    
+    if st.button("🏗️ Modo Arquitecto", use_container_width=True, help="Analiza y planifica antes de implementar"):
+        st.session_state.show_architect_modal = True
+    
+    if st.button("🔍 Analizar Ejecución", use_container_width=True, help="Interpreta la salida del programa"):
+        if st.session_state.console_output.strip():
+            with st.spinner("Analizando salida..."):
+                try:
+                    is_error = "error" in st.session_state.console_output.lower() or "exception" in st.session_state.console_output.lower()
+                    analysis = analyze_execution(
+                        st.session_state.console_output, 
+                        st.session_state.files,
+                        is_error
+                    )
+                    st.session_state.ai_notifications.append({
+                        "type": "execution_analysis",
+                        "content": f"**Análisis de ejecución:**\n\n{analysis}"
+                    })
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        else:
+            st.info("Ejecuta el programa primero para analizar la salida")
+    
+    search_col1, search_col2 = st.columns([3, 1])
+    with search_col1:
+        search_query = st.text_input("🔎 Buscar:", placeholder="clase, método...", key="search_input", label_visibility="collapsed")
+    with search_col2:
+        do_search = st.button("🔍", key="search_btn", use_container_width=True)
+    
+    if do_search and search_query:
+        with st.spinner("Buscando..."):
+            try:
+                results = search_in_project(search_query, st.session_state.files)
+                if results.get("results"):
+                    result_text = f"**Resultados para '{search_query}':**\n\n"
+                    for r in results["results"]:
+                        result_text += f"📍 **{r.get('file', 'N/A')}** (línea {r.get('line', 'N/A')})\n"
+                        result_text += f"   `{r.get('match', '')}`\n"
+                        result_text += f"   _{r.get('relevance', '')}_\n\n"
+                    result_text += f"\n**Resumen:** {results.get('summary', '')}"
+                else:
+                    result_text = f"**Búsqueda:** '{search_query}'\n\n{results.get('summary', 'No se encontraron resultados')}"
+                st.session_state.ai_notifications.append({
+                    "type": "search",
+                    "content": result_text
+                })
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error: {e}")
     
     st.markdown("---")
     st.session_state.auto_fix_enabled = st.toggle(
@@ -445,6 +504,81 @@ if st.session_state.get('show_generate_modal', False):
             if st.button("Cancelar", use_container_width=True):
                 st.session_state.show_generate_modal = False
                 st.rerun()
+        st.markdown("---")
+
+if st.session_state.get('show_architect_modal', False):
+    with st.container():
+        st.markdown("### 🏗️ Modo Arquitecto")
+        st.markdown("*Analiza y planifica tu proyecto antes de implementarlo*")
+        
+        architect_description = st.text_area(
+            "¿Qué quieres construir?",
+            placeholder="Ej: Un sistema de gestión de inventario con productos, categorías y reportes",
+            height=100,
+            key="architect_input"
+        )
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📋 Analizar", use_container_width=True):
+                if architect_description:
+                    with st.spinner("Analizando requisitos..."):
+                        try:
+                            plan = architect_analyze(architect_description, st.session_state.files)
+                            st.session_state.architect_plan = plan
+                        except Exception as e:
+                            st.error(f"Error: {e}")
+                else:
+                    st.warning("Describe qué quieres construir")
+        with col2:
+            if st.button("🚀 Implementar Plan", use_container_width=True, disabled=not st.session_state.architect_plan):
+                if st.session_state.architect_plan:
+                    plan_summary = st.session_state.architect_plan.get('analysis', '')
+                    files_needed = st.session_state.architect_plan.get('files_needed', [])
+                    files_list = ", ".join([f.get('name', '') for f in files_needed])
+                    
+                    implementation_prompt = f"Implementa el siguiente plan:\n{plan_summary}\n\nArchivos necesarios: {files_list}\n\nCrea todos los archivos con código completo y funcional."
+                    
+                    st.session_state.chat_messages.append({
+                        "role": "user",
+                        "content": implementation_prompt
+                    })
+                    st.session_state.show_architect_modal = False
+                    st.session_state.architect_plan = None
+                    st.rerun()
+        with col3:
+            if st.button("Cerrar", use_container_width=True):
+                st.session_state.show_architect_modal = False
+                st.session_state.architect_plan = None
+                st.rerun()
+        
+        if st.session_state.architect_plan:
+            plan = st.session_state.architect_plan
+            st.markdown("---")
+            st.markdown("#### 📊 Análisis")
+            st.info(plan.get('analysis', 'Sin análisis'))
+            
+            if plan.get('files_needed'):
+                st.markdown("#### 📁 Archivos Necesarios")
+                for f in plan['files_needed']:
+                    deps = ", ".join(f.get('dependencies', [])) if f.get('dependencies') else "Ninguna"
+                    st.markdown(f"- **{f.get('name', 'N/A')}**: {f.get('purpose', '')} *(deps: {deps})*")
+            
+            if plan.get('implementation_plan'):
+                st.markdown("#### 📝 Plan de Implementación")
+                for step in plan['implementation_plan']:
+                    files = ", ".join(step.get('files', []))
+                    st.markdown(f"{step.get('step', '')}. {step.get('description', '')} *({files})*")
+            
+            complexity = plan.get('estimated_complexity', 'desconocida')
+            complexity_emoji = {"baja": "🟢", "media": "🟡", "alta": "🔴"}.get(complexity, "⚪")
+            st.markdown(f"#### Complejidad: {complexity_emoji} {complexity.capitalize()}")
+            
+            if plan.get('recommendations'):
+                st.markdown("#### 💡 Recomendaciones")
+                for rec in plan['recommendations']:
+                    st.markdown(f"- {rec}")
+        
         st.markdown("---")
 
 col_editor, col_chat = st.columns([3, 2])

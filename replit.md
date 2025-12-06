@@ -66,3 +66,6 @@ streamlit run app.py --server.port 5000
   - **NUEVO: Acciones delete y rename** - Claude puede eliminar y renombrar archivos además de crearlos y modificarlos
   - **NUEVO: Auto-corrección de errores** - Cuando hay un error de compilación, Claude automáticamente analiza y corrige el código (toggle en la barra lateral)
   - **NUEVO: Historial de chat persistente** - El historial de conversación se guarda con cada proyecto en la base de datos
+  - **FASE 2: Modo Arquitecto** - Analiza requisitos y crea un plan de implementación antes de escribir código
+  - **FASE 2: Análisis de Ejecución** - Interpreta la salida del programa y sugiere mejoras
+  - **FASE 2: Búsqueda en Proyecto** - Encuentra código, clases, métodos y patrones en el proyecto

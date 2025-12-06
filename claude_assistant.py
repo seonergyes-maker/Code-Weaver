@@ -244,6 +244,185 @@ Reglas:
     retry=retry_if_exception(is_rate_limit_error),
     reraise=True
 )
+def architect_analyze(description: str, project_files: dict) -> dict:
+    """
+    Modo arquitecto: Analiza requisitos y crea un plan de implementación.
+    Returns: dict con {analysis, files_needed, implementation_plan}
+    """
+    context = ""
+    if project_files:
+        context = "\n\n=== PROYECTO ACTUAL ===\n"
+        for fname, code in project_files.items():
+            context += f"\n--- {fname} ---\n```java\n{code[:2000]}{'...' if len(code) > 2000 else ''}\n```\n"
+        context += "=== FIN DEL PROYECTO ===\n"
+    
+    system_prompt = """Eres un arquitecto de software Java experto. Tu trabajo es:
+1. Analizar los requisitos del usuario
+2. Identificar los archivos Java necesarios
+3. Crear un plan de implementación detallado
+
+Responde SIEMPRE con este formato JSON:
+```json
+{
+    "analysis": "Breve análisis de lo que se necesita (2-3 oraciones)",
+    "files_needed": [
+        {"name": "Archivo.java", "purpose": "Propósito del archivo", "dependencies": ["OtroArchivo.java"]}
+    ],
+    "implementation_plan": [
+        {"step": 1, "description": "Descripción del paso", "files": ["Archivo.java"]}
+    ],
+    "estimated_complexity": "baja|media|alta",
+    "recommendations": ["Recomendación 1", "Recomendación 2"]
+}
+```
+
+Considera:
+- Patrones de diseño apropiados
+- Separación de responsabilidades
+- Reutilización de código existente
+- Buenas prácticas de Java"""
+
+    response = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=4096,
+        system=system_prompt + context,
+        messages=[{
+            "role": "user",
+            "content": f"Analiza y planifica la implementación de: {description}"
+        }]
+    )
+    
+    response_text = response.content[0].text
+    
+    json_match = re.search(r'```json\s*(\{[\s\S]*?\})\s*```', response_text)
+    if json_match:
+        try:
+            return json.loads(json_match.group(1))
+        except json.JSONDecodeError:
+            pass
+    
+    try:
+        start = response_text.find('{')
+        end = response_text.rfind('}') + 1
+        if start != -1 and end > start:
+            return json.loads(response_text[start:end])
+    except json.JSONDecodeError:
+        pass
+    
+    return {
+        "analysis": response_text,
+        "files_needed": [],
+        "implementation_plan": [],
+        "estimated_complexity": "desconocida",
+        "recommendations": []
+    }
+
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=2, max=64),
+    retry=retry_if_exception(is_rate_limit_error),
+    reraise=True
+)
+def analyze_execution(output: str, project_files: dict, is_error: bool = False) -> str:
+    """
+    Analiza la salida de ejecución de un programa Java.
+    """
+    context = "\n\n=== CÓDIGO DEL PROYECTO ===\n"
+    for fname, code in project_files.items():
+        context += f"\n--- {fname} ---\n```java\n{code}\n```\n"
+    context += "=== FIN DEL CÓDIGO ===\n"
+    
+    output_type = "error" if is_error else "salida"
+    
+    system_prompt = f"""Eres un experto en depuración y análisis de programas Java.
+Analiza la {output_type} del programa y proporciona:
+1. Explicación de lo que muestra la salida
+2. Si hay errores, explica la causa y cómo solucionarlos
+3. Si funciona correctamente, sugiere posibles mejoras
+
+Sé conciso pero informativo."""
+
+    response = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=4096,
+        system=system_prompt + context,
+        messages=[{
+            "role": "user",
+            "content": f"Analiza esta {output_type} de ejecución:\n\n```\n{output}\n```"
+        }]
+    )
+    
+    return response.content[0].text
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=16),
+    retry=retry_if_exception(is_rate_limit_error),
+    reraise=True
+)
+def search_in_project(query: str, project_files: dict) -> list:
+    """
+    Busca código, clases, métodos o patrones en el proyecto.
+    Returns: lista de resultados con ubicación y contexto
+    """
+    context = "\n\n=== PROYECTO COMPLETO ===\n"
+    for fname, code in project_files.items():
+        lines = code.split('\n')
+        numbered_code = '\n'.join([f"{i+1}: {line}" for i, line in enumerate(lines)])
+        context += f"\n--- {fname} ---\n{numbered_code}\n"
+    context += "=== FIN DEL PROYECTO ===\n"
+    
+    system_prompt = """Eres un asistente de búsqueda de código Java.
+Busca en el proyecto según la consulta del usuario y devuelve resultados relevantes.
+
+Responde SIEMPRE con formato JSON:
+```json
+{
+    "results": [
+        {
+            "file": "Archivo.java",
+            "line": 10,
+            "match": "texto encontrado",
+            "context": "líneas de contexto alrededor",
+            "relevance": "explicación de por qué es relevante"
+        }
+    ],
+    "summary": "Resumen de lo encontrado"
+}
+```
+
+Si no encuentras nada, devuelve results vacío con un summary explicativo."""
+
+    response = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=4096,
+        system=system_prompt + context,
+        messages=[{
+            "role": "user",
+            "content": f"Busca en el proyecto: {query}"
+        }]
+    )
+    
+    response_text = response.content[0].text
+    
+    json_match = re.search(r'```json\s*(\{[\s\S]*?\})\s*```', response_text)
+    if json_match:
+        try:
+            return json.loads(json_match.group(1))
+        except json.JSONDecodeError:
+            pass
+    
+    return {"results": [], "summary": response_text}
+
+
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=2, max=64),
+    retry=retry_if_exception(is_rate_limit_error),
+    reraise=True
+)
 def suggest_improvements(code: str) -> str:
     response = client.messages.create(
         model="claude-sonnet-4-5",
