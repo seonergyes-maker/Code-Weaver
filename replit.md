@@ -74,3 +74,8 @@ streamlit run app.py --server.port 5000
   - **FASE 3: Plantillas de Código** - Templates para patrones de diseño (Singleton, Factory, Observer, MVC, Builder, Strategy)
   - **FASE 3: Exportar Proyecto** - Descarga todo el proyecto como .zip con archivos, librerías y README
   - **Fat JAR** - Los archivos JAR generados incluyen automáticamente todas las librerías dependientes (Gson, Jackson, etc.)
+  - **Script Ubuntu** - Genera script de instalación completo para Ubuntu/Debian con:
+    - Instalación automática de Java (OpenJDK 17)
+    - Creación de directorio de aplicación en /opt/
+    - Enlace simbólico para ejecución desde cualquier lugar
+    - Servicio systemd opcional para ejecución automática

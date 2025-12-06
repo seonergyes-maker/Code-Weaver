@@ -351,6 +351,136 @@ Generado por Java IDE con Claude AI
         else:
             st.warning("No hay archivos para exportar")
     
+    if st.button("🐧 Script Ubuntu", use_container_width=True, help="Genera script de instalación para Ubuntu/Debian"):
+        if st.session_state.files:
+            from java_compiler import find_main_class
+            project_name = st.session_state.get('current_project_name', 'JavaProject').replace(" ", "_").lower()
+            main_class = find_main_class(st.session_state.files) or "Main"
+            jar_name = f"{main_class}.jar"
+            
+            deploy_script = f'''#!/bin/bash
+# =============================================================================
+# Script de Instalación para Ubuntu/Debian
+# Proyecto: {project_name}
+# Generado por Java IDE con Claude AI
+# =============================================================================
+
+set -e
+
+# Colores para mensajes
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[1;33m'
+NC='\\033[0m' # Sin color
+
+echo -e "${{GREEN}}=========================================${{NC}}"
+echo -e "${{GREEN}}  Instalador de {project_name}${{NC}}"
+echo -e "${{GREEN}}=========================================${{NC}}"
+
+# Verificar si se ejecuta como root
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${{YELLOW}}Nota: Algunas operaciones pueden requerir sudo${{NC}}"
+fi
+
+# 1. Actualizar sistema
+echo -e "\\n${{YELLOW}}[1/5] Actualizando sistema...${{NC}}"
+sudo apt-get update -qq
+
+# 2. Instalar Java (OpenJDK 17)
+echo -e "\\n${{YELLOW}}[2/5] Verificando Java...${{NC}}"
+if ! command -v java &> /dev/null; then
+    echo "Java no encontrado. Instalando OpenJDK 17..."
+    sudo apt-get install -y openjdk-17-jre-headless
+else
+    java_version=$(java -version 2>&1 | head -n 1)
+    echo -e "${{GREEN}}Java ya instalado: $java_version${{NC}}"
+fi
+
+# 3. Crear directorio de aplicación
+echo -e "\\n${{YELLOW}}[3/5] Creando directorio de aplicación...${{NC}}"
+APP_DIR="/opt/{project_name}"
+sudo mkdir -p "$APP_DIR"
+sudo chown $USER:$USER "$APP_DIR"
+
+# 4. Copiar archivos
+echo -e "\\n${{YELLOW}}[4/5] Copiando archivos...${{NC}}"
+SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+
+# Copiar JAR si existe
+if [ -f "$SCRIPT_DIR/{jar_name}" ]; then
+    cp "$SCRIPT_DIR/{jar_name}" "$APP_DIR/"
+    echo "JAR copiado: {jar_name}"
+elif [ -f "$SCRIPT_DIR/output/{jar_name}" ]; then
+    cp "$SCRIPT_DIR/output/{jar_name}" "$APP_DIR/"
+    echo "JAR copiado desde output: {jar_name}"
+else
+    echo -e "${{RED}}Advertencia: No se encontró {jar_name}${{NC}}"
+    echo "Asegúrate de generar el JAR primero y colocarlo junto a este script"
+fi
+
+# 5. Crear script de ejecución
+echo -e "\\n${{YELLOW}}[5/5] Creando script de ejecución...${{NC}}"
+cat > "$APP_DIR/run.sh" << 'RUNEOF'
+#!/bin/bash
+cd /opt/{project_name}
+java -jar {jar_name} "$@"
+RUNEOF
+chmod +x "$APP_DIR/run.sh"
+
+# Crear enlace simbólico en /usr/local/bin
+sudo ln -sf "$APP_DIR/run.sh" "/usr/local/bin/{project_name}"
+
+# Crear servicio systemd (opcional)
+read -p "¿Deseas crear un servicio systemd para ejecución automática? (s/n): " create_service
+if [[ "$create_service" =~ ^[Ss]$ ]]; then
+    sudo tee /etc/systemd/system/{project_name}.service > /dev/null << SERVICEEOF
+[Unit]
+Description={project_name} Java Application
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=/opt/{project_name}
+ExecStart=/usr/bin/java -jar /opt/{project_name}/{jar_name}
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+SERVICEEOF
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable {project_name}
+    echo -e "${{GREEN}}Servicio creado. Usa: sudo systemctl start {project_name}${{NC}}"
+fi
+
+echo -e "\\n${{GREEN}}=========================================${{NC}}"
+echo -e "${{GREEN}}  ¡Instalación completada!${{NC}}"
+echo -e "${{GREEN}}=========================================${{NC}}"
+echo ""
+echo "Comandos disponibles:"
+echo "  - Ejecutar: {project_name}"
+echo "  - O directamente: java -jar $APP_DIR/{jar_name}"
+if [[ "$create_service" =~ ^[Ss]$ ]]; then
+    echo "  - Iniciar servicio: sudo systemctl start {project_name}"
+    echo "  - Ver estado: sudo systemctl status {project_name}"
+    echo "  - Ver logs: journalctl -u {project_name} -f"
+fi
+echo ""
+echo "Directorio de instalación: $APP_DIR"
+'''
+            
+            st.download_button(
+                label="⬇️ Descargar install.sh",
+                data=deploy_script,
+                file_name="install.sh",
+                mime="text/x-shellscript",
+                use_container_width=True
+            )
+        else:
+            st.warning("No hay proyecto para desplegar")
+    
     st.markdown("---")
     st.markdown("**Archivos del Proyecto**")
     
