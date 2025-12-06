@@ -40,7 +40,63 @@ class ArchitectAgent(BaseAgent):
         plan = self._parse_plan(result["response"])
         result["plan"] = plan
         
+        # Format response for human readability
+        result["response"] = self._format_plan_response(plan)
+        
         return result
+    
+    def _format_plan_response(self, plan: dict) -> str:
+        """Format the plan as a readable response for the user."""
+        lines = []
+        
+        # Analysis section
+        if plan.get("analysis"):
+            lines.append("## 📋 Análisis del Proyecto\n")
+            lines.append(plan["analysis"])
+            lines.append("")
+        
+        # Files needed section
+        if plan.get("files_needed"):
+            lines.append("## 📁 Archivos a Crear\n")
+            for i, f in enumerate(plan["files_needed"], 1):
+                name = f.get("name", "Archivo")
+                purpose = f.get("purpose", "")
+                deps = f.get("dependencies", [])
+                lines.append(f"**{i}. {name}**")
+                if purpose:
+                    lines.append(f"   - Propósito: {purpose}")
+                if deps:
+                    lines.append(f"   - Dependencias: {', '.join(deps)}")
+            lines.append("")
+        
+        # Implementation plan section
+        if plan.get("implementation_plan"):
+            lines.append("## 🛠️ Plan de Implementación\n")
+            for step in plan["implementation_plan"]:
+                step_num = step.get("step", "")
+                desc = step.get("description", "")
+                files = step.get("files", [])
+                lines.append(f"**Paso {step_num}:** {desc}")
+                if files:
+                    lines.append(f"   - Archivos: {', '.join(files)}")
+            lines.append("")
+        
+        # Complexity
+        if plan.get("estimated_complexity"):
+            complexity = plan["estimated_complexity"]
+            emoji = "🟢" if complexity == "baja" else "🟡" if complexity == "media" else "🔴"
+            lines.append(f"**Complejidad estimada:** {emoji} {complexity.capitalize()}\n")
+        
+        # Recommendations
+        if plan.get("recommendations"):
+            lines.append("## 💡 Recomendaciones\n")
+            for rec in plan["recommendations"]:
+                lines.append(f"- {rec}")
+            lines.append("")
+        
+        lines.append("\n---\n*Escribe 'comienza' para que empiece a crear los archivos.*")
+        
+        return "\n".join(lines) if lines else plan.get("analysis", "Plan generado.")
     
     def _parse_plan(self, response_text: str) -> dict:
         """Parse the architecture plan from response."""
