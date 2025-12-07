@@ -97,6 +97,9 @@ public class APIClient implements AutoCloseable {
     /** Callback para errores */
     private Consumer<Exception> errorHandler;
     
+    /** Modo de visualización del EPC: true = hex, false = decimal */
+    private volatile boolean displayHexMode = true;
+    
     /**
      * Resultado de un envío a la API.
      */
@@ -242,6 +245,24 @@ public class APIClient implements AutoCloseable {
     
     public void setErrorHandler(Consumer<Exception> handler) {
         this.errorHandler = handler;
+    }
+    
+    /**
+     * Establece el modo de visualización del EPC (hexadecimal o decimal).
+     * 
+     * @param hexMode true para hexadecimal, false para decimal
+     */
+    public void setDisplayHexMode(boolean hexMode) {
+        this.displayHexMode = hexMode;
+    }
+    
+    /**
+     * Obtiene el modo de visualización del EPC.
+     * 
+     * @return true si está en modo hexadecimal, false si decimal
+     */
+    public boolean isDisplayHexMode() {
+        return displayHexMode;
     }
     
     // ==================== Estadísticas ====================
@@ -622,7 +643,8 @@ public class APIClient implements AutoCloseable {
      */
     private String tagToJson(TagData tag) {
         StringBuilder sb = new StringBuilder();
-        sb.append("{\"epc\":\"").append(escapeJson(tag.getEpc())).append("\"");
+        String epc = displayHexMode ? tag.getEpc() : convertEpcToDecimal(tag.getEpc());
+        sb.append("{\"epc\":\"").append(escapeJson(epc)).append("\"");
         sb.append(",\"rssi\":").append(tag.getRssi());
         sb.append(",\"antenna\":").append(tag.getAntennaPort());
         sb.append(",\"timestamp\":").append(tag.getTimestamp());
@@ -662,6 +684,24 @@ public class APIClient implements AutoCloseable {
                    .replace("\n", "\\n")
                    .replace("\r", "\\r")
                    .replace("\t", "\\t");
+    }
+    
+    /**
+     * Convierte un EPC hexadecimal a formato decimal.
+     * 
+     * @param hexEpc EPC en formato hexadecimal
+     * @return EPC en formato decimal (número grande)
+     */
+    private String convertEpcToDecimal(String hexEpc) {
+        if (hexEpc == null || hexEpc.isEmpty()) {
+            return "";
+        }
+        try {
+            java.math.BigInteger bigInt = new java.math.BigInteger(hexEpc, 16);
+            return bigInt.toString();
+        } catch (NumberFormatException e) {
+            return hexEpc;
+        }
     }
     
     /**

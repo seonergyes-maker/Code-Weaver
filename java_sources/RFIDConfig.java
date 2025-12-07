@@ -133,6 +133,9 @@ public class RFIDConfig implements Serializable {
     /** Auto-conexión al iniciar la aplicación */
     private boolean autoConnectEnabled;
     
+    /** Mostrar EPC en formato hexadecimal (true) o decimal (false) */
+    private boolean displayHexMode;
+    
     /** Última conexión exitosa (para auto-conexión) */
     private String lastConnectedIP;
     
@@ -179,6 +182,7 @@ public class RFIDConfig implements Serializable {
         this.reportPhaseAngle = false;
         this.reportChannelIndex = false;
         this.autoConnectEnabled = false;    // Deshabilitado por defecto
+        this.displayHexMode = true;          // Hexadecimal por defecto
         this.lastConnectedIP = null;
     }
     
@@ -507,6 +511,14 @@ public class RFIDConfig implements Serializable {
         this.autoConnectEnabled = enabled;
     }
     
+    public boolean isDisplayHexMode() {
+        return displayHexMode;
+    }
+    
+    public void setDisplayHexMode(boolean hexMode) {
+        this.displayHexMode = hexMode;
+    }
+    
     public String getLastConnectedIP() {
         return lastConnectedIP;
     }
@@ -660,7 +672,28 @@ public class RFIDConfig implements Serializable {
             sb.append(gpoSettings[i]);
             if (i < gpoSettings.length - 1) sb.append(", ");
         }
-        sb.append("]\n");
+        sb.append("],\n");
+        
+        // Configuración avanzada
+        sb.append("  \"duplicateFilterEnabled\": ").append(duplicateFilterEnabled).append(",\n");
+        sb.append("  \"duplicateFilterExpiration\": ").append(duplicateFilterExpiration).append(",\n");
+        sb.append("  \"rssiThreshold\": ").append(rssiThreshold).append(",\n");
+        sb.append("  \"rssiFilterEnabled\": ").append(rssiFilterEnabled).append(",\n");
+        sb.append("  \"inventorySession\": ").append(inventorySession).append(",\n");
+        sb.append("  \"inventoryTarget\": ").append(inventoryTarget).append(",\n");
+        sb.append("  \"tagPopulation\": ").append(tagPopulation).append(",\n");
+        sb.append("  \"rfModeIndex\": ").append(rfModeIndex).append(",\n");
+        sb.append("  \"denseReaderMode\": ").append(denseReaderMode).append(",\n");
+        sb.append("  \"gpiTriggerPort\": ").append(gpiTriggerPort).append(",\n");
+        sb.append("  \"gpiTriggerEnabled\": ").append(gpiTriggerEnabled).append(",\n");
+        sb.append("  \"gpiTriggerState\": ").append(gpiTriggerState).append(",\n");
+        sb.append("  \"reportIntervalMs\": ").append(reportIntervalMs).append(",\n");
+        sb.append("  \"reportTimestamp\": ").append(reportTimestamp).append(",\n");
+        sb.append("  \"reportAntennaId\": ").append(reportAntennaId).append(",\n");
+        sb.append("  \"reportPhaseAngle\": ").append(reportPhaseAngle).append(",\n");
+        sb.append("  \"reportChannelIndex\": ").append(reportChannelIndex).append(",\n");
+        sb.append("  \"autoConnectEnabled\": ").append(autoConnectEnabled).append(",\n");
+        sb.append("  \"displayHexMode\": ").append(displayHexMode).append("\n");
         
         sb.append("}");
         return sb.toString();
@@ -730,6 +763,27 @@ public class RFIDConfig implements Serializable {
                 }
             }
         }
+        
+        // Configuración avanzada
+        config.duplicateFilterEnabled = extractBooleanValue(json, "duplicateFilterEnabled", config.duplicateFilterEnabled);
+        config.duplicateFilterExpiration = extractIntValue(json, "duplicateFilterExpiration", config.duplicateFilterExpiration);
+        config.rssiThreshold = extractIntValue(json, "rssiThreshold", config.rssiThreshold);
+        config.rssiFilterEnabled = extractBooleanValue(json, "rssiFilterEnabled", config.rssiFilterEnabled);
+        config.inventorySession = extractIntValue(json, "inventorySession", config.inventorySession);
+        config.inventoryTarget = extractIntValue(json, "inventoryTarget", config.inventoryTarget);
+        config.tagPopulation = extractIntValue(json, "tagPopulation", config.tagPopulation);
+        config.rfModeIndex = extractIntValue(json, "rfModeIndex", config.rfModeIndex);
+        config.denseReaderMode = extractBooleanValue(json, "denseReaderMode", config.denseReaderMode);
+        config.gpiTriggerPort = extractIntValue(json, "gpiTriggerPort", config.gpiTriggerPort);
+        config.gpiTriggerEnabled = extractBooleanValue(json, "gpiTriggerEnabled", config.gpiTriggerEnabled);
+        config.gpiTriggerState = extractBooleanValue(json, "gpiTriggerState", config.gpiTriggerState);
+        config.reportIntervalMs = extractIntValue(json, "reportIntervalMs", config.reportIntervalMs);
+        config.reportTimestamp = extractBooleanValue(json, "reportTimestamp", config.reportTimestamp);
+        config.reportAntennaId = extractBooleanValue(json, "reportAntennaId", config.reportAntennaId);
+        config.reportPhaseAngle = extractBooleanValue(json, "reportPhaseAngle", config.reportPhaseAngle);
+        config.reportChannelIndex = extractBooleanValue(json, "reportChannelIndex", config.reportChannelIndex);
+        config.autoConnectEnabled = extractBooleanValue(json, "autoConnectEnabled", config.autoConnectEnabled);
+        config.displayHexMode = extractBooleanValue(json, "displayHexMode", config.displayHexMode);
         
         return config;
     }

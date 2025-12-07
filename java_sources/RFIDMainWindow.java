@@ -1024,6 +1024,14 @@ public class RFIDMainWindow extends JFrame {
                 "Mostrando en Hexadecimal - Clic para cambiar a Decimal" : 
                 "Mostrando en Decimal - Clic para cambiar a Hexadecimal");
             updateTagTable(); // Refrescar la tabla con el nuevo formato
+            // Sincronizar con API client
+            if (apiClient != null) {
+                apiClient.setDisplayHexMode(displayHexMode);
+            }
+            // Guardar preferencia
+            config.setDisplayHexMode(displayHexMode);
+            autoSaveConfiguration();
+            System.out.println("[Config] Formato EPC cambiado a: " + (displayHexMode ? "Hexadecimal" : "Decimal"));
         });
         
         // Botón probar API
@@ -1141,6 +1149,11 @@ public class RFIDMainWindow extends JFrame {
         if (config.getApiKey() != null) {
             apiKeyField.setText(config.getApiKey());
         }
+        
+        // Cargar preferencia de formato EPC
+        displayHexMode = config.isDisplayHexMode();
+        hexDecimalToggle.setSelected(displayHexMode);
+        hexDecimalToggle.setText(displayHexMode ? "HEX" : "DEC");
     }
     
     /**
@@ -1158,6 +1171,9 @@ public class RFIDMainWindow extends JFrame {
         
         config.setApiEndpoint(apiEndpointField.getText().trim());
         config.setApiKey(new String(apiKeyField.getPassword()));
+        
+        // Guardar preferencia de formato EPC
+        config.setDisplayHexMode(displayHexMode);
     }
     
     // ==================== Acciones ====================
@@ -1339,6 +1355,7 @@ public class RFIDMainWindow extends JFrame {
         
         if (!endpoint.isEmpty()) {
             apiClient = new APIClient(endpoint, key);
+            apiClient.setDisplayHexMode(displayHexMode); // Sincronizar formato EPC
             apiClient.setSendResultHandler(result -> {
                 SwingUtilities.invokeLater(() -> {
                     if (result.success) {
@@ -1473,11 +1490,11 @@ public class RFIDMainWindow extends JFrame {
     
     /**
      * Convierte un EPC hexadecimal a formato decimal.
-     * El EPC se divide en segmentos de 4 caracteres hex y cada uno se convierte a decimal.
-     * Ejemplo: "E2801170000002150A77C87C" -> "57984-4464-0-533-2679-51324"
+     * Convierte el EPC completo a un número decimal grande.
+     * Ejemplo: "E2801170000002150A77C87C" -> "300830068000000562168440956"
      * 
      * @param hexEpc EPC en formato hexadecimal
-     * @return EPC en formato decimal (segmentos separados por guiones)
+     * @return EPC en formato decimal (número grande)
      */
     private String convertEpcToDecimal(String hexEpc) {
         if (hexEpc == null || hexEpc.isEmpty()) {
@@ -1485,22 +1502,23 @@ public class RFIDMainWindow extends JFrame {
         }
         
         try {
-            StringBuilder decimal = new StringBuilder();
-            // Procesar en bloques de 4 caracteres hex (16 bits = 0-65535)
-            for (int i = 0; i < hexEpc.length(); i += 4) {
-                int endIndex = Math.min(i + 4, hexEpc.length());
-                String segment = hexEpc.substring(i, endIndex);
-                long value = Long.parseLong(segment, 16);
-                if (decimal.length() > 0) {
-                    decimal.append("-");
-                }
-                decimal.append(value);
-            }
-            return decimal.toString();
+            // Convertir hexadecimal completo a BigInteger decimal
+            java.math.BigInteger bigInt = new java.math.BigInteger(hexEpc, 16);
+            return bigInt.toString();
         } catch (NumberFormatException e) {
             // Si hay error de conversión, devolver el original
             return hexEpc;
         }
+    }
+    
+    /**
+     * Formatea un EPC según el modo de visualización actual.
+     * 
+     * @param hexEpc EPC en formato hexadecimal original
+     * @return EPC formateado según displayHexMode
+     */
+    public String formatEpc(String hexEpc) {
+        return displayHexMode ? hexEpc : convertEpcToDecimal(hexEpc);
     }
     
     /**
