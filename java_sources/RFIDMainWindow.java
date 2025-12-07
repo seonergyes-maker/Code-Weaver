@@ -60,6 +60,8 @@ public class RFIDMainWindow extends JFrame {
     private JLabel tpsLabel;
     private JButton clearTagsButton;
     private JCheckBox autoScrollCheck;
+    private JToggleButton hexDecimalToggle;
+    private boolean displayHexMode = true; // true = hexadecimal, false = decimal
     
     // ==================== Componentes de API ====================
     private JTextField apiEndpointField;
@@ -415,6 +417,10 @@ public class RFIDMainWindow extends JFrame {
         tpsLabel = new JLabel("0.0");
         clearTagsButton = new JButton("Limpiar");
         autoScrollCheck = new JCheckBox("Auto-scroll", true);
+        hexDecimalToggle = new JToggleButton("HEX", true);
+        hexDecimalToggle.setToolTipText("Alternar entre visualización Hexadecimal y Decimal del EPC");
+        hexDecimalToggle.setFont(new Font("Monospaced", Font.BOLD, 11));
+        hexDecimalToggle.setPreferredSize(new Dimension(60, 25));
         
         // Componentes de API
         apiEndpointField = new JTextField(config.getApiEndpoint() != null ? config.getApiEndpoint() : "", 30);
@@ -640,6 +646,9 @@ public class RFIDMainWindow extends JFrame {
         statsPanel.add(Box.createHorizontalStrut(20));
         statsPanel.add(clearTagsButton);
         statsPanel.add(autoScrollCheck);
+        statsPanel.add(Box.createHorizontalStrut(10));
+        statsPanel.add(new JLabel("Formato EPC:"));
+        statsPanel.add(hexDecimalToggle);
         panel.add(statsPanel, BorderLayout.NORTH);
         
         // Tabla de tags
@@ -1006,6 +1015,16 @@ public class RFIDMainWindow extends JFrame {
         
         // Botón limpiar tags
         clearTagsButton.addActionListener(e -> clearTags());
+        
+        // Toggle Hex/Decimal
+        hexDecimalToggle.addActionListener(e -> {
+            displayHexMode = hexDecimalToggle.isSelected();
+            hexDecimalToggle.setText(displayHexMode ? "HEX" : "DEC");
+            hexDecimalToggle.setToolTipText(displayHexMode ? 
+                "Mostrando en Hexadecimal - Clic para cambiar a Decimal" : 
+                "Mostrando en Decimal - Clic para cambiar a Hexadecimal");
+            updateTagTable(); // Refrescar la tabla con el nuevo formato
+        });
         
         // Botón probar API
         testApiButton.addActionListener(e -> testApiConnection());
@@ -1437,8 +1456,9 @@ public class RFIDMainWindow extends JFrame {
             .sorted((a, b) -> Long.compare(b.getLastSeen(), a.getLastSeen()))
             .limit(maxTagsInTable)
             .forEach(tag -> {
+                String epcDisplay = displayHexMode ? tag.getEpc() : convertEpcToDecimal(tag.getEpc());
                 tagTableModel.addRow(new Object[]{
-                    tag.getEpc(),
+                    epcDisplay,
                     String.format("%.1f", tag.getRssi()),
                     tag.getAntennaPort(),
                     tag.getReadCount(),
@@ -1448,6 +1468,38 @@ public class RFIDMainWindow extends JFrame {
         
         if (autoScrollCheck.isSelected() && tagTable.getRowCount() > 0) {
             tagTable.scrollRectToVisible(tagTable.getCellRect(0, 0, true));
+        }
+    }
+    
+    /**
+     * Convierte un EPC hexadecimal a formato decimal.
+     * El EPC se divide en segmentos de 4 caracteres hex y cada uno se convierte a decimal.
+     * Ejemplo: "E2801170000002150A77C87C" -> "57984-4464-0-533-2679-51324"
+     * 
+     * @param hexEpc EPC en formato hexadecimal
+     * @return EPC en formato decimal (segmentos separados por guiones)
+     */
+    private String convertEpcToDecimal(String hexEpc) {
+        if (hexEpc == null || hexEpc.isEmpty()) {
+            return "";
+        }
+        
+        try {
+            StringBuilder decimal = new StringBuilder();
+            // Procesar en bloques de 4 caracteres hex (16 bits = 0-65535)
+            for (int i = 0; i < hexEpc.length(); i += 4) {
+                int endIndex = Math.min(i + 4, hexEpc.length());
+                String segment = hexEpc.substring(i, endIndex);
+                long value = Long.parseLong(segment, 16);
+                if (decimal.length() > 0) {
+                    decimal.append("-");
+                }
+                decimal.append(value);
+            }
+            return decimal.toString();
+        } catch (NumberFormatException e) {
+            // Si hay error de conversión, devolver el original
+            return hexEpc;
         }
     }
     
