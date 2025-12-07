@@ -77,6 +77,12 @@ public class RFIDConfig implements Serializable {
     /** Región regulatoria */
     private String regulatoryRegion;
     
+    /** Habilitar filtro de duplicados */
+    private boolean duplicateFilterEnabled;
+    
+    /** Tiempo de expiración del filtro de duplicados en segundos */
+    private int duplicateFilterExpiration;
+    
     /**
      * Constructor por defecto con valores predeterminados.
      */
@@ -99,6 +105,9 @@ public class RFIDConfig implements Serializable {
         
         this.gpoSettings = new boolean[4];
         Arrays.fill(this.gpoSettings, false);
+        
+        this.duplicateFilterEnabled = true;
+        this.duplicateFilterExpiration = 5;
     }
     
     /**
@@ -264,6 +273,23 @@ public class RFIDConfig implements Serializable {
     
     public void setRegulatoryRegion(String regulatoryRegion) {
         this.regulatoryRegion = regulatoryRegion;
+    }
+    
+    public boolean isDuplicateFilterEnabled() {
+        return duplicateFilterEnabled;
+    }
+    
+    public void setDuplicateFilterEnabled(boolean enabled) {
+        this.duplicateFilterEnabled = enabled;
+    }
+    
+    public int getDuplicateFilterExpiration() {
+        return duplicateFilterExpiration;
+    }
+    
+    public void setDuplicateFilterExpiration(int seconds) {
+        if (seconds < 1) seconds = 1;
+        this.duplicateFilterExpiration = seconds;
     }
     
     // ==================== Métodos de utilidad ====================

@@ -75,6 +75,17 @@ public class RFIDMainWindow extends JFrame {
     private JLabel statsLabel;
     private JProgressBar activityIndicator;
     
+    // ==================== Componentes de Herramientas ====================
+    private JCheckBox duplicateFilterCheck;
+    private JSpinner duplicateExpirationSpinner;
+    private JButton generateWindowsServiceButton;
+    private JButton generateUbuntuServiceButton;
+    private JButton saveConfigButton;
+    private JLabel duplicateStatsLabel;
+    
+    // ==================== Filtro de duplicados ====================
+    private DuplicateFilter duplicateFilter;
+    
     // ==================== Panel de pestañas ====================
     private JTabbedPane tabbedPane;
     
@@ -109,6 +120,8 @@ public class RFIDMainWindow extends JFrame {
         super(WINDOW_TITLE);
         this.config = config != null ? config : new RFIDConfig();
         this.statistics = new ReaderStatistics();
+        this.duplicateFilter = new DuplicateFilter(this.config.getDuplicateFilterExpiration() * 1000L);
+        this.duplicateFilter.setEnabled(this.config.isDuplicateFilterEnabled());
         
         initializeLookAndFeel();
         initializeComponents();
@@ -216,6 +229,15 @@ public class RFIDMainWindow extends JFrame {
         activityIndicator.setIndeterminate(false);
         activityIndicator.setPreferredSize(new Dimension(100, 15));
         
+        // Componentes de Herramientas
+        duplicateFilterCheck = new JCheckBox("Filtrar tags duplicados", config.isDuplicateFilterEnabled());
+        duplicateExpirationSpinner = new JSpinner(new SpinnerNumberModel(
+            config.getDuplicateFilterExpiration(), 1, 300, 1));
+        generateWindowsServiceButton = new JButton("Generar Instalador Windows");
+        generateUbuntuServiceButton = new JButton("Generar Script Ubuntu");
+        saveConfigButton = new JButton("Guardar Configuración");
+        duplicateStatsLabel = new JLabel("Filtrados: 0 | Procesados: 0");
+        
         // Panel de pestañas
         tabbedPane = new JTabbedPane();
     }
@@ -232,6 +254,7 @@ public class RFIDMainWindow extends JFrame {
         tabbedPane.addTab("Monitoreo", createMonitoringPanel());
         tabbedPane.addTab("API", createApiPanel());
         tabbedPane.addTab("GPIO", createGpioPanel());
+        tabbedPane.addTab("Herramientas", createToolsPanel());
         
         add(tabbedPane, BorderLayout.CENTER);
         add(createStatusBar(), BorderLayout.SOUTH);
@@ -480,6 +503,83 @@ public class RFIDMainWindow extends JFrame {
     }
     
     /**
+     * Crea el panel de herramientas.
+     * 
+     * @return Panel de herramientas
+     */
+    private JPanel createToolsPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        // ==================== Sección Filtro de Duplicados ====================
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 3;
+        JLabel filterTitle = new JLabel("Filtro de Tags Duplicados");
+        filterTitle.setFont(filterTitle.getFont().deriveFont(Font.BOLD, 14f));
+        panel.add(filterTitle, gbc);
+        
+        gbc.gridy = 1; gbc.gridwidth = 1;
+        panel.add(duplicateFilterCheck, gbc);
+        
+        gbc.gridx = 1;
+        panel.add(new JLabel("Tiempo de expiración (segundos):"), gbc);
+        
+        gbc.gridx = 2;
+        panel.add(duplicateExpirationSpinner, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 3;
+        panel.add(duplicateStatsLabel, gbc);
+        
+        // Separador
+        gbc.gridy = 3; gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(new JSeparator(), gbc);
+        
+        // ==================== Sección Instaladores de Servicio ====================
+        gbc.gridy = 4; gbc.fill = GridBagConstraints.NONE;
+        JLabel serviceTitle = new JLabel("Generadores de Servicio");
+        serviceTitle.setFont(serviceTitle.getFont().deriveFont(Font.BOLD, 14f));
+        panel.add(serviceTitle, gbc);
+        
+        gbc.gridy = 5; gbc.gridwidth = 1;
+        gbc.gridx = 0;
+        panel.add(generateWindowsServiceButton, gbc);
+        
+        gbc.gridx = 1;
+        panel.add(generateUbuntuServiceButton, gbc);
+        
+        gbc.gridy = 6; gbc.gridx = 0; gbc.gridwidth = 3;
+        JLabel serviceInfo = new JLabel("<html><i>Genera scripts de instalación para ejecutar como servicio del sistema.</i></html>");
+        panel.add(serviceInfo, gbc);
+        
+        // Separador
+        gbc.gridy = 7; gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(new JSeparator(), gbc);
+        
+        // ==================== Sección Configuración ====================
+        gbc.gridy = 8; gbc.fill = GridBagConstraints.NONE;
+        JLabel configTitle = new JLabel("Configuración");
+        configTitle.setFont(configTitle.getFont().deriveFont(Font.BOLD, 14f));
+        panel.add(configTitle, gbc);
+        
+        gbc.gridy = 9; gbc.gridwidth = 1;
+        panel.add(saveConfigButton, gbc);
+        
+        gbc.gridx = 1; gbc.gridwidth = 2;
+        JLabel saveInfo = new JLabel("Guarda la configuración actual en config.json");
+        panel.add(saveInfo, gbc);
+        
+        // Espacio vacío para expandir
+        gbc.gridx = 0; gbc.gridy = 10; gbc.gridwidth = 3;
+        gbc.weighty = 1.0;
+        panel.add(new JLabel(), gbc);
+        
+        return panel;
+    }
+    
+    /**
      * Crea la barra de estado inferior.
      * 
      * @return Panel de barra de estado
@@ -519,6 +619,25 @@ public class RFIDMainWindow extends JFrame {
             final int port = i + 1;
             gpoButtons[i].addActionListener(e -> toggleGpo(port));
         }
+        
+        // Filtro de duplicados
+        duplicateFilterCheck.addActionListener(e -> {
+            duplicateFilter.setEnabled(duplicateFilterCheck.isSelected());
+            config.setDuplicateFilterEnabled(duplicateFilterCheck.isSelected());
+        });
+        
+        duplicateExpirationSpinner.addChangeListener(e -> {
+            int seconds = (Integer) duplicateExpirationSpinner.getValue();
+            duplicateFilter.setExpirationSeconds(seconds);
+            config.setDuplicateFilterExpiration(seconds);
+        });
+        
+        // Generadores de servicio
+        generateWindowsServiceButton.addActionListener(e -> generateWindowsService());
+        generateUbuntuServiceButton.addActionListener(e -> generateUbuntuService());
+        
+        // Guardar configuración
+        saveConfigButton.addActionListener(e -> saveConfiguration());
         
         // Cierre de ventana
         addWindowListener(new WindowAdapter() {
@@ -800,6 +919,18 @@ public class RFIDMainWindow extends JFrame {
     public void addTag(TagData tag) {
         if (tag == null) return;
         
+        // Filtrar duplicados si está habilitado
+        if (!duplicateFilter.shouldProcess(tag.getEpc())) {
+            // Actualizar estadísticas de filtrado en la UI
+            SwingUtilities.invokeLater(() -> {
+                duplicateStatsLabel.setText(String.format(
+                    "Filtrados: %d | Procesados: %d",
+                    duplicateFilter.getDuplicatesFiltered(),
+                    duplicateFilter.getUniqueTagsProcessed()));
+            });
+            return;
+        }
+        
         statistics.recordTagRead(tag);
         
         String epc = tag.getEpc();
@@ -945,5 +1076,151 @@ public class RFIDMainWindow extends JFrame {
     
     public APIClient getApiClient() {
         return apiClient;
+    }
+    
+    public DuplicateFilter getDuplicateFilter() {
+        return duplicateFilter;
+    }
+    
+    // ==================== Métodos de Herramientas ====================
+    
+    /**
+     * Genera los scripts de instalación para Windows Service.
+     */
+    private void generateWindowsService() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Seleccionar carpeta de destino");
+        chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        
+        if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            try {
+                WindowsServiceInstaller installer = new WindowsServiceInstaller();
+                installer.setServiceName("RFIDZebraService");
+                installer.setJarFileName("rfid-zebra.jar");
+                installer.setAutoStart(true);
+                installer.generateAll(chooser.getSelectedFile().getAbsolutePath());
+                
+                JOptionPane.showMessageDialog(this,
+                    "Scripts de Windows generados exitosamente:\n" +
+                    "- install-service-nssm.bat\n" +
+                    "- install-service-winsw.bat\n" +
+                    "- uninstall-service.bat\n" +
+                    "- LEEME-Windows.txt",
+                    "Éxito",
+                    JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this,
+                    "Error al generar scripts: " + e.getMessage(),
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    /**
+     * Genera el script de instalación para Ubuntu/Debian.
+     */
+    private void generateUbuntuService() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Guardar script de instalación Ubuntu");
+        chooser.setSelectedFile(new java.io.File("install-rfid-ubuntu.sh"));
+        
+        if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            try {
+                StringBuilder sb = new StringBuilder();
+                sb.append("#!/bin/bash\n");
+                sb.append("# Script de instalación para Ubuntu/Debian\n");
+                sb.append("# Ejecutar con: sudo bash install-rfid-ubuntu.sh\n\n");
+                
+                sb.append("set -e\n\n");
+                
+                sb.append("echo \"========================================\"\n");
+                sb.append("echo \"  Instalador RFID Zebra FX7500\"\n");
+                sb.append("echo \"========================================\"\n\n");
+                
+                sb.append("# Verificar permisos de root\n");
+                sb.append("if [ \"$EUID\" -ne 0 ]; then\n");
+                sb.append("    echo \"Error: Ejecutar con sudo\"\n");
+                sb.append("    exit 1\n");
+                sb.append("fi\n\n");
+                
+                sb.append("# Instalar Java si no existe\n");
+                sb.append("if ! command -v java &> /dev/null; then\n");
+                sb.append("    echo \"Instalando OpenJDK 17...\"\n");
+                sb.append("    apt-get update\n");
+                sb.append("    apt-get install -y openjdk-17-jre-headless\n");
+                sb.append("fi\n\n");
+                
+                sb.append("# Crear directorio de instalación\n");
+                sb.append("INSTALL_DIR=\"/opt/rfid-zebra\"\n");
+                sb.append("mkdir -p $INSTALL_DIR\n");
+                sb.append("mkdir -p $INSTALL_DIR/logs\n\n");
+                
+                sb.append("# Copiar archivos\n");
+                sb.append("cp rfid-zebra.jar $INSTALL_DIR/\n");
+                sb.append("[ -f config.json ] && cp config.json $INSTALL_DIR/\n\n");
+                
+                sb.append("# Crear servicio systemd\n");
+                sb.append("cat > /etc/systemd/system/rfid-zebra.service << EOF\n");
+                sb.append("[Unit]\n");
+                sb.append("Description=RFID Zebra FX7500 Service\n");
+                sb.append("After=network.target\n\n");
+                sb.append("[Service]\n");
+                sb.append("Type=simple\n");
+                sb.append("User=root\n");
+                sb.append("WorkingDirectory=$INSTALL_DIR\n");
+                sb.append("ExecStart=/usr/bin/java -Xmx256m -jar rfid-zebra.jar --headless\n");
+                sb.append("Restart=always\n");
+                sb.append("RestartSec=10\n\n");
+                sb.append("[Install]\n");
+                sb.append("WantedBy=multi-user.target\n");
+                sb.append("EOF\n\n");
+                
+                sb.append("# Habilitar e iniciar servicio\n");
+                sb.append("systemctl daemon-reload\n");
+                sb.append("systemctl enable rfid-zebra\n");
+                sb.append("systemctl start rfid-zebra\n\n");
+                
+                sb.append("echo \"\"\n");
+                sb.append("echo \"Instalación completada!\"\n");
+                sb.append("echo \"Comandos útiles:\"\n");
+                sb.append("echo \"  sudo systemctl status rfid-zebra\"\n");
+                sb.append("echo \"  sudo journalctl -u rfid-zebra -f\"\n");
+                
+                java.io.FileWriter writer = new java.io.FileWriter(chooser.getSelectedFile());
+                writer.write(sb.toString());
+                writer.close();
+                
+                JOptionPane.showMessageDialog(this,
+                    "Script de Ubuntu generado: " + chooser.getSelectedFile().getName(),
+                    "Éxito",
+                    JOptionPane.INFORMATION_MESSAGE);
+            } catch (Exception e) {
+                JOptionPane.showMessageDialog(this,
+                    "Error al generar script: " + e.getMessage(),
+                    "Error",
+                    JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+    
+    /**
+     * Guarda la configuración actual en archivo JSON.
+     */
+    private void saveConfiguration() {
+        saveUIToConfig();
+        
+        try {
+            config.saveToFile("config.json");
+            JOptionPane.showMessageDialog(this,
+                "Configuración guardada en config.json",
+                "Guardado",
+                JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this,
+                "Error al guardar: " + e.getMessage(),
+                "Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
     }
 }
