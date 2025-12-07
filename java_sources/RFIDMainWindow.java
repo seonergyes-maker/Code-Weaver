@@ -206,21 +206,11 @@ public class RFIDMainWindow extends JFrame {
     }
     
     /**
-     * Inicializa el look and feel de la aplicación.
+     * Inicializa el look and feel de la aplicación con tema oscuro moderno.
      */
     private void initializeLookAndFeel() {
-        try {
-            // Intentar cargar FlatLaf si está disponible
-            Class<?> flatLafClass = Class.forName("com.formdev.flatlaf.FlatLightLaf");
-            UIManager.setLookAndFeel((LookAndFeel) flatLafClass.getDeclaredConstructor().newInstance());
-        } catch (Exception e) {
-            try {
-                // Usar look and feel del sistema
-                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-            } catch (Exception ex) {
-                // Usar look and feel por defecto
-            }
-        }
+        // Aplicar tema oscuro moderno
+        ModernUIStyle.applyDarkTheme();
     }
     
     /**
@@ -371,21 +361,31 @@ public class RFIDMainWindow extends JFrame {
     }
     
     /**
-     * Inicializa todos los componentes de la interfaz.
+     * Inicializa todos los componentes de la interfaz con estilos modernos.
      */
     private void initializeComponents() {
         // Componentes de conexión
         ipField = new JTextField(config.getReaderIP(), 15);
+        ModernUIStyle.styleTextField(ipField);
+        
         portSpinner = new JSpinner(new SpinnerNumberModel(config.getReaderPort(), 1, 65535, 1));
-        connectButton = new JButton("Conectar");
-        disconnectButton = new JButton("Desconectar");
+        ModernUIStyle.styleSpinner(portSpinner);
+        
+        connectButton = new JButton("⚡ Conectar");
+        ModernUIStyle.stylePrimaryButton(connectButton);
+        
+        disconnectButton = new JButton("✕ Desconectar");
+        ModernUIStyle.styleDangerButton(disconnectButton);
         disconnectButton.setEnabled(false);
+        
         connectionStatusLabel = new JLabel("Desconectado");
-        connectionIndicator = new JPanel();
-        connectionIndicator.setPreferredSize(new Dimension(20, 20));
-        connectionIndicator.setBackground(Color.RED);
-        connectionIndicator.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY));
+        connectionStatusLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
+        connectionStatusLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        
+        connectionIndicator = ModernUIStyle.createStatusIndicator(ModernUIStyle.ACCENT_ERROR);
+        
         autoConnectCheck = new JCheckBox("Auto-conectar al iniciar", config.isAutoConnectEnabled());
+        ModernUIStyle.styleCheckBox(autoConnectCheck);
         
         // Componentes de antenas
         for (int i = 0; i < 4; i++) {
@@ -394,9 +394,14 @@ public class RFIDMainWindow extends JFrame {
             powerSliders[i].setMinorTickSpacing(1);
             powerSliders[i].setPaintTicks(true);
             powerSliders[i].setPaintLabels(true);
+            ModernUIStyle.styleSlider(powerSliders[i]);
             
             antennaEnableChecks[i] = new JCheckBox("Habilitada", config.getAntennaConfig(i + 1).isEnabled());
+            ModernUIStyle.styleCheckBox(antennaEnableChecks[i]);
+            
             powerLabels[i] = new JLabel(powerSliders[i].getValue() + " dBm");
+            powerLabels[i].setForeground(ModernUIStyle.ACCENT_PRIMARY);
+            powerLabels[i].setFont(new Font("Consolas", Font.BOLD, 14));
         }
         
         // Componentes de monitoreo
@@ -411,83 +416,159 @@ public class RFIDMainWindow extends JFrame {
         tagTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tagTable.getColumnModel().getColumn(0).setPreferredWidth(200);
         tagTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+        ModernUIStyle.styleTable(tagTable);
         
         tagsReadLabel = new JLabel("0");
+        tagsReadLabel.setForeground(ModernUIStyle.ACCENT_PRIMARY);
+        tagsReadLabel.setFont(new Font("Consolas", Font.BOLD, 16));
+        
         uniqueTagsLabel = new JLabel("0");
+        uniqueTagsLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
+        uniqueTagsLabel.setFont(new Font("Consolas", Font.BOLD, 16));
+        
         tpsLabel = new JLabel("0.0");
-        clearTagsButton = new JButton("Limpiar");
+        tpsLabel.setForeground(ModernUIStyle.ACCENT_WARNING);
+        tpsLabel.setFont(new Font("Consolas", Font.BOLD, 16));
+        
+        clearTagsButton = new JButton("🗑 Limpiar");
+        ModernUIStyle.styleSecondaryButton(clearTagsButton);
+        
         autoScrollCheck = new JCheckBox("Auto-scroll", true);
+        ModernUIStyle.styleCheckBox(autoScrollCheck);
+        
         hexDecimalToggle = new JToggleButton("HEX", true);
         hexDecimalToggle.setToolTipText("Alternar entre visualización Hexadecimal y Decimal del EPC");
-        hexDecimalToggle.setFont(new Font("Monospaced", Font.BOLD, 11));
-        hexDecimalToggle.setPreferredSize(new Dimension(60, 25));
+        hexDecimalToggle.setFont(new Font("Consolas", Font.BOLD, 11));
+        hexDecimalToggle.setBackground(ModernUIStyle.ACCENT_INFO);
+        hexDecimalToggle.setForeground(Color.WHITE);
+        hexDecimalToggle.setFocusPainted(false);
+        hexDecimalToggle.setPreferredSize(new Dimension(65, 28));
         
         // Componentes de API
         apiEndpointField = new JTextField(config.getApiEndpoint() != null ? config.getApiEndpoint() : "", 30);
+        ModernUIStyle.styleTextField(apiEndpointField);
+        
         apiKeyField = new JPasswordField(config.getApiKey() != null ? config.getApiKey() : "", 20);
-        testApiButton = new JButton("Probar Conexión");
+        apiKeyField.setBackground(ModernUIStyle.BG_INPUT);
+        apiKeyField.setForeground(ModernUIStyle.TEXT_PRIMARY);
+        apiKeyField.setCaretColor(ModernUIStyle.TEXT_PRIMARY);
+        apiKeyField.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(ModernUIStyle.BORDER_DEFAULT, 1),
+            BorderFactory.createEmptyBorder(8, 12, 8, 12)
+        ));
+        
+        testApiButton = new JButton("🔗 Probar Conexión");
+        ModernUIStyle.styleSecondaryButton(testApiButton);
+        
         apiStatusLabel = new JLabel("No configurado");
+        apiStatusLabel.setForeground(ModernUIStyle.TEXT_MUTED);
+        
         apiEnabledCheck = new JCheckBox("Envío automático habilitado", false);
+        ModernUIStyle.styleCheckBox(apiEnabledCheck);
         
         // Componentes de GPIO
         for (int i = 0; i < 4; i++) {
             gpoButtons[i] = new JToggleButton("GPO " + (i + 1));
-            gpoButtons[i].setPreferredSize(new Dimension(100, 40));
+            gpoButtons[i].setPreferredSize(new Dimension(110, 45));
+            gpoButtons[i].setBackground(ModernUIStyle.BG_CARD);
+            gpoButtons[i].setForeground(ModernUIStyle.TEXT_PRIMARY);
+            gpoButtons[i].setFont(new Font("Segoe UI", Font.BOLD, 12));
+            gpoButtons[i].setFocusPainted(false);
+            gpoButtons[i].setBorder(BorderFactory.createLineBorder(ModernUIStyle.BORDER_DEFAULT, 2));
             
-            gpiIndicators[i] = new JPanel();
+            gpiIndicators[i] = ModernUIStyle.createStatusIndicator(ModernUIStyle.TEXT_MUTED);
             gpiIndicators[i].setPreferredSize(new Dimension(30, 30));
-            gpiIndicators[i].setBackground(Color.GRAY);
-            gpiIndicators[i].setBorder(BorderFactory.createLineBorder(Color.BLACK));
             
             gpiLabels[i] = new JLabel("GPI " + (i + 1) + ": --");
+            gpiLabels[i].setForeground(ModernUIStyle.TEXT_SECONDARY);
+            gpiLabels[i].setFont(new Font("Consolas", Font.PLAIN, 12));
         }
         
         // Barra de estado
-        statusLabel = new JLabel("Listo");
+        statusLabel = new JLabel("● Listo");
+        statusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
+        statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        
         statsLabel = new JLabel("Tags: 0 | Únicos: 0 | TPS: 0.0");
-        activityIndicator = new JProgressBar();
+        statsLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
+        statsLabel.setFont(new Font("Consolas", Font.PLAIN, 12));
+        
+        activityIndicator = ModernUIStyle.createModernProgressBar();
         activityIndicator.setIndeterminate(false);
-        activityIndicator.setPreferredSize(new Dimension(100, 15));
+        activityIndicator.setPreferredSize(new Dimension(120, 8));
         
         // Componentes de Herramientas
         duplicateFilterCheck = new JCheckBox("Filtrar tags duplicados", config.isDuplicateFilterEnabled());
+        ModernUIStyle.styleCheckBox(duplicateFilterCheck);
+        
         duplicateExpirationSpinner = new JSpinner(new SpinnerNumberModel(
             config.getDuplicateFilterExpiration(), 1, 300, 1));
-        generateWindowsServiceButton = new JButton("Generar Instalador Windows");
-        generateUbuntuServiceButton = new JButton("Generar Script Ubuntu");
-        saveConfigButton = new JButton("Guardar Configuración");
+        ModernUIStyle.styleSpinner(duplicateExpirationSpinner);
+        
+        generateWindowsServiceButton = new JButton("🪟 Generar Instalador Windows");
+        ModernUIStyle.stylePrimaryButton(generateWindowsServiceButton);
+        
+        generateUbuntuServiceButton = new JButton("🐧 Generar Script Ubuntu");
+        ModernUIStyle.styleSecondaryButton(generateUbuntuServiceButton);
+        
+        saveConfigButton = new JButton("💾 Guardar Configuración");
+        ModernUIStyle.styleSuccessButton(saveConfigButton);
+        
         duplicateStatsLabel = new JLabel("Filtrados: 0 | Procesados: 0");
+        duplicateStatsLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
+        duplicateStatsLabel.setFont(new Font("Consolas", Font.PLAIN, 11));
         
         // Componentes de Configuración Avanzada
         rssiFilterCheck = new JCheckBox("Filtrar por RSSI", config.isRssiFilterEnabled());
+        ModernUIStyle.styleCheckBox(rssiFilterCheck);
+        
         rssiThresholdSpinner = new JSpinner(new SpinnerNumberModel(
             config.getRssiThreshold(), -80, 0, 1));
+        ModernUIStyle.styleSpinner(rssiThresholdSpinner);
+        
         rssiStatsLabel = new JLabel("Filtrados por RSSI: 0");
+        rssiStatsLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
         
         sessionCombo = new JComboBox<>(new String[]{"S0 (Volátil)", "S1 (Persistente)", "S2 (Multi-lector)", "S3 (Multi-lector)"});
         sessionCombo.setSelectedIndex(config.getInventorySession());
+        ModernUIStyle.styleComboBox(sessionCombo);
         
         targetCombo = new JComboBox<>(new String[]{"A", "B", "A↔B (Alternado)"});
         targetCombo.setSelectedIndex(config.getInventoryTarget());
+        ModernUIStyle.styleComboBox(targetCombo);
         
         tagPopulationSpinner = new JSpinner(new SpinnerNumberModel(
             config.getTagPopulation(), 1, 1000, 10));
+        ModernUIStyle.styleSpinner(tagPopulationSpinner);
         
         denseReaderCheck = new JCheckBox("Dense Reader Mode (DRM)", config.isDenseReaderMode());
+        ModernUIStyle.styleCheckBox(denseReaderCheck);
+        
         rfModeSpinner = new JSpinner(new SpinnerNumberModel(
             config.getRfModeIndex(), 0, 50, 1));
+        ModernUIStyle.styleSpinner(rfModeSpinner);
         
         gpiTriggerCheck = new JCheckBox("Trigger por GPI", config.isGpiTriggerEnabled());
+        ModernUIStyle.styleCheckBox(gpiTriggerCheck);
+        
         gpiTriggerPortCombo = new JComboBox<>(new String[]{"Deshabilitado", "GPI 1", "GPI 2", "GPI 3", "GPI 4"});
         gpiTriggerPortCombo.setSelectedIndex(config.getGpiTriggerPort());
+        ModernUIStyle.styleComboBox(gpiTriggerPortCombo);
+        
         gpiTriggerStateCombo = new JComboBox<>(new String[]{"HIGH (Alto)", "LOW (Bajo)"});
         gpiTriggerStateCombo.setSelectedIndex(config.isGpiTriggerState() ? 0 : 1);
+        ModernUIStyle.styleComboBox(gpiTriggerStateCombo);
         
         reportPhaseCheck = new JCheckBox("Reportar Phase Angle", config.isReportPhaseAngle());
+        ModernUIStyle.styleCheckBox(reportPhaseCheck);
+        
         reportChannelCheck = new JCheckBox("Reportar Canal RF", config.isReportChannelIndex());
+        ModernUIStyle.styleCheckBox(reportChannelCheck);
         
         // Panel de pestañas
         tabbedPane = new JTabbedPane();
+        tabbedPane.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        ModernUIStyle.styleTabbedPane(tabbedPane);
     }
     
     /**
@@ -510,61 +591,88 @@ public class RFIDMainWindow extends JFrame {
     }
     
     /**
-     * Crea el panel de conexión.
+     * Crea el panel de conexión con estilo moderno.
      * 
      * @return Panel de conexión
      */
     private JPanel createConnectionPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        panel.setBackground(ModernUIStyle.BG_DARK);
+        panel.setBorder(BorderFactory.createEmptyBorder(25, 25, 25, 25));
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.insets = new Insets(8, 8, 8, 8);
         gbc.anchor = GridBagConstraints.WEST;
         
-        // Título
+        // Título con icono
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 4;
-        JLabel titleLabel = new JLabel("Configuración de Conexión LLRP");
-        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 16f));
+        JLabel titleLabel = ModernUIStyle.createTitleLabel("📡 Conexión LLRP");
         panel.add(titleLabel, gbc);
         
+        // Subtítulo
+        gbc.gridy = 1;
+        JLabel subtitleLabel = ModernUIStyle.createSubtitleLabel("Configure la conexión con el lector Zebra FX7500");
+        panel.add(subtitleLabel, gbc);
+        
         // IP
-        gbc.gridy = 1; gbc.gridwidth = 1;
-        panel.add(new JLabel("Dirección IP:"), gbc);
+        gbc.gridy = 2; gbc.gridwidth = 1;
+        JLabel ipLabel = new JLabel("Dirección IP:");
+        ipLabel.setForeground(ModernUIStyle.TEXT_PRIMARY);
+        panel.add(ipLabel, gbc);
         gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(ipField, gbc);
         
         // Puerto
         gbc.gridx = 2; gbc.fill = GridBagConstraints.NONE;
-        panel.add(new JLabel("Puerto:"), gbc);
+        JLabel portLabel = new JLabel("Puerto:");
+        portLabel.setForeground(ModernUIStyle.TEXT_PRIMARY);
+        panel.add(portLabel, gbc);
         gbc.gridx = 3;
         panel.add(portSpinner, gbc);
         
         // Botones
-        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        buttonPanel.setBackground(ModernUIStyle.BG_DARK);
         buttonPanel.add(connectButton);
         buttonPanel.add(disconnectButton);
         panel.add(buttonPanel, gbc);
         
         // Estado
         gbc.gridx = 2; gbc.gridwidth = 2;
-        JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        statusPanel.add(new JLabel("Estado:"));
+        JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        statusPanel.setBackground(ModernUIStyle.BG_DARK);
+        JLabel estadoLabel = new JLabel("Estado:");
+        estadoLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
+        statusPanel.add(estadoLabel);
         statusPanel.add(connectionIndicator);
         statusPanel.add(connectionStatusLabel);
         panel.add(statusPanel, gbc);
         
         // Auto-conexión
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 4;
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 4;
         panel.add(autoConnectCheck, gbc);
         
         // Panel de información del lector
-        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 4; gbc.fill = GridBagConstraints.BOTH;
+        gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 4; gbc.fill = GridBagConstraints.BOTH;
         gbc.weightx = 1.0; gbc.weighty = 1.0;
         JPanel infoPanel = new JPanel(new BorderLayout());
-        infoPanel.setBorder(BorderFactory.createTitledBorder("Información del Lector"));
+        infoPanel.setBackground(ModernUIStyle.BG_CARD);
+        infoPanel.setBorder(BorderFactory.createCompoundBorder(
+            new ModernUIStyle.RoundedBorder(10, ModernUIStyle.BORDER_DEFAULT),
+            BorderFactory.createEmptyBorder(15, 15, 15, 15)
+        ));
+        
+        JLabel infoTitle = new JLabel("📋 Información del Lector");
+        infoTitle.setForeground(ModernUIStyle.TEXT_PRIMARY);
+        infoTitle.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        infoPanel.add(infoTitle, BorderLayout.NORTH);
+        
         JTextArea infoText = new JTextArea("Conecte al lector para ver información.");
         infoText.setEditable(false);
+        infoText.setBackground(ModernUIStyle.BG_CARD);
+        infoText.setForeground(ModernUIStyle.TEXT_SECONDARY);
+        infoText.setFont(new Font("Consolas", Font.PLAIN, 12));
+        infoText.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
         infoText.setBackground(panel.getBackground());
         infoPanel.add(new JScrollPane(infoText), BorderLayout.CENTER);
         panel.add(infoPanel, gbc);
@@ -979,15 +1087,16 @@ public class RFIDMainWindow extends JFrame {
     }
     
     /**
-     * Crea la barra de estado inferior.
+     * Crea la barra de estado inferior con estilo moderno.
      * 
      * @return Panel de barra de estado
      */
     private JPanel createStatusBar() {
-        JPanel statusBar = new JPanel(new BorderLayout(10, 0));
+        JPanel statusBar = new JPanel(new BorderLayout(15, 0));
+        statusBar.setBackground(ModernUIStyle.BG_CARD);
         statusBar.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(1, 0, 0, 0, Color.GRAY),
-            BorderFactory.createEmptyBorder(3, 10, 3, 10)
+            BorderFactory.createMatteBorder(2, 0, 0, 0, ModernUIStyle.ACCENT_PRIMARY),
+            BorderFactory.createEmptyBorder(8, 15, 8, 15)
         ));
         
         statusBar.add(statusLabel, BorderLayout.WEST);
@@ -1230,8 +1339,9 @@ public class RFIDMainWindow extends JFrame {
      * Llamado cuando la conexión es exitosa.
      */
     private void onConnected() {
-        connectionIndicator.setBackground(Color.GREEN);
+        connectionIndicator.setBackground(ModernUIStyle.ACCENT_SUCCESS);
         connectionStatusLabel.setText("Conectado");
+        connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
         connectButton.setEnabled(false);
         disconnectButton.setEnabled(true);
         setStatus("Conectado a " + config.getReaderIP());
@@ -1257,8 +1367,9 @@ public class RFIDMainWindow extends JFrame {
      * @param error Mensaje de error
      */
     private void onConnectionFailed(String error) {
-        connectionIndicator.setBackground(Color.RED);
+        connectionIndicator.setBackground(ModernUIStyle.ACCENT_ERROR);
         connectionStatusLabel.setText("Error: " + error);
+        connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_ERROR);
         connectButton.setEnabled(true);
         disconnectButton.setEnabled(false);
         setStatus("Error de conexión: " + error);
@@ -1274,8 +1385,9 @@ public class RFIDMainWindow extends JFrame {
      * Llamado cuando se desconecta.
      */
     private void onDisconnected() {
-        connectionIndicator.setBackground(Color.RED);
+        connectionIndicator.setBackground(ModernUIStyle.ACCENT_ERROR);
         connectionStatusLabel.setText("Desconectado");
+        connectionStatusLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
         connectButton.setEnabled(true);
         disconnectButton.setEnabled(false);
         setStatus("Desconectado");
