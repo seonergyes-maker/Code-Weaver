@@ -110,6 +110,9 @@ public class LLRPMessage {
     /** Parámetro Custom (para extensiones de vendedor) */
     public static final int PARAM_CUSTOM = 1023;
     
+    /** MotoDefaultSpec parameter subtype for Zebra FX7500 */
+    public static final int MOTO_DEFAULT_SPEC_SUBTYPE = 102;
+    
     // ==================== Campos del mensaje ====================
     
     /** Tipo de mensaje LLRP */
@@ -456,7 +459,7 @@ public class LLRPMessage {
         
         ByteArrayOutputStream rfTxBaos = new ByteArrayOutputStream();
         DataOutputStream rfTxDos = new DataOutputStream(rfTxBaos);
-        rfTxDos.writeShort(config.getTransmitPowerIndex() + 1);
+        rfTxDos.writeShort(config.getPowerIndex());
         rfTxDos.writeShort(0);
         rfTxDos.flush();
         
@@ -491,6 +494,8 @@ public class LLRPMessage {
         writeAISpec(roSpecDos, antennaPorts, inventoryParamSpecId);
         
         writeROReportSpec(roSpecDos);
+        
+        writeMotoDefaultSpec(roSpecDos);
         
         roSpecDos.flush();
         byte[] roSpecData = roSpecBaos.toByteArray();
@@ -678,6 +683,34 @@ public class LLRPMessage {
         dos.writeShort((PARAM_TAG_REPORT_CONTENT_SELECTOR & 0x03FF) | 0x0400);
         dos.writeShort(4 + selectorData.length);
         dos.write(selectorData);
+    }
+    
+    /**
+     * Escribe MotoDefaultSpec - parámetro personalizado de Zebra/Motorola.
+     * REQUERIDO por el FX7500 para funcionamiento correcto del ROSpec.
+     * 
+     * Formato Custom Parameter:
+     * - Type: 1023 (Custom)
+     * - VendorID: 161 (Zebra/Motorola)
+     * - Subtype: 102 (MotoDefaultSpec)
+     * - UseDefaultSpecForAutoMode: 1 byte (1 = true)
+     */
+    private static void writeMotoDefaultSpec(DataOutputStream dos) throws IOException {
+        ByteArrayOutputStream customBaos = new ByteArrayOutputStream();
+        DataOutputStream customDos = new DataOutputStream(customBaos);
+        
+        customDos.writeInt(ZEBRA_VENDOR_ID);
+        
+        customDos.writeInt(MOTO_DEFAULT_SPEC_SUBTYPE);
+        
+        customDos.writeByte(1);
+        
+        customDos.flush();
+        byte[] customData = customBaos.toByteArray();
+        
+        dos.writeShort((PARAM_CUSTOM & 0x03FF) | 0x0400);
+        dos.writeShort(4 + customData.length);
+        dos.write(customData);
     }
     
     // ==================== Parsing de RO_ACCESS_REPORT ====================

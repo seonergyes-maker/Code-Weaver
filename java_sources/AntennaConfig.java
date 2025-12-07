@@ -261,22 +261,38 @@ public class AntennaConfig implements Serializable {
     
     /**
      * Convierte la potencia de transmisión a índice para LLRP.
-     * El índice se calcula basándose en incrementos de 0.25 dBm desde 10 dBm.
+     * El FX7500 usa una tabla de potencia donde:
+     * - Index 1 = 10.0 dBm
+     * - Index 51 = 15.0 dBm
+     * - Index 101 = 20.0 dBm
+     * - Index 151 = 25.0 dBm
+     * - Index 201 = 30.0 dBm (max)
+     * Formula: index = (dBm - 10.0) * 10 + 1
      * 
-     * @return Índice de potencia para protocolo LLRP
+     * @return Índice de potencia para protocolo LLRP (1-201)
      */
     public int getTransmitPowerIndex() {
-        return (int) Math.round((transmitPower - MIN_TRANSMIT_POWER) / 0.25);
+        return (int) Math.round((transmitPower - MIN_TRANSMIT_POWER) * 10) + 1;
+    }
+    
+    /**
+     * Obtiene el índice de potencia para LLRP (alias para compatibilidad).
+     * 
+     * @return Índice de potencia para protocolo LLRP (1-201)
+     */
+    public int getPowerIndex() {
+        return getTransmitPowerIndex();
     }
     
     /**
      * Establece la potencia de transmisión desde un índice LLRP.
+     * Formula inversa: dBm = (index - 1) / 10.0 + 10.0
      * 
-     * @param index Índice de potencia LLRP
+     * @param index Índice de potencia LLRP (1-201)
      */
     public void setTransmitPowerFromIndex(int index) {
-        double power = MIN_TRANSMIT_POWER + (index * 0.25);
-        setTransmitPower(Math.min(power, MAX_TRANSMIT_POWER));
+        double power = ((index - 1) / 10.0) + MIN_TRANSMIT_POWER;
+        setTransmitPower(Math.min(Math.max(power, MIN_TRANSMIT_POWER), MAX_TRANSMIT_POWER));
     }
     
     /**

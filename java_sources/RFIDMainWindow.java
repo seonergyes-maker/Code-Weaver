@@ -809,7 +809,7 @@ public class RFIDMainWindow extends JFrame {
             statistics.recordUniqueTag();
             tagCache.put(epc, tag);
         } else {
-            existing.update(tag);
+            existing.merge(tag);
         }
         
         SwingUtilities.invokeLater(() -> {

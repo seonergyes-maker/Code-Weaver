@@ -153,7 +153,7 @@ public class GPIOController implements AutoCloseable {
         
         try {
             LLRPMessage request = buildSetGpoMessage(port, state);
-            LLRPMessage response = connection.sendMessage(request, operationTimeout);
+            LLRPMessage response = connection.sendAndReceive(request, operationTimeout);
             
             if (response != null && isSuccessResponse(response)) {
                 gpoState[port - 1] = state;
@@ -296,7 +296,7 @@ public class GPIOController implements AutoCloseable {
         
         try {
             LLRPMessage request = buildGetGpiMessage(port);
-            LLRPMessage response = connection.sendMessage(request, operationTimeout);
+            LLRPMessage response = connection.sendAndReceive(request, operationTimeout);
             
             if (response != null) {
                 boolean state = parseGpiState(response, port);
@@ -339,6 +339,82 @@ public class GPIOController implements AutoCloseable {
     }
     
     // ==================== Monitoreo de GPI ====================
+    
+    /**
+     * Habilita los eventos de notificación para GPI en el lector.
+     * DEBE llamarse antes de iniciar el monitoreo de GPI para que el lector
+     * reporte cambios de estado en los puertos GPI.
+     * 
+     * Envía SET_READER_CONFIG con EventsAndReports conteniendo
+     * ReaderEventNotificationSpec con EventNotificationState para GPI habilitado.
+     * 
+     * @return true si la configuración fue exitosa
+     */
+    public boolean enableGPIEvents() {
+        try {
+            LLRPMessage request = buildEnableGPIEventsMessage();
+            LLRPMessage response = connection.sendAndReceive(request, operationTimeout);
+            
+            if (response != null && isSuccessResponse(response)) {
+                System.out.println("[GPIO] Eventos GPI habilitados correctamente");
+                return true;
+            } else {
+                System.err.println("[GPIO] Error al habilitar eventos GPI");
+                return false;
+            }
+            
+        } catch (Exception e) {
+            handleError(e);
+            return false;
+        }
+    }
+    
+    /**
+     * Construye mensaje SET_READER_CONFIG para habilitar eventos GPI.
+     * 
+     * @return Mensaje LLRP codificado
+     */
+    private LLRPMessage buildEnableGPIEventsMessage() throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        
+        dos.writeByte(0);
+        
+        ByteArrayOutputStream eventsBaos = new ByteArrayOutputStream();
+        DataOutputStream eventsDos = new DataOutputStream(eventsBaos);
+        
+        ByteArrayOutputStream notifBaos = new ByteArrayOutputStream();
+        DataOutputStream notifDos = new DataOutputStream(notifBaos);
+        
+        int gpiEventType = 5;
+        notifDos.writeShort(gpiEventType);
+        notifDos.writeByte(1);
+        
+        notifDos.flush();
+        byte[] notifData = notifBaos.toByteArray();
+        
+        int eventNotifStateType = (1 << 15) | PARAM_EVENT_NOTIFICATION_STATE;
+        eventsDos.writeShort(eventNotifStateType);
+        eventsDos.writeShort(4 + notifData.length);
+        eventsDos.write(notifData);
+        
+        eventsDos.flush();
+        byte[] eventsInnerData = eventsBaos.toByteArray();
+        
+        ByteArrayOutputStream readerEventBaos = new ByteArrayOutputStream();
+        DataOutputStream readerEventDos = new DataOutputStream(readerEventBaos);
+        readerEventDos.write(eventsInnerData);
+        readerEventDos.flush();
+        byte[] readerEventData = readerEventBaos.toByteArray();
+        
+        int readerEventNotifType = (1 << 15) | PARAM_READER_EVENT_NOTIFICATION_SPEC;
+        dos.writeShort(readerEventNotifType);
+        dos.writeShort(4 + readerEventData.length);
+        dos.write(readerEventData);
+        
+        dos.flush();
+        return new LLRPMessage(LLRPMessageType.SET_READER_CONFIG, baos.toByteArray());
+    }
     
     /**
      * Inicia el monitoreo automático de puertos GPI.

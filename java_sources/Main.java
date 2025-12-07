@@ -535,7 +535,7 @@ public class Main {
         connection.setAsyncMessageHandler(message -> {
             if (message.getMessageType() == LLRPMessageType.RO_ACCESS_REPORT) {
                 // Parsear y mostrar tags
-                List<TagData> tags = LLRPMessage.parseRoAccessReport(message);
+                List<TagData> tags = LLRPMessage.parseROAccessReport(message);
                 for (TagData tag : tags) {
                     statistics.recordTagRead(tag);
                     System.out.println("Tag: " + tag.getEpc() + 
