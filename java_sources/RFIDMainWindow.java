@@ -126,6 +126,10 @@ public class RFIDMainWindow extends JFrame {
     // ==================== Contador de filtrado RSSI ====================
     private volatile long rssiFilteredCount = 0;
     
+    // ==================== System Tray ====================
+    private TrayIcon trayIcon;
+    private boolean minimizedToTray = false;
+    
     /**
      * Constructor por defecto. Crea la ventana cargando configuración desde archivo.
      */
@@ -174,10 +178,13 @@ public class RFIDMainWindow extends JFrame {
         initializeEventHandlers();
         loadConfigToUI();
         
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
         setSize(DEFAULT_SIZE);
         setMinimumSize(new Dimension(800, 600));
         setLocationRelativeTo(null);
+        
+        // Inicializar System Tray
+        initializeSystemTray();
         
         startUpdateTimer();
         
@@ -211,6 +218,153 @@ public class RFIDMainWindow extends JFrame {
             } catch (Exception ex) {
                 // Usar look and feel por defecto
             }
+        }
+    }
+    
+    /**
+     * Inicializa el icono en la bandeja del sistema (System Tray).
+     * Permite minimizar la aplicación a la bandeja y restaurarla.
+     */
+    private void initializeSystemTray() {
+        if (!SystemTray.isSupported()) {
+            System.out.println("[Tray] System Tray no soportado en este sistema");
+            // Si no hay soporte, cerrar normalmente
+            setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            return;
+        }
+        
+        try {
+            SystemTray tray = SystemTray.getSystemTray();
+            
+            // Crear imagen del icono (icono simple de RFID)
+            Image trayImage = createTrayIcon();
+            
+            // Menú popup del tray
+            PopupMenu popup = new PopupMenu();
+            
+            MenuItem showItem = new MenuItem("Mostrar");
+            showItem.addActionListener(e -> restoreFromTray());
+            
+            MenuItem connectItem = new MenuItem("Conectar");
+            connectItem.addActionListener(e -> {
+                restoreFromTray();
+                connect();
+            });
+            
+            MenuItem disconnectItem = new MenuItem("Desconectar");
+            disconnectItem.addActionListener(e -> disconnect());
+            
+            MenuItem exitItem = new MenuItem("Salir");
+            exitItem.addActionListener(e -> exitApplication());
+            
+            popup.add(showItem);
+            popup.addSeparator();
+            popup.add(connectItem);
+            popup.add(disconnectItem);
+            popup.addSeparator();
+            popup.add(exitItem);
+            
+            // Crear el TrayIcon
+            trayIcon = new TrayIcon(trayImage, WINDOW_TITLE, popup);
+            trayIcon.setImageAutoSize(true);
+            
+            // Doble clic para restaurar
+            trayIcon.addActionListener(e -> restoreFromTray());
+            
+            // Agregar al system tray
+            tray.add(trayIcon);
+            
+            System.out.println("[Tray] Icono de bandeja del sistema inicializado");
+            
+        } catch (Exception e) {
+            System.err.println("[Tray] Error al inicializar System Tray: " + e.getMessage());
+            setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        }
+    }
+    
+    /**
+     * Crea una imagen simple para el icono de la bandeja.
+     * 
+     * @return Imagen del icono
+     */
+    private Image createTrayIcon() {
+        int size = 16;
+        java.awt.image.BufferedImage image = new java.awt.image.BufferedImage(
+            size, size, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g2d = image.createGraphics();
+        
+        // Fondo transparente
+        g2d.setComposite(java.awt.AlphaComposite.Clear);
+        g2d.fillRect(0, 0, size, size);
+        g2d.setComposite(java.awt.AlphaComposite.SrcOver);
+        
+        // Dibujar un icono simple de RFID (ondas)
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2d.setColor(new Color(0, 120, 215)); // Azul Windows
+        g2d.setStroke(new BasicStroke(1.5f));
+        
+        // Dibujar arcos (ondas de RF)
+        g2d.drawArc(2, 4, 6, 8, 45, 90);
+        g2d.drawArc(5, 3, 8, 10, 45, 90);
+        g2d.drawArc(8, 2, 10, 12, 45, 90);
+        
+        // Punto central (tag)
+        g2d.fillOval(1, 6, 4, 4);
+        
+        g2d.dispose();
+        return image;
+    }
+    
+    /**
+     * Minimiza la ventana a la bandeja del sistema.
+     */
+    private void minimizeToTray() {
+        if (trayIcon != null) {
+            setVisible(false);
+            minimizedToTray = true;
+            trayIcon.displayMessage(WINDOW_TITLE, 
+                "La aplicación sigue ejecutándose en segundo plano.\n" +
+                "Haga doble clic en el icono para restaurar.",
+                TrayIcon.MessageType.INFO);
+            System.out.println("[Tray] Aplicación minimizada a la bandeja");
+        }
+    }
+    
+    /**
+     * Restaura la ventana desde la bandeja del sistema.
+     */
+    private void restoreFromTray() {
+        if (minimizedToTray) {
+            setVisible(true);
+            setExtendedState(JFrame.NORMAL);
+            toFront();
+            requestFocus();
+            minimizedToTray = false;
+            System.out.println("[Tray] Aplicación restaurada desde la bandeja");
+        } else {
+            setVisible(true);
+            toFront();
+        }
+    }
+    
+    /**
+     * Cierra la aplicación completamente.
+     */
+    private void exitApplication() {
+        int confirm = JOptionPane.showConfirmDialog(this,
+            "¿Está seguro que desea salir de la aplicación?\n" +
+            "Se desconectará del lector RFID.",
+            "Confirmar salida",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE);
+        
+        if (confirm == JOptionPane.YES_OPTION) {
+            // Remover icono del tray
+            if (trayIcon != null) {
+                SystemTray.getSystemTray().remove(trayIcon);
+            }
+            shutdown();
+            System.exit(0);
         }
     }
     
@@ -938,7 +1092,13 @@ public class RFIDMainWindow extends JFrame {
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
-                shutdown();
+                // Minimizar a bandeja en lugar de cerrar
+                if (trayIcon != null && SystemTray.isSupported()) {
+                    minimizeToTray();
+                } else {
+                    // Si no hay soporte de tray, cerrar normalmente
+                    exitApplication();
+                }
             }
         });
     }
