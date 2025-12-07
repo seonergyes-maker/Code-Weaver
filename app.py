@@ -47,6 +47,18 @@ st.markdown("""
         background-color: #2D2D2D;
         color: white;
     }
+    /* Editor más grande y responsivo */
+    [data-testid="stVerticalBlock"] > div:has(> iframe) {
+        min-height: 60vh !important;
+    }
+    .ace_editor {
+        min-height: 500px !important;
+    }
+    /* Reducir padding para más espacio */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -637,7 +649,7 @@ code = st_ace(
     value=st.session_state.code,
     language='java',
     theme='monokai',
-    height=450,
+    height=600,
     font_size=14,
     tab_size=4,
     show_gutter=True,
