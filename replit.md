@@ -1,38 +1,24 @@
-# Java IDE con Claude AI
+# Java IDE
 
 ## Overview
-Una aplicación web tipo IDE que permite desarrollar aplicaciones Java con asistencia de inteligencia artificial (Claude). Similar al estilo de Replit, permite escribir, compilar y generar archivos .jar directamente desde el navegador.
+Una aplicación web tipo IDE que permite desarrollar aplicaciones Java. Similar al estilo de Replit, permite escribir, compilar y generar archivos .jar directamente desde el navegador.
 
 ## Features
 - **Editor de código Java** con resaltado de sintaxis (usando Ace Editor)
 - **Compilación en tiempo real** usando OpenJDK
 - **Generación de archivos .jar** descargables
 - **Ejecución de código Java** con salida en consola
-- **Chat con Claude AI** para:
-  - Generar código nuevo basado en descripciones
-  - Explicar errores de compilación
-  - Sugerir mejoras al código
-  - Responder preguntas sobre Java
-  - **Crear y modificar archivos** automáticamente desde el chat (sin confirmación)
+- **Gestión de proyectos** con persistencia en base de datos
+- **Librerías externas** desde Maven Central
+- **Exportación de proyectos** como .zip
+- **Scripts de despliegue** para Ubuntu/Debian con systemd
 
 ## Project Structure
 ```
 ├── app.py              # Aplicación principal Streamlit
-├── claude_assistant.py # Integración con Claude AI (Anthropic)
 ├── java_compiler.py    # Funciones de compilación Java y generación JAR
 ├── database.py         # Persistencia de proyectos en PostgreSQL
 ├── dependency_manager.py # Gestor de librerías externas (Maven Central)
-├── agents/             # Arquitectura de agentes inteligentes
-│   ├── __init__.py
-│   ├── base_agent.py   # Clase base para todos los agentes
-│   ├── prompts.py      # Prompts compartidos
-│   ├── coordinator.py  # Agente coordinador (routing)
-│   └── subagents/      # Subagentes especializados
-│       ├── code_writer.py      # Genera código nuevo
-│       ├── error_fixer.py      # Corrige errores
-│       ├── test_generator.py   # Crea tests JUnit
-│       ├── doc_generator.py    # Genera JavaDoc
-│       └── architect.py        # Planifica proyectos
 ├── output/             # Directorio para archivos JAR generados
 └── .streamlit/
     └── config.toml     # Configuración del servidor Streamlit
@@ -40,7 +26,6 @@ Una aplicación web tipo IDE que permite desarrollar aplicaciones Java con asist
 
 ## Technical Stack
 - **Frontend**: Streamlit + streamlit-ace (editor de código)
-- **AI**: Claude API via Replit AI Integrations (Anthropic)
 - **Compilador**: OpenJDK (javac, jar)
 - **Lenguaje**: Python 3.11
 
@@ -58,51 +43,19 @@ streamlit run app.py --server.port 5000
 - Ejecución Java tiene límites de memoria (128MB max) y tiempo (30 segundos)
 - Este IDE está diseñado para uso personal en entornos Replit
 - Para despliegue público multi-usuario, se requeriría sandboxing adicional (Docker, Firejail)
-- Las respuestas de "acciones rápidas" de IA se separan del historial de chat para cumplir con la API de Anthropic
 
 ## Recent Changes
 - Diciembre 2025: Creación inicial del proyecto
   - Implementación del editor de código con Ace
-  - Integración con Claude AI para asistencia
   - Sistema de compilación y generación de JAR
-  - Interfaz de chat interactivo
   - Límites de memoria y tiempo para ejecución Java
-  - Separación de notificaciones AI del historial de chat
   - Soporte multi-archivo para proyectos Java
   - Persistencia de proyectos en base de datos PostgreSQL
-  - Autocompletado de línea inteligente con Claude AI
   - Gestor de dependencias para librerías externas (Maven Central)
   - Soporte para librerías comunes: Gson, Guava, Jackson, OkHttp, etc.
   - Importación de proyectos existentes (.java y .zip)
-  - **NUEVO: Contexto completo del proyecto** - Claude ahora recibe TODOS los archivos del proyecto en cada conversación
-  - **NUEVO: Bucle automático multi-archivo** - Cuando Claude indica que hay más archivos por crear, el sistema continúa automáticamente hasta 10 archivos sin intervención del usuario
-  - **NUEVO: Acciones delete y rename** - Claude puede eliminar y renombrar archivos además de crearlos y modificarlos
-  - **NUEVO: Auto-corrección de errores** - Cuando hay un error de compilación, Claude automáticamente analiza y corrige el código (toggle en la barra lateral)
-  - **NUEVO: Historial de chat persistente** - El historial de conversación se guarda con cada proyecto en la base de datos
-  - **FASE 2: Modo Arquitecto** - Analiza requisitos y crea un plan de implementación antes de escribir código
-  - **FASE 2: Análisis de Ejecución** - Interpreta la salida del programa y sugiere mejoras
-  - **FASE 2: Búsqueda en Proyecto** - Encuentra código, clases, métodos y patrones en el proyecto
-  - **FASE 3: Generación de Tests JUnit** - Crea tests unitarios automáticamente para clases Java
-  - **FASE 3: Documentación Automática** - Genera JavaDoc profesional para métodos y clases
-  - **FASE 3: Plantillas de Código** - Templates para patrones de diseño (Singleton, Factory, Observer, MVC, Builder, Strategy)
-  - **FASE 3: Exportar Proyecto** - Descarga todo el proyecto como .zip con archivos, librerías y README
-  - **Fat JAR** - Los archivos JAR generados incluyen automáticamente todas las librerías dependientes (Gson, Jackson, etc.)
-  - **Script Ubuntu** - Genera script de instalación completo para Ubuntu/Debian con:
-    - Instalación automática de Java (OpenJDK 17)
-    - Creación de directorio de aplicación en /opt/
-    - Enlace simbólico para ejecución desde cualquier lugar
-    - Servicio systemd opcional para ejecución automática
-  - **NUEVO: Instalación Automática de Librerías** - El IDE detecta automáticamente las dependencias del código:
-    - Al compilar, ejecutar o crear JAR, detecta imports y descarga las librerías
-    - Cuando Claude genera código, las dependencias se instalan automáticamente
-    - Soporta: Gson, Jackson, Guava, OkHttp, MySQL, PostgreSQL, Commons, SLF4J, etc.
-  - **NUEVO: Arquitectura de Agente con Subagentes** - Sistema inteligente de IA con especialización:
-    - **CoordinatorAgent**: Analiza la intención del usuario y enruta a subagentes especializados
-    - **CodeWriterAgent**: Genera código nuevo optimizado
-    - **ErrorFixerAgent**: Corrige errores de compilación/ejecución
-    - **TestGeneratorAgent**: Crea tests JUnit 5
-    - **DocGeneratorAgent**: Genera documentación JavaDoc
-    - **ArchitectAgent**: Planifica proyectos multi-archivo
-    - Toggle "Modo Agente Inteligente" en la barra lateral para activar/desactivar
-    - Clasificación automática de intención con modelo rápido (Haiku)
-    - Fallback a modo legacy si hay errores
+  - Exportar Proyecto - Descarga todo el proyecto como .zip
+  - Fat JAR - Los archivos JAR incluyen automáticamente todas las librerías
+  - Script Ubuntu - Script de instalación para Ubuntu/Debian con systemd
+  - Instalación Automática de Librerías - Detecta imports y descarga las librerías
+  - **ELIMINADAS TODAS LAS FUNCIONES DE IA** - El IDE ahora funciona sin Claude ni ninguna IA
