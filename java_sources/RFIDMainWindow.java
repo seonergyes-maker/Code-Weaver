@@ -967,7 +967,7 @@ public class RFIDMainWindow extends JFrame {
         panel.add(saveConfigButton, gbc);
         
         gbc.gridx = 1; gbc.gridwidth = 2;
-        JLabel saveInfo = new JLabel("Guarda la configuración actual en config.json");
+        JLabel saveInfo = new JLabel("Guarda la configuración actual en rfid_config.json");
         panel.add(saveInfo, gbc);
         
         // Espacio vacío para expandir
@@ -1703,7 +1703,7 @@ public class RFIDMainWindow extends JFrame {
                 
                 sb.append("# Copiar archivos\n");
                 sb.append("cp rfid-zebra.jar $INSTALL_DIR/\n");
-                sb.append("[ -f config.json ] && cp config.json $INSTALL_DIR/\n\n");
+                sb.append("[ -f rfid_config.json ] && cp rfid_config.json $INSTALL_DIR/\n\n");
                 
                 sb.append("# Crear servicio systemd\n");
                 sb.append("cat > /etc/systemd/system/rfid-zebra.service << EOF\n");
@@ -1714,7 +1714,7 @@ public class RFIDMainWindow extends JFrame {
                 sb.append("Type=simple\n");
                 sb.append("User=root\n");
                 sb.append("WorkingDirectory=$INSTALL_DIR\n");
-                sb.append("ExecStart=/usr/bin/java -Xmx256m -jar rfid-zebra.jar --headless\n");
+                sb.append("ExecStart=/usr/bin/java -Xmx256m -jar rfid-zebra.jar --headless --autostart\n");
                 sb.append("Restart=always\n");
                 sb.append("RestartSec=10\n\n");
                 sb.append("[Install]\n");

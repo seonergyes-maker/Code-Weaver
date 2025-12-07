@@ -110,8 +110,10 @@ public class Main {
             switch (arg) {
                 case "--nogui":
                 case "-nogui":
+                case "--headless":
+                case "-headless":
                     noGui = true;
-                    System.out.println("[Args] Modo consola habilitado");
+                    System.out.println("[Args] Modo consola/headless habilitado");
                     break;
                     
                 case "--config":
@@ -178,7 +180,7 @@ public class Main {
         System.out.println("Uso: java Main [opciones]");
         System.out.println();
         System.out.println("Opciones:");
-        System.out.println("  --nogui, -nogui      Ejecutar en modo consola sin GUI");
+        System.out.println("  --nogui, --headless  Ejecutar en modo consola sin GUI (para servicios)");
         System.out.println("  --config, -c FILE    Cargar configuración desde archivo JSON");
         System.out.println("  --ip ADDRESS         Establecer IP del lector (override)");
         System.out.println("  --autostart, -a      Conectar automáticamente al iniciar");

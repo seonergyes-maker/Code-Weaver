@@ -64,6 +64,17 @@ public class WindowsServiceInstaller {
         sb.append("    exit /b 1\r\n");
         sb.append(")\r\n\r\n");
         
+        sb.append(":: Verificar Java\r\n");
+        sb.append("where java >nul 2>&1\r\n");
+        sb.append("if %errorLevel% neq 0 (\r\n");
+        sb.append("    echo ERROR: Java no encontrado en el PATH.\r\n");
+        sb.append("    echo Instala Java (OpenJDK 11+) desde: https://adoptium.net/\r\n");
+        sb.append("    pause\r\n");
+        sb.append("    exit /b 1\r\n");
+        sb.append(")\r\n");
+        sb.append("echo Java encontrado:\r\n");
+        sb.append("java -version 2>&1 | findstr /i version\r\n\r\n");
+        
         sb.append(":: Crear directorio de instalacion\r\n");
         sb.append("if not exist \"").append(installPath).append("\" (\r\n");
         sb.append("    mkdir \"").append(installPath).append("\"\r\n");
@@ -73,7 +84,7 @@ public class WindowsServiceInstaller {
         sb.append(":: Copiar archivos\r\n");
         sb.append("echo Copiando archivos...\r\n");
         sb.append("copy /Y \"").append(jarFileName).append("\" \"").append(installPath).append("\\\"\r\n");
-        sb.append("if exist \"config.json\" copy /Y \"config.json\" \"").append(installPath).append("\\\"\r\n");
+        sb.append("if exist \"rfid_config.json\" copy /Y \"rfid_config.json\" \"").append(installPath).append("\\\"\r\n");
         sb.append("if exist \"libs\" xcopy /Y /E \"libs\" \"").append(installPath).append("\\libs\\\"\r\n\r\n");
         
         sb.append(":: Verificar NSSM\r\n");
@@ -96,7 +107,7 @@ public class WindowsServiceInstaller {
         sb.append("echo Instalando servicio...\r\n");
         sb.append("%NSSM% install ").append(serviceName).append(" \"").append(javaPath).append("\"\r\n");
         sb.append("%NSSM% set ").append(serviceName).append(" AppParameters \"")
-          .append(jvmOptions).append(" -jar ").append(installPath).append("\\").append(jarFileName).append("\"\r\n");
+          .append(jvmOptions).append(" -jar ").append(installPath).append("\\").append(jarFileName).append(" --headless --autostart\"\r\n");
         sb.append("%NSSM% set ").append(serviceName).append(" AppDirectory \"").append(installPath).append("\"\r\n");
         sb.append("%NSSM% set ").append(serviceName).append(" DisplayName \"").append(displayName).append("\"\r\n");
         sb.append("%NSSM% set ").append(serviceName).append(" Description \"").append(description).append("\"\r\n");
@@ -173,7 +184,7 @@ public class WindowsServiceInstaller {
         sb.append("  <name>").append(displayName).append("</name>\r\n");
         sb.append("  <description>").append(description).append("</description>\r\n");
         sb.append("  <executable>").append(javaPath).append("</executable>\r\n");
-        sb.append("  <arguments>").append(jvmOptions).append(" -jar ").append(jarFileName).append("</arguments>\r\n");
+        sb.append("  <arguments>").append(jvmOptions).append(" -jar ").append(jarFileName).append(" --headless --autostart</arguments>\r\n");
         sb.append("  <workingdirectory>").append(installPath).append("</workingdirectory>\r\n");
         sb.append("  <logpath>").append(installPath).append("\\logs</logpath>\r\n");
         sb.append("  <log mode=\"roll-by-size\">\r\n");
@@ -209,6 +220,15 @@ public class WindowsServiceInstaller {
         sb.append("    exit /b 1\r\n");
         sb.append(")\r\n\r\n");
         
+        sb.append(":: Verificar Java\r\n");
+        sb.append("where java >nul 2>&1\r\n");
+        sb.append("if %errorLevel% neq 0 (\r\n");
+        sb.append("    echo ERROR: Java no encontrado en el PATH.\r\n");
+        sb.append("    echo Instala Java (OpenJDK 11+) desde: https://adoptium.net/\r\n");
+        sb.append("    pause\r\n");
+        sb.append("    exit /b 1\r\n");
+        sb.append(")\r\n\r\n");
+        
         sb.append("if not exist \"rfid-service.exe\" (\r\n");
         sb.append("    echo ERROR: rfid-service.exe no encontrado.\r\n");
         sb.append("    echo Descarga WinSW y renombralo a rfid-service.exe\r\n");
@@ -221,7 +241,9 @@ public class WindowsServiceInstaller {
         
         sb.append("copy /Y \"").append(jarFileName).append("\" \"").append(installPath).append("\\\"\r\n");
         sb.append("copy /Y \"rfid-service.exe\" \"").append(installPath).append("\\\"\r\n");
-        sb.append("copy /Y \"rfid-service.xml\" \"").append(installPath).append("\\\"\r\n\r\n");
+        sb.append("copy /Y \"rfid-service.xml\" \"").append(installPath).append("\\\"\r\n");
+        sb.append("if exist \"rfid_config.json\" copy /Y \"rfid_config.json\" \"").append(installPath).append("\\\"\r\n");
+        sb.append("if exist \"libs\" xcopy /Y /E \"libs\" \"").append(installPath).append("\\libs\\\"\r\n\r\n");
         
         sb.append("cd /d \"").append(installPath).append("\"\r\n");
         sb.append("rfid-service.exe install\r\n");
@@ -294,7 +316,7 @@ public class WindowsServiceInstaller {
         sb.append("Los logs se guardan en: ").append(installPath).append("\\logs\\\r\n\r\n");
         
         sb.append("## Configuración\r\n");
-        sb.append("Edita `config.json` en ").append(installPath).append(" para cambiar:\r\n");
+        sb.append("Edita `rfid_config.json` en ").append(installPath).append(" para cambiar:\r\n");
         sb.append("- Dirección IP del lector\r\n");
         sb.append("- Configuración de antenas\r\n");
         sb.append("- URL del API endpoint\r\n");
