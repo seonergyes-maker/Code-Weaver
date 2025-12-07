@@ -86,6 +86,21 @@ public class RFIDMainWindow extends JFrame {
     // ==================== Filtro de duplicados ====================
     private DuplicateFilter duplicateFilter;
     
+    // ==================== Componentes de Configuración Avanzada ====================
+    private JCheckBox rssiFilterCheck;
+    private JSpinner rssiThresholdSpinner;
+    private JLabel rssiStatsLabel;
+    private JComboBox<String> sessionCombo;
+    private JComboBox<String> targetCombo;
+    private JSpinner tagPopulationSpinner;
+    private JCheckBox denseReaderCheck;
+    private JSpinner rfModeSpinner;
+    private JCheckBox gpiTriggerCheck;
+    private JComboBox<String> gpiTriggerPortCombo;
+    private JComboBox<String> gpiTriggerStateCombo;
+    private JCheckBox reportPhaseCheck;
+    private JCheckBox reportChannelCheck;
+    
     // ==================== Panel de pestañas ====================
     private JTabbedPane tabbedPane;
     
@@ -103,6 +118,9 @@ public class RFIDMainWindow extends JFrame {
     // ==================== Cache de tags para la tabla ====================
     private final Map<String, TagData> tagCache = new ConcurrentHashMap<>();
     private final int maxTagsInTable = 1000;
+    
+    // ==================== Contador de filtrado RSSI ====================
+    private volatile long rssiFilteredCount = 0;
     
     /**
      * Constructor por defecto. Crea la ventana con configuración por defecto.
@@ -238,6 +256,34 @@ public class RFIDMainWindow extends JFrame {
         saveConfigButton = new JButton("Guardar Configuración");
         duplicateStatsLabel = new JLabel("Filtrados: 0 | Procesados: 0");
         
+        // Componentes de Configuración Avanzada
+        rssiFilterCheck = new JCheckBox("Filtrar por RSSI", config.isRssiFilterEnabled());
+        rssiThresholdSpinner = new JSpinner(new SpinnerNumberModel(
+            config.getRssiThreshold(), -80, 0, 1));
+        rssiStatsLabel = new JLabel("Filtrados por RSSI: 0");
+        
+        sessionCombo = new JComboBox<>(new String[]{"S0 (Volátil)", "S1 (Persistente)", "S2 (Multi-lector)", "S3 (Multi-lector)"});
+        sessionCombo.setSelectedIndex(config.getInventorySession());
+        
+        targetCombo = new JComboBox<>(new String[]{"A", "B", "A↔B (Alternado)"});
+        targetCombo.setSelectedIndex(config.getInventoryTarget());
+        
+        tagPopulationSpinner = new JSpinner(new SpinnerNumberModel(
+            config.getTagPopulation(), 1, 1000, 10));
+        
+        denseReaderCheck = new JCheckBox("Dense Reader Mode (DRM)", config.isDenseReaderMode());
+        rfModeSpinner = new JSpinner(new SpinnerNumberModel(
+            config.getRfModeIndex(), 0, 50, 1));
+        
+        gpiTriggerCheck = new JCheckBox("Trigger por GPI", config.isGpiTriggerEnabled());
+        gpiTriggerPortCombo = new JComboBox<>(new String[]{"Deshabilitado", "GPI 1", "GPI 2", "GPI 3", "GPI 4"});
+        gpiTriggerPortCombo.setSelectedIndex(config.getGpiTriggerPort());
+        gpiTriggerStateCombo = new JComboBox<>(new String[]{"HIGH (Alto)", "LOW (Bajo)"});
+        gpiTriggerStateCombo.setSelectedIndex(config.isGpiTriggerState() ? 0 : 1);
+        
+        reportPhaseCheck = new JCheckBox("Reportar Phase Angle", config.isReportPhaseAngle());
+        reportChannelCheck = new JCheckBox("Reportar Canal RF", config.isReportChannelIndex());
+        
         // Panel de pestañas
         tabbedPane = new JTabbedPane();
     }
@@ -254,6 +300,7 @@ public class RFIDMainWindow extends JFrame {
         tabbedPane.addTab("Monitoreo", createMonitoringPanel());
         tabbedPane.addTab("API", createApiPanel());
         tabbedPane.addTab("GPIO", createGpioPanel());
+        tabbedPane.addTab("Avanzado", createAdvancedPanel());
         tabbedPane.addTab("Herramientas", createToolsPanel());
         
         add(tabbedPane, BorderLayout.CENTER);
@@ -503,6 +550,149 @@ public class RFIDMainWindow extends JFrame {
     }
     
     /**
+     * Crea el panel de configuración avanzada Zebra.
+     * 
+     * @return Panel de configuración avanzada
+     */
+    private JPanel createAdvancedPanel() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        
+        int row = 0;
+        
+        // ==================== Sección Filtro RSSI ====================
+        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
+        JLabel rssiTitle = new JLabel("Filtro RSSI (Señal)");
+        rssiTitle.setFont(rssiTitle.getFont().deriveFont(Font.BOLD, 14f));
+        panel.add(rssiTitle, gbc);
+        
+        gbc.gridy = row; gbc.gridwidth = 1;
+        gbc.gridx = 0;
+        panel.add(rssiFilterCheck, gbc);
+        gbc.gridx = 1;
+        panel.add(new JLabel("Umbral mínimo (dBm):"), gbc);
+        gbc.gridx = 2;
+        panel.add(rssiThresholdSpinner, gbc);
+        gbc.gridx = 3;
+        panel.add(rssiStatsLabel, gbc);
+        row++;
+        
+        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
+        JLabel rssiInfo = new JLabel("<html><i>Tags con RSSI menor al umbral serán ignorados. -70 dBm es típico, -80 es muy débil.</i></html>");
+        panel.add(rssiInfo, gbc);
+        
+        // Separador
+        gbc.gridy = row++; gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(new JSeparator(), gbc);
+        
+        // ==================== Sección Inventario C1G2 ====================
+        gbc.gridy = row++; gbc.fill = GridBagConstraints.NONE;
+        JLabel invTitle = new JLabel("Inventario C1G2");
+        invTitle.setFont(invTitle.getFont().deriveFont(Font.BOLD, 14f));
+        panel.add(invTitle, gbc);
+        
+        gbc.gridy = row; gbc.gridwidth = 1;
+        gbc.gridx = 0;
+        panel.add(new JLabel("Sesión:"), gbc);
+        gbc.gridx = 1;
+        panel.add(sessionCombo, gbc);
+        gbc.gridx = 2;
+        panel.add(new JLabel("Target:"), gbc);
+        gbc.gridx = 3;
+        panel.add(targetCombo, gbc);
+        row++;
+        
+        gbc.gridy = row; gbc.gridx = 0;
+        panel.add(new JLabel("Población estimada:"), gbc);
+        gbc.gridx = 1;
+        panel.add(tagPopulationSpinner, gbc);
+        gbc.gridx = 2; gbc.gridwidth = 2;
+        JLabel popInfo = new JLabel("<html><i>(Afecta algoritmo Q)</i></html>");
+        panel.add(popInfo, gbc);
+        row++;
+        
+        // Separador
+        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(new JSeparator(), gbc);
+        
+        // ==================== Sección Dense Reader Mode ====================
+        gbc.gridy = row++; gbc.fill = GridBagConstraints.NONE;
+        JLabel drmTitle = new JLabel("Dense Reader Mode (Interferencia)");
+        drmTitle.setFont(drmTitle.getFont().deriveFont(Font.BOLD, 14f));
+        panel.add(drmTitle, gbc);
+        
+        gbc.gridy = row; gbc.gridwidth = 1;
+        gbc.gridx = 0;
+        panel.add(denseReaderCheck, gbc);
+        gbc.gridx = 1;
+        panel.add(new JLabel("Índice modo RF:"), gbc);
+        gbc.gridx = 2;
+        panel.add(rfModeSpinner, gbc);
+        row++;
+        
+        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
+        JLabel drmInfo = new JLabel("<html><i>DRM reduce interferencia cuando hay múltiples lectores cercanos.</i></html>");
+        panel.add(drmInfo, gbc);
+        
+        // Separador
+        gbc.gridy = row++; gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(new JSeparator(), gbc);
+        
+        // ==================== Sección Trigger GPI ====================
+        gbc.gridy = row++; gbc.fill = GridBagConstraints.NONE;
+        JLabel triggerTitle = new JLabel("Trigger por Sensor (GPI)");
+        triggerTitle.setFont(triggerTitle.getFont().deriveFont(Font.BOLD, 14f));
+        panel.add(triggerTitle, gbc);
+        
+        gbc.gridy = row; gbc.gridwidth = 1;
+        gbc.gridx = 0;
+        panel.add(gpiTriggerCheck, gbc);
+        gbc.gridx = 1;
+        panel.add(new JLabel("Puerto:"), gbc);
+        gbc.gridx = 2;
+        panel.add(gpiTriggerPortCombo, gbc);
+        gbc.gridx = 3;
+        panel.add(gpiTriggerStateCombo, gbc);
+        row++;
+        
+        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
+        JLabel triggerInfo = new JLabel("<html><i>Inicia/para lectura cuando el sensor detecta presencia.</i></html>");
+        panel.add(triggerInfo, gbc);
+        
+        // Separador
+        gbc.gridy = row++; gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(new JSeparator(), gbc);
+        
+        // ==================== Sección Reportes Avanzados ====================
+        gbc.gridy = row++; gbc.fill = GridBagConstraints.NONE;
+        JLabel reportTitle = new JLabel("Reportes Avanzados");
+        reportTitle.setFont(reportTitle.getFont().deriveFont(Font.BOLD, 14f));
+        panel.add(reportTitle, gbc);
+        
+        gbc.gridy = row; gbc.gridwidth = 2;
+        gbc.gridx = 0;
+        panel.add(reportPhaseCheck, gbc);
+        gbc.gridx = 2;
+        panel.add(reportChannelCheck, gbc);
+        row++;
+        
+        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
+        JLabel reportInfo = new JLabel("<html><i>Phase Angle es útil para localización de tags.</i></html>");
+        panel.add(reportInfo, gbc);
+        
+        // Espacio vacío para expandir
+        gbc.gridy = row; gbc.weighty = 1.0;
+        panel.add(new JLabel(), gbc);
+        
+        return panel;
+    }
+    
+    /**
      * Crea el panel de herramientas.
      * 
      * @return Panel de herramientas
@@ -638,6 +828,59 @@ public class RFIDMainWindow extends JFrame {
         
         // Guardar configuración
         saveConfigButton.addActionListener(e -> saveConfiguration());
+        
+        // Configuración avanzada - RSSI
+        rssiFilterCheck.addActionListener(e -> {
+            config.setRssiFilterEnabled(rssiFilterCheck.isSelected());
+        });
+        
+        rssiThresholdSpinner.addChangeListener(e -> {
+            config.setRssiThreshold((Integer) rssiThresholdSpinner.getValue());
+        });
+        
+        // Configuración avanzada - Inventario
+        sessionCombo.addActionListener(e -> {
+            config.setInventorySession(sessionCombo.getSelectedIndex());
+        });
+        
+        targetCombo.addActionListener(e -> {
+            config.setInventoryTarget(targetCombo.getSelectedIndex());
+        });
+        
+        tagPopulationSpinner.addChangeListener(e -> {
+            config.setTagPopulation((Integer) tagPopulationSpinner.getValue());
+        });
+        
+        // Configuración avanzada - DRM
+        denseReaderCheck.addActionListener(e -> {
+            config.setDenseReaderMode(denseReaderCheck.isSelected());
+        });
+        
+        rfModeSpinner.addChangeListener(e -> {
+            config.setRfModeIndex((Integer) rfModeSpinner.getValue());
+        });
+        
+        // Configuración avanzada - GPI Trigger
+        gpiTriggerCheck.addActionListener(e -> {
+            config.setGpiTriggerEnabled(gpiTriggerCheck.isSelected());
+        });
+        
+        gpiTriggerPortCombo.addActionListener(e -> {
+            config.setGpiTriggerPort(gpiTriggerPortCombo.getSelectedIndex());
+        });
+        
+        gpiTriggerStateCombo.addActionListener(e -> {
+            config.setGpiTriggerState(gpiTriggerStateCombo.getSelectedIndex() == 0);
+        });
+        
+        // Configuración avanzada - Reportes
+        reportPhaseCheck.addActionListener(e -> {
+            config.setReportPhaseAngle(reportPhaseCheck.isSelected());
+        });
+        
+        reportChannelCheck.addActionListener(e -> {
+            config.setReportChannelIndex(reportChannelCheck.isSelected());
+        });
         
         // Cierre de ventana
         addWindowListener(new WindowAdapter() {
@@ -918,6 +1161,17 @@ public class RFIDMainWindow extends JFrame {
      */
     public void addTag(TagData tag) {
         if (tag == null) return;
+        
+        // Filtrar por RSSI si está habilitado
+        if (config.isRssiFilterEnabled()) {
+            if (tag.getRssi() < config.getRssiThreshold()) {
+                rssiFilteredCount++;
+                SwingUtilities.invokeLater(() -> {
+                    rssiStatsLabel.setText("Filtrados por RSSI: " + rssiFilteredCount);
+                });
+                return;
+            }
+        }
         
         // Filtrar duplicados si está habilitado
         if (!duplicateFilter.shouldProcess(tag.getEpc())) {

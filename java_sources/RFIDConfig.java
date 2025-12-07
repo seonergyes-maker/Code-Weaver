@@ -83,6 +83,53 @@ public class RFIDConfig implements Serializable {
     /** Tiempo de expiración del filtro de duplicados en segundos */
     private int duplicateFilterExpiration;
     
+    // ==================== Configuración Avanzada Zebra ====================
+    
+    /** Umbral RSSI mínimo en dBm (-80 a 0). Tags con RSSI menor se ignoran. */
+    private int rssiThreshold;
+    
+    /** Habilitar filtrado por RSSI */
+    private boolean rssiFilterEnabled;
+    
+    /** Sesión de inventario C1G2 (0-3). Sesión 2 es común para múltiples lectores. */
+    private int inventorySession;
+    
+    /** Target de inventario (0=A, 1=B, 2=AB alternado) */
+    private int inventoryTarget;
+    
+    /** Estimación de población de tags (afecta algoritmo Q) */
+    private int tagPopulation;
+    
+    /** Índice de modo RF para Dense Reader Mode (0-50, depende del firmware) */
+    private int rfModeIndex;
+    
+    /** Habilitar Dense Reader Mode (reduce interferencia entre lectores) */
+    private boolean denseReaderMode;
+    
+    /** Puerto GPI que dispara inicio de lectura (0 = deshabilitado) */
+    private int gpiTriggerPort;
+    
+    /** Habilitar trigger por GPI */
+    private boolean gpiTriggerEnabled;
+    
+    /** Estado del GPI que activa lectura (true=HIGH, false=LOW) */
+    private boolean gpiTriggerState;
+    
+    /** Tiempo mínimo entre reportes de tags en ms */
+    private int reportIntervalMs;
+    
+    /** Incluir timestamp en reportes */
+    private boolean reportTimestamp;
+    
+    /** Incluir datos de antena en reportes */
+    private boolean reportAntennaId;
+    
+    /** Incluir phase angle en reportes (para localización) */
+    private boolean reportPhaseAngle;
+    
+    /** Incluir frecuencia de canal en reportes */
+    private boolean reportChannelIndex;
+    
     /**
      * Constructor por defecto con valores predeterminados.
      */
@@ -108,6 +155,23 @@ public class RFIDConfig implements Serializable {
         
         this.duplicateFilterEnabled = true;
         this.duplicateFilterExpiration = 5;
+        
+        // Configuración avanzada Zebra - valores por defecto
+        this.rssiThreshold = -70;           // -70 dBm es un buen umbral por defecto
+        this.rssiFilterEnabled = false;     // Deshabilitado por defecto
+        this.inventorySession = 2;          // Sesión 2 recomendada para múltiples lectores
+        this.inventoryTarget = 0;           // Target A
+        this.tagPopulation = 32;            // Estimación conservadora
+        this.rfModeIndex = 0;               // Modo estándar
+        this.denseReaderMode = false;       // DRM deshabilitado por defecto
+        this.gpiTriggerPort = 0;            // Sin trigger
+        this.gpiTriggerEnabled = false;
+        this.gpiTriggerState = true;        // Trigger en HIGH
+        this.reportIntervalMs = 0;          // Sin throttling
+        this.reportTimestamp = true;
+        this.reportAntennaId = true;
+        this.reportPhaseAngle = false;
+        this.reportChannelIndex = false;
     }
     
     /**
@@ -290,6 +354,141 @@ public class RFIDConfig implements Serializable {
     public void setDuplicateFilterExpiration(int seconds) {
         if (seconds < 1) seconds = 1;
         this.duplicateFilterExpiration = seconds;
+    }
+    
+    // ==================== Getters/Setters Configuración Avanzada ====================
+    
+    public int getRssiThreshold() {
+        return rssiThreshold;
+    }
+    
+    public void setRssiThreshold(int rssiThreshold) {
+        if (rssiThreshold < -80) rssiThreshold = -80;
+        if (rssiThreshold > 0) rssiThreshold = 0;
+        this.rssiThreshold = rssiThreshold;
+    }
+    
+    public boolean isRssiFilterEnabled() {
+        return rssiFilterEnabled;
+    }
+    
+    public void setRssiFilterEnabled(boolean enabled) {
+        this.rssiFilterEnabled = enabled;
+    }
+    
+    public int getInventorySession() {
+        return inventorySession;
+    }
+    
+    public void setInventorySession(int session) {
+        if (session < 0) session = 0;
+        if (session > 3) session = 3;
+        this.inventorySession = session;
+    }
+    
+    public int getInventoryTarget() {
+        return inventoryTarget;
+    }
+    
+    public void setInventoryTarget(int target) {
+        if (target < 0) target = 0;
+        if (target > 2) target = 2;
+        this.inventoryTarget = target;
+    }
+    
+    public int getTagPopulation() {
+        return tagPopulation;
+    }
+    
+    public void setTagPopulation(int population) {
+        if (population < 1) population = 1;
+        if (population > 1000) population = 1000;
+        this.tagPopulation = population;
+    }
+    
+    public int getRfModeIndex() {
+        return rfModeIndex;
+    }
+    
+    public void setRfModeIndex(int index) {
+        if (index < 0) index = 0;
+        if (index > 50) index = 50;
+        this.rfModeIndex = index;
+    }
+    
+    public boolean isDenseReaderMode() {
+        return denseReaderMode;
+    }
+    
+    public void setDenseReaderMode(boolean enabled) {
+        this.denseReaderMode = enabled;
+    }
+    
+    public int getGpiTriggerPort() {
+        return gpiTriggerPort;
+    }
+    
+    public void setGpiTriggerPort(int port) {
+        if (port < 0) port = 0;
+        if (port > 4) port = 4;
+        this.gpiTriggerPort = port;
+    }
+    
+    public boolean isGpiTriggerEnabled() {
+        return gpiTriggerEnabled;
+    }
+    
+    public void setGpiTriggerEnabled(boolean enabled) {
+        this.gpiTriggerEnabled = enabled;
+    }
+    
+    public boolean isGpiTriggerState() {
+        return gpiTriggerState;
+    }
+    
+    public void setGpiTriggerState(boolean state) {
+        this.gpiTriggerState = state;
+    }
+    
+    public int getReportIntervalMs() {
+        return reportIntervalMs;
+    }
+    
+    public void setReportIntervalMs(int intervalMs) {
+        if (intervalMs < 0) intervalMs = 0;
+        this.reportIntervalMs = intervalMs;
+    }
+    
+    public boolean isReportTimestamp() {
+        return reportTimestamp;
+    }
+    
+    public void setReportTimestamp(boolean report) {
+        this.reportTimestamp = report;
+    }
+    
+    public boolean isReportAntennaId() {
+        return reportAntennaId;
+    }
+    
+    public void setReportAntennaId(boolean report) {
+        this.reportAntennaId = report;
+    }
+    
+    public boolean isReportPhaseAngle() {
+        return reportPhaseAngle;
+    }
+    
+    public void setReportPhaseAngle(boolean report) {
+        this.reportPhaseAngle = report;
+    }
+    
+    public boolean isReportChannelIndex() {
+        return reportChannelIndex;
+    }
+    
+    public void setReportChannelIndex(boolean report) {
+        this.reportChannelIndex = report;
     }
     
     // ==================== Métodos de utilidad ====================
