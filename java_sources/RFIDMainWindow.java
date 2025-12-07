@@ -30,6 +30,9 @@ public class RFIDMainWindow extends JFrame {
     /** Título de la ventana */
     private static final String WINDOW_TITLE = "Zebra FX7500 RFID Manager";
     
+    /** Ruta del archivo de configuración */
+    private static final String CONFIG_FILE_PATH = "rfid_config.json";
+    
     /** Tamaño por defecto de la ventana */
     private static final Dimension DEFAULT_SIZE = new Dimension(1024, 768);
     
@@ -123,10 +126,33 @@ public class RFIDMainWindow extends JFrame {
     private volatile long rssiFilteredCount = 0;
     
     /**
-     * Constructor por defecto. Crea la ventana con configuración por defecto.
+     * Constructor por defecto. Crea la ventana cargando configuración desde archivo.
      */
     public RFIDMainWindow() {
-        this(new RFIDConfig());
+        this(loadConfigFromFile());
+    }
+    
+    /**
+     * Carga la configuración desde archivo o crea una nueva si no existe.
+     * 
+     * @return Configuración cargada o por defecto
+     */
+    private static RFIDConfig loadConfigFromFile() {
+        java.io.File configFile = new java.io.File(CONFIG_FILE_PATH);
+        if (configFile.exists()) {
+            try {
+                RFIDConfig loaded = RFIDConfig.loadFromFile(CONFIG_FILE_PATH);
+                System.out.println("[Config] Configuración cargada desde: " + CONFIG_FILE_PATH);
+                return loaded;
+            } catch (Exception e) {
+                System.err.println("[Config] Error al cargar configuración: " + e.getMessage());
+                System.out.println("[Config] Usando configuración por defecto");
+            }
+        } else {
+            System.out.println("[Config] Archivo no encontrado: " + CONFIG_FILE_PATH);
+            System.out.println("[Config] Usando configuración por defecto");
+        }
+        return new RFIDConfig();
     }
     
     /**
@@ -136,7 +162,7 @@ public class RFIDMainWindow extends JFrame {
      */
     public RFIDMainWindow(RFIDConfig config) {
         super(WINDOW_TITLE);
-        this.config = config != null ? config : new RFIDConfig();
+        this.config = config != null ? config : loadConfigFromFile();
         this.statistics = new ReaderStatistics();
         this.duplicateFilter = new DuplicateFilter(this.config.getDuplicateFilterExpiration() * 1000L);
         this.duplicateFilter.setEnabled(this.config.isDuplicateFilterEnabled());
@@ -1298,6 +1324,10 @@ public class RFIDMainWindow extends JFrame {
     public void shutdown() {
         running = false;
         
+        // Guardar configuración antes de cerrar
+        autoSaveConfiguration();
+        System.out.println("[Config] Configuración guardada automáticamente al cerrar");
+        
         if (updateExecutor != null) {
             updateExecutor.shutdown();
         }
@@ -1465,9 +1495,9 @@ public class RFIDMainWindow extends JFrame {
         saveUIToConfig();
         
         try {
-            config.saveToFile("config.json");
+            config.saveToFile(CONFIG_FILE_PATH);
             JOptionPane.showMessageDialog(this,
-                "Configuración guardada en config.json",
+                "Configuración guardada en " + CONFIG_FILE_PATH,
                 "Guardado",
                 JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception e) {
@@ -1475,6 +1505,18 @@ public class RFIDMainWindow extends JFrame {
                 "Error al guardar: " + e.getMessage(),
                 "Error",
                 JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    /**
+     * Guarda la configuración automáticamente sin mostrar mensaje.
+     */
+    private void autoSaveConfiguration() {
+        saveUIToConfig();
+        try {
+            config.saveToFile(CONFIG_FILE_PATH);
+        } catch (Exception e) {
+            System.err.println("[Config] Error al auto-guardar: " + e.getMessage());
         }
     }
 }
