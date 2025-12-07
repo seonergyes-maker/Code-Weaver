@@ -130,6 +130,12 @@ public class RFIDConfig implements Serializable {
     /** Incluir frecuencia de canal en reportes */
     private boolean reportChannelIndex;
     
+    /** Auto-conexión al iniciar la aplicación */
+    private boolean autoConnectEnabled;
+    
+    /** Última conexión exitosa (para auto-conexión) */
+    private String lastConnectedIP;
+    
     /**
      * Constructor por defecto con valores predeterminados.
      */
@@ -172,6 +178,8 @@ public class RFIDConfig implements Serializable {
         this.reportAntennaId = true;
         this.reportPhaseAngle = false;
         this.reportChannelIndex = false;
+        this.autoConnectEnabled = false;    // Deshabilitado por defecto
+        this.lastConnectedIP = null;
     }
     
     /**
@@ -489,6 +497,22 @@ public class RFIDConfig implements Serializable {
     
     public void setReportChannelIndex(boolean report) {
         this.reportChannelIndex = report;
+    }
+    
+    public boolean isAutoConnectEnabled() {
+        return autoConnectEnabled;
+    }
+    
+    public void setAutoConnectEnabled(boolean enabled) {
+        this.autoConnectEnabled = enabled;
+    }
+    
+    public String getLastConnectedIP() {
+        return lastConnectedIP;
+    }
+    
+    public void setLastConnectedIP(String ip) {
+        this.lastConnectedIP = ip;
     }
     
     // ==================== Métodos de utilidad ====================

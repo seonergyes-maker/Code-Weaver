@@ -103,6 +103,7 @@ public class RFIDMainWindow extends JFrame {
     private JComboBox<String> gpiTriggerStateCombo;
     private JCheckBox reportPhaseCheck;
     private JCheckBox reportChannelCheck;
+    private JCheckBox autoConnectCheck;
     
     // ==================== Panel de pestañas ====================
     private JTabbedPane tabbedPane;
@@ -179,6 +180,20 @@ public class RFIDMainWindow extends JFrame {
         setLocationRelativeTo(null);
         
         startUpdateTimer();
+        
+        // Auto-conexión al iniciar si está habilitada
+        if (config.isAutoConnectEnabled()) {
+            SwingUtilities.invokeLater(() -> {
+                System.out.println("[AutoConnect] Auto-conexión habilitada, intentando conectar a " + config.getReaderIP() + "...");
+                statusLabel.setText("Auto-conectando a " + config.getReaderIP() + "...");
+                // Pequeño delay para que la ventana se muestre primero
+                javax.swing.Timer timer = new javax.swing.Timer(1500, e -> {
+                    connect();
+                });
+                timer.setRepeats(false);
+                timer.start();
+            });
+        }
     }
     
     /**
@@ -214,6 +229,7 @@ public class RFIDMainWindow extends JFrame {
         connectionIndicator.setPreferredSize(new Dimension(20, 20));
         connectionIndicator.setBackground(Color.RED);
         connectionIndicator.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY));
+        autoConnectCheck = new JCheckBox("Auto-conectar al iniciar", config.isAutoConnectEnabled());
         
         // Componentes de antenas
         for (int i = 0; i < 4; i++) {
@@ -378,8 +394,12 @@ public class RFIDMainWindow extends JFrame {
         statusPanel.add(connectionStatusLabel);
         panel.add(statusPanel, gbc);
         
+        // Auto-conexión
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 4;
+        panel.add(autoConnectCheck, gbc);
+        
         // Panel de información del lector
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 4; gbc.fill = GridBagConstraints.BOTH;
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 4; gbc.fill = GridBagConstraints.BOTH;
         gbc.weightx = 1.0; gbc.weighty = 1.0;
         JPanel infoPanel = new JPanel(new BorderLayout());
         infoPanel.setBorder(BorderFactory.createTitledBorder("Información del Lector"));
@@ -824,6 +844,12 @@ public class RFIDMainWindow extends JFrame {
         // Botón desconectar
         disconnectButton.addActionListener(e -> disconnect());
         
+        // Auto-conexión
+        autoConnectCheck.addActionListener(e -> {
+            config.setAutoConnectEnabled(autoConnectCheck.isSelected());
+            autoSaveConfiguration();
+        });
+        
         // Botón limpiar tags
         clearTagsButton.addActionListener(e -> clearTags());
         
@@ -1015,6 +1041,11 @@ public class RFIDMainWindow extends JFrame {
         disconnectButton.setEnabled(true);
         setStatus("Conectado a " + config.getReaderIP());
         statistics.recordConnection();
+        
+        // Guardar la última IP conectada exitosamente para auto-conexión
+        config.setLastConnectedIP(config.getReaderIP());
+        autoSaveConfiguration();
+        System.out.println("[Config] Última IP conectada guardada: " + config.getReaderIP());
         
         // Inicializar controlador GPIO
         gpioController = new GPIOController(connection);
