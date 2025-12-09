@@ -142,6 +142,43 @@ with st.sidebar:
                     st.rerun()
     
     st.markdown("---")
+    
+    # Buscador de código
+    st.markdown("**🔍 Buscar en Proyecto**")
+    search_query = st.text_input("Buscar:", placeholder="texto a buscar...", key="search_code_input")
+    
+    if search_query and len(search_query) >= 2:
+        search_results = []
+        query_lower = search_query.lower()
+        
+        for filename, content in st.session_state.files.items():
+            lines = content.split('\n')
+            for line_num, line in enumerate(lines, 1):
+                if query_lower in line.lower():
+                    search_results.append({
+                        'file': filename,
+                        'line': line_num,
+                        'content': line.strip()[:60]
+                    })
+        
+        if search_results:
+            st.caption(f"📋 {len(search_results)} resultado(s)")
+            with st.container(height=200):
+                for i, result in enumerate(search_results[:20]):
+                    result_text = f"**{result['file']}** :{result['line']}"
+                    if st.button(result_text, key=f"search_result_{i}", use_container_width=True, help=result['content']):
+                        st.session_state.files[st.session_state.current_file] = st.session_state.code
+                        st.session_state.current_file = result['file']
+                        st.session_state.code = st.session_state.files[result['file']]
+                        st.session_state.search_goto_line = result['line']
+                        st.rerun()
+                    st.caption(f"└─ `{result['content']}`")
+            if len(search_results) > 20:
+                st.caption(f"... y {len(search_results) - 20} más")
+        else:
+            st.caption("Sin resultados")
+    
+    st.markdown("---")
     new_file = st.text_input("Nuevo archivo:", placeholder="NombreClase.java", key="new_file_input")
     if st.button("➕ Crear Archivo", use_container_width=True):
         if new_file:
