@@ -371,10 +371,10 @@ public class RFIDMainWindow extends JFrame {
         portSpinner = new JSpinner(new SpinnerNumberModel(config.getReaderPort(), 1, 65535, 1));
         ModernUIStyle.styleSpinner(portSpinner);
         
-        connectButton = new JButton("⚡ Conectar");
+        connectButton = new JButton("\u25B6 Conectar");  // ▶
         ModernUIStyle.stylePrimaryButton(connectButton);
         
-        disconnectButton = new JButton("✕ Desconectar");
+        disconnectButton = new JButton("\u25A0 Desconectar");  // ■
         ModernUIStyle.styleDangerButton(disconnectButton);
         disconnectButton.setEnabled(false);
         
@@ -430,7 +430,7 @@ public class RFIDMainWindow extends JFrame {
         tpsLabel.setForeground(ModernUIStyle.ACCENT_WARNING);
         tpsLabel.setFont(new Font("Consolas", Font.BOLD, 16));
         
-        clearTagsButton = new JButton("🗑 Limpiar");
+        clearTagsButton = new JButton("\u2715 Limpiar");  // ✕
         ModernUIStyle.styleSecondaryButton(clearTagsButton);
         
         autoScrollCheck = new JCheckBox("Auto-scroll", true);
@@ -457,7 +457,7 @@ public class RFIDMainWindow extends JFrame {
             BorderFactory.createEmptyBorder(8, 12, 8, 12)
         ));
         
-        testApiButton = new JButton("🔗 Probar Conexión");
+        testApiButton = new JButton("\u21C4 Probar Conexion");  // ⇄
         ModernUIStyle.styleSecondaryButton(testApiButton);
         
         apiStatusLabel = new JLabel("No configurado");
@@ -485,7 +485,7 @@ public class RFIDMainWindow extends JFrame {
         }
         
         // Barra de estado
-        statusLabel = new JLabel("● Listo");
+        statusLabel = new JLabel("\u25CF Listo");  // ●
         statusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
         statusLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
         
@@ -505,13 +505,13 @@ public class RFIDMainWindow extends JFrame {
             config.getDuplicateFilterExpiration(), 1, 300, 1));
         ModernUIStyle.styleSpinner(duplicateExpirationSpinner);
         
-        generateWindowsServiceButton = new JButton("🪟 Generar Instalador Windows");
+        generateWindowsServiceButton = new JButton("\u229E Generar Instalador Windows");  // ⊞
         ModernUIStyle.stylePrimaryButton(generateWindowsServiceButton);
         
-        generateUbuntuServiceButton = new JButton("🐧 Generar Script Ubuntu");
+        generateUbuntuServiceButton = new JButton("\u2318 Generar Script Ubuntu");  // ⌘
         ModernUIStyle.styleSecondaryButton(generateUbuntuServiceButton);
         
-        saveConfigButton = new JButton("💾 Guardar Configuración");
+        saveConfigButton = new JButton("\u2714 Guardar Configuracion");  // ✔
         ModernUIStyle.styleSuccessButton(saveConfigButton);
         
         duplicateStatsLabel = new JLabel("Filtrados: 0 | Procesados: 0");
@@ -605,7 +605,7 @@ public class RFIDMainWindow extends JFrame {
         
         // Título con icono
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 4;
-        JLabel titleLabel = ModernUIStyle.createTitleLabel("📡 Conexión LLRP");
+        JLabel titleLabel = ModernUIStyle.createTitleLabel("\u25C9 Conexion LLRP");  // ◉
         panel.add(titleLabel, gbc);
         
         // Subtítulo
@@ -662,7 +662,7 @@ public class RFIDMainWindow extends JFrame {
             BorderFactory.createEmptyBorder(15, 15, 15, 15)
         ));
         
-        JLabel infoTitle = new JLabel("📋 Información del Lector");
+        JLabel infoTitle = new JLabel("\u2630 Informacion del Lector");  // ☰
         infoTitle.setForeground(ModernUIStyle.TEXT_PRIMARY);
         infoTitle.setFont(new Font("Segoe UI", Font.BOLD, 14));
         infoPanel.add(infoTitle, BorderLayout.NORTH);
