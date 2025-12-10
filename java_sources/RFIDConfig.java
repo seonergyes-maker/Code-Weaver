@@ -680,7 +680,9 @@ public class RFIDConfig implements Serializable {
             sb.append("      \"receiveSensitivity\": ").append(ac.getReceiveSensitivity()).append(",\n");
             sb.append("      \"enabled\": ").append(ac.isEnabled()).append(",\n");
             sb.append("      \"cableLoss\": ").append(ac.getCableLoss()).append(",\n");
-            sb.append("      \"antennaGain\": ").append(ac.getAntennaGain()).append("\n");
+            sb.append("      \"antennaGain\": ").append(ac.getAntennaGain()).append(",\n");
+            sb.append("      \"rssiThreshold\": ").append(ac.getRssiThreshold()).append(",\n");
+            sb.append("      \"rssiFilterEnabled\": ").append(ac.isRssiFilterEnabled()).append("\n");
             sb.append("    }");
             if (i < antennaConfigs.length - 1) sb.append(",");
             sb.append("\n");
@@ -768,6 +770,8 @@ public class RFIDConfig implements Serializable {
                     ac.setEnabled(extractBooleanValue(obj, "enabled", ac.isEnabled()));
                     ac.setCableLoss(extractDoubleValue(obj, "cableLoss", ac.getCableLoss()));
                     ac.setAntennaGain(extractDoubleValue(obj, "antennaGain", ac.getAntennaGain()));
+                    ac.setRssiThreshold(extractIntValue(obj, "rssiThreshold", ac.getRssiThreshold()));
+                    ac.setRssiFilterEnabled(extractBooleanValue(obj, "rssiFilterEnabled", ac.isRssiFilterEnabled()));
                 }
             }
         }
