@@ -56,6 +56,9 @@ public class RFIDConfig implements Serializable {
     /** Clave de API para autenticación */
     private String apiKey;
     
+    /** Identificador de trabajo para la API (campo configurable) */
+    private String apiTrabajo;
+    
     /** Configuración de GPO (General Purpose Output) - 4 puertos */
     private boolean[] gpoSettings;
     
@@ -283,6 +286,14 @@ public class RFIDConfig implements Serializable {
     
     public void setApiKey(String apiKey) {
         this.apiKey = apiKey;
+    }
+    
+    public String getApiTrabajo() {
+        return apiTrabajo;
+    }
+    
+    public void setApiTrabajo(String apiTrabajo) {
+        this.apiTrabajo = apiTrabajo;
     }
     
     public boolean[] getGpoSettings() {
@@ -607,6 +618,7 @@ public class RFIDConfig implements Serializable {
         copy.tagCacheTimeout = this.tagCacheTimeout;
         copy.apiEndpoint = this.apiEndpoint;
         copy.apiKey = this.apiKey;
+        copy.apiTrabajo = this.apiTrabajo;
         copy.keepAliveInterval = this.keepAliveInterval;
         copy.connectionTimeout = this.connectionTimeout;
         copy.autoReconnect = this.autoReconnect;
@@ -649,6 +661,9 @@ public class RFIDConfig implements Serializable {
         }
         if (apiKey != null) {
             sb.append("  \"apiKey\": \"").append(escapeJson(apiKey)).append("\",\n");
+        }
+        if (apiTrabajo != null) {
+            sb.append("  \"apiTrabajo\": \"").append(escapeJson(apiTrabajo)).append("\",\n");
         }
         
         sb.append("  \"antennaConfigs\": [\n");
@@ -723,6 +738,7 @@ public class RFIDConfig implements Serializable {
         config.regulatoryRegion = extractStringValue(json, "regulatoryRegion", config.regulatoryRegion);
         config.apiEndpoint = extractStringValue(json, "apiEndpoint", null);
         config.apiKey = extractStringValue(json, "apiKey", null);
+        config.apiTrabajo = extractStringValue(json, "apiTrabajo", null);
         
         String modeStr = extractStringValue(json, "operationMode", "CONTINUOUS");
         try {

@@ -43,11 +43,17 @@ public class APIClient implements AutoCloseable {
     /** Intervalo de envío por lotes en milisegundos */
     public static final long DEFAULT_BATCH_INTERVAL = 1000;
     
-    /** URL del endpoint de la API */
+    /** URL del endpoint de la API (base URL sin parámetros) */
     private String endpointUrl;
     
-    /** Clave de API para autenticación */
+    /** Clave de API para autenticación (token) */
     private String apiKey;
+    
+    /** IP del lector RFID para enviar a la API */
+    private String readerIP;
+    
+    /** Identificador de trabajo para la API */
+    private String apiTrabajo;
     
     /** Timeout de conexión en milisegundos */
     private int connectTimeout = DEFAULT_CONNECT_TIMEOUT;
@@ -184,6 +190,22 @@ public class APIClient implements AutoCloseable {
     
     public String getApiKey() {
         return apiKey;
+    }
+    
+    public void setReaderIP(String readerIP) {
+        this.readerIP = readerIP;
+    }
+    
+    public String getReaderIP() {
+        return readerIP;
+    }
+    
+    public void setApiTrabajo(String apiTrabajo) {
+        this.apiTrabajo = apiTrabajo;
+    }
+    
+    public String getApiTrabajo() {
+        return apiTrabajo;
     }
     
     public void setConnectTimeout(int connectTimeout) {
@@ -572,36 +594,55 @@ public class APIClient implements AutoCloseable {
     
     /**
      * Realiza el envío HTTP de las etiquetas.
+     * Usa formato URL con parámetros en path: {baseUrl}/{token}/{ip}/{trabajo}/{tag}
      * 
      * @param tags Lista de etiquetas a enviar
-     * @return Código de respuesta HTTP
+     * @return Código de respuesta HTTP del último envío
      * @throws IOException si hay error de conexión
      */
     private int doSend(List<TagData> tags) throws IOException {
-        URL url = new URL(endpointUrl);
+        int lastResponseCode = 0;
+        
+        for (TagData tag : tags) {
+            lastResponseCode = doSendSingleTag(tag);
+        }
+        
+        return lastResponseCode;
+    }
+    
+    /**
+     * Envía una etiqueta individual usando formato URL con path parameters.
+     * URL: {baseUrl}/{token}/{ip}/{trabajo}/{tag}
+     * 
+     * @param tag Datos de la etiqueta
+     * @return Código de respuesta HTTP
+     * @throws IOException si hay error de conexión
+     */
+    private int doSendSingleTag(TagData tag) throws IOException {
+        String epc = displayHexMode ? tag.getEpc() : convertEpcToDecimal(tag.getEpc());
+        
+        String token = (apiKey != null) ? URLEncoder.encode(apiKey, StandardCharsets.UTF_8.toString()) : "";
+        String ip = (readerIP != null) ? URLEncoder.encode(readerIP, StandardCharsets.UTF_8.toString()) : "";
+        String trabajo = (apiTrabajo != null) ? URLEncoder.encode(apiTrabajo, StandardCharsets.UTF_8.toString()) : "";
+        String tagEpc = URLEncoder.encode(epc, StandardCharsets.UTF_8.toString());
+        
+        String fullUrl = endpointUrl;
+        if (!fullUrl.endsWith("/")) {
+            fullUrl += "/";
+        }
+        fullUrl += token + "/" + ip + "/" + trabajo + "/" + tagEpc;
+        
+        URL url = new URL(fullUrl);
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         
         try {
-            conn.setRequestMethod("POST");
-            conn.setDoOutput(true);
+            conn.setRequestMethod("GET");
             conn.setConnectTimeout(connectTimeout);
             conn.setReadTimeout(readTimeout);
-            conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
             conn.setRequestProperty("Accept", "application/json");
-            
-            if (apiKey != null && !apiKey.isEmpty()) {
-                conn.setRequestProperty("Authorization", "Bearer " + apiKey);
-            }
             
             for (Map.Entry<String, String> header : customHeaders.entrySet()) {
                 conn.setRequestProperty(header.getKey(), header.getValue());
-            }
-            
-            String jsonPayload = buildJsonPayload(tags);
-            
-            try (OutputStream os = conn.getOutputStream()) {
-                byte[] input = jsonPayload.getBytes(StandardCharsets.UTF_8);
-                os.write(input, 0, input.length);
             }
             
             return conn.getResponseCode();

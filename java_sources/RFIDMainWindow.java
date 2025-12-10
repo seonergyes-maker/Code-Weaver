@@ -66,6 +66,7 @@ public class RFIDMainWindow extends JFrame {
     // ==================== Componentes de API ====================
     private JTextField apiEndpointField;
     private JPasswordField apiKeyField;
+    private JTextField apiTrabajoField;
     private JButton testApiButton;
     private JLabel apiStatusLabel;
     private JCheckBox apiEnabledCheck;
@@ -457,6 +458,10 @@ public class RFIDMainWindow extends JFrame {
             BorderFactory.createEmptyBorder(8, 12, 8, 12)
         ));
         
+        apiTrabajoField = new JTextField(config.getApiTrabajo() != null ? config.getApiTrabajo() : "", 20);
+        ModernUIStyle.styleTextField(apiTrabajoField);
+        apiTrabajoField.setToolTipText("Identificador del trabajo/turno para la API");
+        
         testApiButton = new JButton("\u21C4 Probar Conexion");  // ⇄
         ModernUIStyle.styleSecondaryButton(testApiButton);
         
@@ -791,18 +796,24 @@ public class RFIDMainWindow extends JFrame {
         gbc.gridx = 1; gbc.gridwidth = 2; gbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(apiEndpointField, gbc);
         
-        // API Key
+        // API Key (Token)
         gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1; gbc.fill = GridBagConstraints.NONE;
-        panel.add(new JLabel("API Key:"), gbc);
+        panel.add(new JLabel("API Key (Token):"), gbc);
         gbc.gridx = 1; gbc.gridwidth = 2; gbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(apiKeyField, gbc);
         
+        // Trabajo
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 1; gbc.fill = GridBagConstraints.NONE;
+        panel.add(new JLabel("Trabajo:"), gbc);
+        gbc.gridx = 1; gbc.gridwidth = 2; gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(apiTrabajoField, gbc);
+        
         // Checkbox habilitado
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 3;
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 3;
         panel.add(apiEnabledCheck, gbc);
         
         // Botón de prueba y estado
-        gbc.gridy = 4;
+        gbc.gridy = 5;
         JPanel testPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         testPanel.add(testApiButton);
         testPanel.add(new JLabel("Estado:"));
@@ -810,7 +821,7 @@ public class RFIDMainWindow extends JFrame {
         panel.add(testPanel, gbc);
         
         // Área de logs de API
-        gbc.gridy = 5; gbc.fill = GridBagConstraints.BOTH;
+        gbc.gridy = 6; gbc.fill = GridBagConstraints.BOTH;
         gbc.weightx = 1.0; gbc.weighty = 1.0;
         JPanel logPanel = new JPanel(new BorderLayout());
         logPanel.setBorder(BorderFactory.createTitledBorder("Log de Envíos"));
@@ -1258,6 +1269,9 @@ public class RFIDMainWindow extends JFrame {
         if (config.getApiKey() != null) {
             apiKeyField.setText(config.getApiKey());
         }
+        if (config.getApiTrabajo() != null) {
+            apiTrabajoField.setText(config.getApiTrabajo());
+        }
         
         // Cargar preferencia de formato EPC
         displayHexMode = config.isDisplayHexMode();
@@ -1280,6 +1294,7 @@ public class RFIDMainWindow extends JFrame {
         
         config.setApiEndpoint(apiEndpointField.getText().trim());
         config.setApiKey(new String(apiKeyField.getPassword()));
+        config.setApiTrabajo(apiTrabajoField.getText().trim());
         
         // Guardar preferencia de formato EPC
         config.setDisplayHexMode(displayHexMode);
@@ -1419,6 +1434,8 @@ public class RFIDMainWindow extends JFrame {
     private void testApiConnection() {
         String endpoint = apiEndpointField.getText().trim();
         String apiKey = new String(apiKeyField.getPassword());
+        String trabajo = apiTrabajoField.getText().trim();
+        String readerIP = ipField.getText().trim();
         
         if (endpoint.isEmpty()) {
             apiStatusLabel.setText("Endpoint vacío");
@@ -1433,6 +1450,8 @@ public class RFIDMainWindow extends JFrame {
             @Override
             protected Boolean doInBackground() {
                 APIClient testClient = new APIClient(endpoint, apiKey);
+                testClient.setReaderIP(readerIP);
+                testClient.setApiTrabajo(trabajo);
                 return testClient.testConnection();
             }
             
@@ -1464,9 +1483,13 @@ public class RFIDMainWindow extends JFrame {
         
         String endpoint = apiEndpointField.getText().trim();
         String key = new String(apiKeyField.getPassword());
+        String trabajo = apiTrabajoField.getText().trim();
+        String readerIP = ipField.getText().trim();
         
         if (!endpoint.isEmpty()) {
             apiClient = new APIClient(endpoint, key);
+            apiClient.setReaderIP(readerIP);
+            apiClient.setApiTrabajo(trabajo);
             apiClient.setDisplayHexMode(displayHexMode); // Sincronizar formato EPC
             apiClient.setSendResultHandler(result -> {
                 SwingUtilities.invokeLater(() -> {
