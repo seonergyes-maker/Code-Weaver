@@ -744,17 +744,17 @@ public class LLRPConnection implements AutoCloseable {
             // Continuar aunque falle (puede que no haya ROSpecs)
         }
         
-        // Paso 2: Configurar antenas
+        // Paso 2: Configurar antenas (opcional - si falla, usa configuración por defecto)
         System.out.println("[LLRP] Paso 2: Configurando antenas...");
         try {
             if (!setReaderConfig(config.getAntennaConfigs())) {
-                System.err.println("[LLRP] ERROR: Fallo al configurar antenas");
-                throw new IOException("Fallo al configurar antenas del lector");
+                System.out.println("[LLRP] Advertencia: No se pudo configurar antenas, usando configuración por defecto");
+            } else {
+                System.out.println("[LLRP] Antenas configuradas OK");
             }
-            System.out.println("[LLRP] Antenas configuradas OK");
         } catch (Exception e) {
-            System.err.println("[LLRP] ERROR en configuración de antenas: " + e.getMessage());
-            throw new IOException("Error configurando antenas: " + e.getMessage());
+            System.out.println("[LLRP] Advertencia: Error en configuración de antenas: " + e.getMessage());
+            System.out.println("[LLRP] Continuando con configuración por defecto del lector...");
         }
         
         // Paso 3: Agregar ROSpec

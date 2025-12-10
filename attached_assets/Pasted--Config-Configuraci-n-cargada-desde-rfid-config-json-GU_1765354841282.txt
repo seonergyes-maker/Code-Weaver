@@ -1,0 +1,46 @@
+[Config] Configuración cargada desde: rfid_config.json
+[GUI] Iniciando interfaz gráfica...
+[Tray] Icono de bandeja del sistema inicializado
+[AutoConnect] Auto-conexión habilitada, intentando conectar a 192.168.1.117...
+[Config] Última IP conectada guardada: 192.168.1.117
+[LLRP] Iniciando lectura - ROSpec ID: 1
+[LLRP] Antenas habilitadas: [1, 2, 3, 4]
+[LLRP] Paso 1: Eliminando ROSpecs existentes...
+[LLRP] ROSpecs eliminados OK
+[LLRP] Paso 2: Configurando antenas...
+[LLRP] ERROR: Fallo al configurar antenas
+[LLRP] ERROR en configuración de antenas: Fallo al configurar antenas del lector
+[LLRP] Iniciando lectura - ROSpec ID: 1
+[LLRP] Antenas habilitadas: [1]
+[LLRP] Paso 1: Eliminando ROSpecs existentes...
+[LLRP] ROSpecs eliminados OK
+[LLRP] Paso 2: Configurando antenas...
+[LLRP] ERROR: Fallo al configurar antenas
+[LLRP] ERROR en configuración de antenas: Fallo al configurar antenas del lector
+[GPIO] Error: No hay conexión con el lector
+[GPIO] Error: No hay conexión con el lector
+[GPIO] Error: No hay conexión con el lector
+[GPIO] Error: No hay conexión con el lector
+[Config] Última IP conectada guardada: 192.168.1.117
+[GPIO] Error al establecer GPO 1
+[GPIO] Error al establecer GPO 2
+[GPIO] Error al establecer GPO 3
+[GPIO] Error al establecer GPO 4
+[GPIO] Error: No hay conexión con el lector
+[GPIO] Error: No hay conexión con el lector
+[GPIO] Error: No hay conexión con el lector
+[GPIO] Error: No hay conexión con el lector
+[Config] Última IP conectada guardada: 192.168.1.117
+[LLRP] Iniciando lectura - ROSpec ID: 1
+[LLRP] Antenas habilitadas: [1, 2, 3, 4]
+[LLRP] Paso 1: Eliminando ROSpecs existentes...
+[LLRP] ROSpecs eliminados OK
+[LLRP] Paso 2: Configurando antenas...
+[LLRP] ERROR: Fallo al configurar antenas
+[LLRP] ERROR en configuración de antenas: Fallo al configurar antenas del lector
+[Tray] Aplicación minimizada a la bandeja
+[Config] Configuración guardada automáticamente al cerrar
+[GPIO] Error: No hay conexión con el lector
+[GPIO] Error: No hay conexión con el lector
+[GPIO] Error: No hay conexión con el lector
+[GPIO] Error: No hay conexión con el lector
