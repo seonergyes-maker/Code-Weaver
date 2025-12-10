@@ -1407,7 +1407,7 @@ public class RFIDMainWindow extends JFrame {
                 try {
                     // Configurar el handler para recibir tags
                     connection.setAsyncMessageHandler(message -> {
-                        if (message != null && message.getType() == LLRPMessageType.RO_ACCESS_REPORT) {
+                        if (message != null && message.getMessageType() == LLRPMessageType.RO_ACCESS_REPORT) {
                             processTagReport(message);
                         }
                     });
