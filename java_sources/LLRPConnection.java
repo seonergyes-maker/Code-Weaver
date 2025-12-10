@@ -507,8 +507,13 @@ public class LLRPConnection implements AutoCloseable {
         if (message.getMessageType() == LLRPMessageType.RO_ACCESS_REPORT ||
             message.getMessageType() == LLRPMessageType.READER_EVENT_NOTIFICATION) {
             
+            System.out.println("[LLRP] Mensaje async recibido: " + message.getMessageType() + 
+                ", payload: " + (message.getPayload() != null ? message.getPayload().length : 0) + " bytes");
+            
             if (asyncMessageHandler != null) {
                 asyncMessageHandler.accept(message);
+            } else {
+                System.out.println("[LLRP] ADVERTENCIA: No hay handler para mensajes async!");
             }
             return;
         }

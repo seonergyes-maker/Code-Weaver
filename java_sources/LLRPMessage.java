@@ -862,8 +862,11 @@ public class LLRPMessage {
         
         byte[] data = message.payload;
         if (data == null || data.length < 4) {
+            System.out.println("[LLRP] RO_ACCESS_REPORT sin payload válido");
             return tags;
         }
+        
+        System.out.println("[LLRP] Parseando RO_ACCESS_REPORT, payload: " + bytesToHex(data));
         
         ByteBuffer buffer = ByteBuffer.wrap(data);
         buffer.order(ByteOrder.BIG_ENDIAN);
@@ -874,6 +877,9 @@ public class LLRPMessage {
             // TLV si bit 15 NO está establecido (TV tiene bit 15 = 1)
             boolean isTLV = (typeAndFlags & 0x8000) == 0;
             int paramType = typeAndFlags & 0x03FF;
+            
+            System.out.println("[LLRP] Parámetro encontrado: tipo=" + paramType + 
+                " (0x" + Integer.toHexString(typeAndFlags) + "), isTLV=" + isTLV);
             
             if (isTLV) {
                 int paramLength = buffer.getShort() & 0xFFFF;
