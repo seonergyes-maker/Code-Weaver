@@ -511,10 +511,11 @@ public class LLRPDebug {
         aispecDos.writeShort(1);
         
         // AISpecStopTrigger (Type 184)
+        // TriggerType: 0=Null, 1=Duration, 2=GPI, 3=TagObservation
         ByteArrayOutputStream aiStopBaos = new ByteArrayOutputStream();
         DataOutputStream aiStopDos = new DataOutputStream(aiStopBaos);
-        aiStopDos.writeByte(0); // TriggerType = Null
-        aiStopDos.writeInt(0);  // DurationTrigger
+        aiStopDos.writeByte(1); // TriggerType = Duration
+        aiStopDos.writeInt(500);  // Duration = 500ms (ciclo continuo)
         writeParameter(aispecDos, 184, aiStopBaos.toByteArray());
         
         // InventoryParameterSpec (Type 186)
