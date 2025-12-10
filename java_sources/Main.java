@@ -672,18 +672,10 @@ public class Main {
             }
         });
         
-        // Iniciar lectura usando LLRPConnection
-        try {
-            if (!connection.startReading(config)) {
-                System.err.println("Error: No se pudo iniciar la lectura");
-                return;
-            }
-            System.out.println("Lectura iniciada. Presione Enter para detener...");
-        } catch (Exception e) {
-            System.err.println("Error al iniciar lectura: " + e.getMessage());
-            return;
-        }
+        // TODO: Enviar START_ROSPEC
+        // Este método requeriría implementación completa de ROSpec
         
+        System.out.println("Lectura iniciada. Presione Enter para detener...");
         readLine("");
         
         stopReading();
@@ -694,11 +686,7 @@ public class Main {
      */
     private static void stopReading() {
         if (connection != null) {
-            try {
-                connection.stopReading(config.getRoSpecId());
-            } catch (Exception e) {
-                System.err.println("Error al detener lectura: " + e.getMessage());
-            }
+            // TODO: Enviar STOP_ROSPEC
             connection.setAsyncMessageHandler(null);
             System.out.println("Lectura detenida");
         }

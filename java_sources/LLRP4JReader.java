@@ -1,32 +1,40 @@
 package com.rfid.zebra;
 
-import java.io.*;
-import java.net.*;
-import java.util.concurrent.*;
+import net.enilink.llrp4j.LlrpContext;
+import net.enilink.llrp4j.net.LlrpClient;
+import net.enilink.llrp4j.net.LlrpEndpoint;
+import net.enilink.llrp4j.types.LlrpMessage;
+import net.enilink.llrp4j.types.BitList;
+
+import org.llrp.modules.LlrpModule;
+import org.llrp.messages.*;
+import org.llrp.parameters.*;
+import org.llrp.enumerations.*;
+import org.llrp.interfaces.EPCParameter;
+import org.llrp.interfaces.SpecParameter;
+import org.llrp.interfaces.AirProtocolEPCMemorySelector;
+
+import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * Lector RFID usando implementación directa del protocolo LLRP.
- * Compatible con Zebra FX7500 y otros lectores LLRP.
+ * Lector RFID usando la librería LLRP4J.
+ * Proporciona una implementación robusta del protocolo LLRP.
  */
 public class LLRP4JReader implements AutoCloseable {
     
     private final String readerIP;
     private final int port;
-    private Socket socket;
-    private DataInputStream in;
-    private DataOutputStream out;
+    private LlrpContext context;
+    private LlrpClient client;
     private volatile boolean connected = false;
     private volatile boolean reading = false;
-    private ExecutorService executor;
     
     private Consumer<String[]> tagCallback; // [epc, antenna, rssi, timestamp]
     private Consumer<String> statusCallback;
     private Consumer<Exception> errorCallback;
-    
-    // Contadores de estadísticas
-    private long totalTagsRead = 0;
-    private long sessionTagsRead = 0;
     
     public LLRP4JReader(String readerIP) {
         this(readerIP, 5084);
@@ -50,14 +58,14 @@ public class LLRP4JReader implements AutoCloseable {
     }
     
     private void log(String message) {
-        System.out.println("[LLRP] " + message);
+        System.out.println("[LLRP4J] " + message);
         if (statusCallback != null) {
             statusCallback.accept(message);
         }
     }
     
     private void logError(String message, Exception e) {
-        System.err.println("[LLRP] ERROR: " + message);
+        System.err.println("[LLRP4J] ERROR: " + message);
         if (e != null) {
             e.printStackTrace();
         }
@@ -73,56 +81,33 @@ public class LLRP4JReader implements AutoCloseable {
         try {
             log("Conectando a " + readerIP + ":" + port + "...");
             
-            socket = new Socket();
-            socket.connect(new InetSocketAddress(readerIP, port), 5000);
-            socket.setSoTimeout(1000);
+            context = LlrpContext.create(new LlrpModule());
             
-            in = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
-            out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+            LlrpEndpoint endpoint = new LlrpEndpoint() {
+                @Override
+                public void messageReceived(LlrpMessage message) {
+                    handleMessage(message);
+                }
+                
+                @Override
+                public void errorOccured(String msg, Throwable cause) {
+                    logError(msg, cause != null ? new Exception(cause) : null);
+                }
+            };
+            
+            client = LlrpClient.create(context, readerIP, port).endpoint(endpoint);
+            
+            // Esperar conexión
+            Thread.sleep(1000);
             
             connected = true;
             log("Conectado exitosamente a " + readerIP);
-            
-            // Esperar READER_EVENT_NOTIFICATION inicial
-            Thread.sleep(500);
-            drainInitialMessages();
             
             return true;
             
         } catch (Exception e) {
             logError("Error al conectar: " + e.getMessage(), e);
             return false;
-        }
-    }
-    
-    private void drainInitialMessages() {
-        try {
-            while (true) {
-                try {
-                    byte[] header = new byte[10];
-                    int read = in.read(header, 0, 10);
-                    if (read < 10) break;
-                    
-                    int typeWord = ((header[0] & 0xFF) << 8) | (header[1] & 0xFF);
-                    int messageType = typeWord & 0x03FF;
-                    long messageLength = ((long)(header[2] & 0xFF) << 24) |
-                                        ((long)(header[3] & 0xFF) << 16) |
-                                        ((long)(header[4] & 0xFF) << 8) |
-                                        ((long)(header[5] & 0xFF));
-                    
-                    int bodyLength = (int)(messageLength - 10);
-                    if (bodyLength > 0) {
-                        byte[] body = new byte[bodyLength];
-                        in.readFully(body);
-                    }
-                    
-                    log("Mensaje inicial recibido: Type " + messageType);
-                } catch (SocketTimeoutException e) {
-                    break;
-                }
-            }
-        } catch (Exception e) {
-            // Ignorar
         }
     }
     
@@ -135,17 +120,13 @@ public class LLRP4JReader implements AutoCloseable {
                 stopReading();
             }
             
+            if (client != null) {
+                client.close();
+                client = null;
+            }
+            
             connected = false;
-            
-            if (socket != null && !socket.isClosed()) {
-                socket.close();
-            }
-            
-            if (executor != null) {
-                executor.shutdownNow();
-            }
-            
-            log("Desconectado");
+            log("Desconectado del lector");
             
         } catch (Exception e) {
             logError("Error al desconectar: " + e.getMessage(), e);
@@ -153,64 +134,50 @@ public class LLRP4JReader implements AutoCloseable {
     }
     
     /**
-     * Inicia la lectura continua de tags.
+     * Inicia la lectura de tags.
      */
     public boolean startReading() {
-        if (!connected) {
-            logError("No conectado al lector", null);
+        if (!connected || client == null) {
+            logError("No hay conexión activa", null);
             return false;
         }
         
-        if (reading) {
-            log("Ya está leyendo");
-            return true;
-        }
-        
         try {
-            // Configurar ROSpec
-            log("Configurando ROSpec...");
+            log("Configurando lectura...");
             
-            // DELETE_ROSPEC(0) - eliminar todas las ROSpecs existentes
-            sendDeleteRoSpec(0, 1);
-            LLRPResponse resp = waitForResponse(31, 2000);
-            if (resp == null || resp.statusCode != 0) {
-                log("Advertencia: DELETE_ROSPEC falló, continuando...");
-            }
+            // 1. Eliminar ROSpecs existentes
+            DELETE_ROSPEC deleteRospec = new DELETE_ROSPEC();
+            deleteRospec.roSpecID(0); // 0 = eliminar todos
             
-            // ADD_ROSPEC
-            sendAddRoSpec(2);
-            resp = waitForResponse(30, 2000);
-            if (resp == null || resp.statusCode != 0) {
-                logError("ADD_ROSPEC falló" + (resp != null ? ": " + resp.statusCode : ""), null);
-                return false;
-            }
-            log("ROSpec agregado correctamente");
+            LlrpMessage deleteResponse = client.transact(deleteRospec);
+            log("ROSpecs anteriores eliminados");
             
-            // ENABLE_ROSPEC
-            sendEnableRoSpec(3);
-            resp = waitForResponse(34, 2000);
-            if (resp == null || resp.statusCode != 0) {
-                logError("ENABLE_ROSPEC falló", null);
-                return false;
+            // 2. Crear y agregar ROSpec
+            ADD_ROSPEC addRospec = createROSpec();
+            LlrpMessage addResponse = client.transact(addRospec);
+            
+            if (addResponse instanceof ADD_ROSPEC_RESPONSE) {
+                ADD_ROSPEC_RESPONSE resp = (ADD_ROSPEC_RESPONSE) addResponse;
+                if (resp.llrpStatus().statusCode() != StatusCode.M_Success) {
+                    logError("Error al agregar ROSpec: " + resp.llrpStatus().errorDescription(), null);
+                    return false;
+                }
             }
+            log("ROSpec agregado");
+            
+            // 3. Habilitar ROSpec
+            ENABLE_ROSPEC enableRospec = new ENABLE_ROSPEC();
+            enableRospec.roSpecID(1);
+            LlrpMessage enableResponse = client.transact(enableRospec);
             log("ROSpec habilitado");
             
-            // START_ROSPEC
-            sendStartRoSpec(4);
-            resp = waitForResponse(32, 2000);
-            if (resp == null || resp.statusCode != 0) {
-                logError("START_ROSPEC falló", null);
-                return false;
-            }
-            log("ROSpec iniciado - Leyendo tags...");
+            // 4. Iniciar ROSpec
+            START_ROSPEC startRospec = new START_ROSPEC();
+            startRospec.roSpecID(1);
+            LlrpMessage startResponse = client.transact(startRospec);
+            log("ROSpec iniciado - Lectura activa!");
             
             reading = true;
-            sessionTagsRead = 0;
-            
-            // Iniciar thread de lectura
-            executor = Executors.newSingleThreadExecutor();
-            executor.submit(this::readLoop);
-            
             return true;
             
         } catch (Exception e) {
@@ -223,27 +190,23 @@ public class LLRP4JReader implements AutoCloseable {
      * Detiene la lectura de tags.
      */
     public boolean stopReading() {
-        if (!reading) {
-            return true;
+        if (!connected || client == null) {
+            return false;
         }
         
-        reading = false;
-        
         try {
-            // STOP_ROSPEC
-            sendStopRoSpec(5);
-            waitForResponse(33, 1000);
+            // Detener ROSpec
+            STOP_ROSPEC stopRospec = new STOP_ROSPEC();
+            stopRospec.roSpecID(1);
+            client.transact(stopRospec);
             
-            // DELETE_ROSPEC
-            sendDeleteRoSpec(1, 6);
-            waitForResponse(31, 1000);
+            // Eliminar ROSpec
+            DELETE_ROSPEC deleteRospec = new DELETE_ROSPEC();
+            deleteRospec.roSpecID(1);
+            client.transact(deleteRospec);
             
-            log("Lectura detenida. Tags leídos en sesión: " + sessionTagsRead);
-            
-            if (executor != null) {
-                executor.shutdownNow();
-                executor = null;
-            }
+            reading = false;
+            log("Lectura detenida");
             
             return true;
             
@@ -253,375 +216,243 @@ public class LLRP4JReader implements AutoCloseable {
         }
     }
     
-    private void readLoop() {
-        byte[] header = new byte[10];
+    /**
+     * Crea un ROSpec para lectura continua.
+     */
+    private ADD_ROSPEC createROSpec() {
+        ADD_ROSPEC addRospec = new ADD_ROSPEC();
         
-        while (reading && connected) {
-            try {
-                // Leer header
-                int bytesRead = 0;
-                while (bytesRead < 10 && reading) {
-                    try {
-                        int read = in.read(header, bytesRead, 10 - bytesRead);
-                        if (read == -1) {
-                            log("Conexión cerrada por el lector");
-                            reading = false;
-                            return;
-                        }
-                        bytesRead += read;
-                    } catch (SocketTimeoutException e) {
-                        continue;
-                    }
-                }
-                
-                if (!reading) break;
-                
-                // Parsear header
-                int typeWord = ((header[0] & 0xFF) << 8) | (header[1] & 0xFF);
-                int messageType = typeWord & 0x03FF;
-                long messageLength = ((long)(header[2] & 0xFF) << 24) |
-                                    ((long)(header[3] & 0xFF) << 16) |
-                                    ((long)(header[4] & 0xFF) << 8) |
-                                    ((long)(header[5] & 0xFF));
-                
-                // Leer body
-                int bodyLength = (int)(messageLength - 10);
-                byte[] body = new byte[bodyLength];
-                if (bodyLength > 0) {
-                    int bodyRead = 0;
-                    while (bodyRead < bodyLength) {
-                        int read = in.read(body, bodyRead, bodyLength - bodyRead);
-                        if (read == -1) break;
-                        bodyRead += read;
-                    }
-                }
-                
-                // Procesar mensaje
-                if (messageType == 61) { // RO_ACCESS_REPORT
-                    processRoAccessReport(body);
-                } else if (messageType == 62) { // KEEPALIVE
-                    sendKeepaliveAck();
-                }
-                
-            } catch (SocketTimeoutException e) {
-                // Normal, continuar
-            } catch (Exception e) {
-                if (reading) {
-                    logError("Error en lectura: " + e.getMessage(), e);
-                }
-            }
-        }
+        ROSpec rospec = new ROSpec();
+        rospec.roSpecID(1);
+        rospec.priority(0);
+        rospec.currentState(ROSpecState.Disabled);
+        
+        // ROBoundarySpec
+        ROBoundarySpec boundarySpec = new ROBoundarySpec();
+        
+        // Start trigger - Null (inicia con START_ROSPEC)
+        ROSpecStartTrigger startTrigger = new ROSpecStartTrigger();
+        startTrigger.roSpecStartTriggerType(ROSpecStartTriggerType.Null);
+        boundarySpec.roSpecStartTrigger(startTrigger);
+        
+        // Stop trigger - Null (corre indefinidamente)
+        ROSpecStopTrigger stopTrigger = new ROSpecStopTrigger();
+        stopTrigger.roSpecStopTriggerType(ROSpecStopTriggerType.Null);
+        stopTrigger.durationTriggerValue(0);
+        boundarySpec.roSpecStopTrigger(stopTrigger);
+        
+        rospec.roBoundarySpec(boundarySpec);
+        
+        // AISpec
+        AISpec aiSpec = new AISpec();
+        
+        // Usar todas las antenas (ID = 0)
+        aiSpec.antennaIDs(new int[]{0});
+        
+        // AISpec stop trigger
+        AISpecStopTrigger aiStopTrigger = new AISpecStopTrigger();
+        aiStopTrigger.aiSpecStopTriggerType(AISpecStopTriggerType.Null);
+        aiStopTrigger.durationTrigger(0);
+        aiSpec.aiSpecStopTrigger(aiStopTrigger);
+        
+        // InventoryParameterSpec
+        InventoryParameterSpec invSpec = new InventoryParameterSpec();
+        invSpec.inventoryParameterSpecID(1);
+        invSpec.protocolID(AirProtocols.EPCGlobalClass1Gen2);
+        
+        List<InventoryParameterSpec> invSpecs = new ArrayList<>();
+        invSpecs.add(invSpec);
+        aiSpec.inventoryParameterSpec(invSpecs);
+        
+        // Agregar AISpec como SpecParameter
+        List<SpecParameter> specParams = new ArrayList<>();
+        specParams.add(aiSpec);
+        rospec.specParameter(specParams);
+        
+        // ROReportSpec
+        ROReportSpec reportSpec = new ROReportSpec();
+        reportSpec.roReportTrigger(ROReportTriggerType.Upon_N_Tags_Or_End_Of_AISpec_Or_End_Of_RFSurveySpec);
+        reportSpec.n(1); // Reportar cada tag
+        
+        TagReportContentSelector contentSelector = new TagReportContentSelector();
+        contentSelector.enableROSpecID(true);
+        contentSelector.enableSpecIndex(true);
+        contentSelector.enableInventoryParameterSpecID(true);
+        contentSelector.enableAntennaID(true);
+        contentSelector.enableChannelIndex(true);
+        contentSelector.enablePeakRSSI(true);
+        contentSelector.enableFirstSeenTimestamp(true);
+        contentSelector.enableLastSeenTimestamp(true);
+        contentSelector.enableTagSeenCount(true);
+        contentSelector.enableAccessSpecID(true);
+        
+        // C1G2EPCMemorySelector
+        C1G2EPCMemorySelector epcSelector = new C1G2EPCMemorySelector();
+        epcSelector.enableCRC(true);
+        epcSelector.enablePCBits(true);
+        
+        List<AirProtocolEPCMemorySelector> epcSelectors = new ArrayList<>();
+        epcSelectors.add(epcSelector);
+        contentSelector.airProtocolEPCMemorySelector(epcSelectors);
+        
+        reportSpec.tagReportContentSelector(contentSelector);
+        rospec.roReportSpec(reportSpec);
+        
+        addRospec.roSpec(rospec);
+        
+        return addRospec;
     }
     
-    private void processRoAccessReport(byte[] body) {
+    /**
+     * Maneja mensajes recibidos del lector.
+     */
+    private void handleMessage(LlrpMessage message) {
         try {
-            int offset = 0;
-            
-            while (offset < body.length - 4) {
-                // Leer parámetro TLV
-                int paramType = ((body[offset] & 0x3F) << 8) | (body[offset + 1] & 0xFF);
-                int paramLen = ((body[offset + 2] & 0xFF) << 8) | (body[offset + 3] & 0xFF);
-                
-                if (paramType == 240) { // TagReportData
-                    parseTagReportData(body, offset + 4, paramLen - 4);
+            if (message instanceof RO_ACCESS_REPORT) {
+                RO_ACCESS_REPORT report = (RO_ACCESS_REPORT) message;
+                processTagReport(report);
+            } else if (message instanceof KEEPALIVE) {
+                // Responder keepalive
+                KEEPALIVE_ACK ack = new KEEPALIVE_ACK();
+                if (client != null) {
+                    client.send(ack);
                 }
-                
-                offset += paramLen;
-                if (paramLen <= 0) break;
+            } else if (message instanceof READER_EVENT_NOTIFICATION) {
+                log("Evento del lector recibido");
             }
         } catch (Exception e) {
-            logError("Error procesando RO_ACCESS_REPORT: " + e.getMessage(), e);
+            logError("Error procesando mensaje: " + e.getMessage(), e);
         }
     }
     
-    private void parseTagReportData(byte[] data, int start, int length) {
-        try {
-            String epc = null;
+    /**
+     * Procesa un reporte de tags.
+     */
+    private void processTagReport(RO_ACCESS_REPORT report) {
+        List<TagReportData> tagReports = report.tagReportData();
+        
+        if (tagReports == null || tagReports.isEmpty()) {
+            return;
+        }
+        
+        log("Recibidos " + tagReports.size() + " tags");
+        
+        for (TagReportData tagReport : tagReports) {
+            String epc = "";
             int antenna = 0;
             int rssi = 0;
             long timestamp = System.currentTimeMillis();
+            int readCount = 1;
             
-            int offset = start;
-            int end = start + length;
-            
-            while (offset < end - 2) {
-                // Verificar si es TV (bit 7 = 1) o TLV (bit 7 = 0)
-                int firstByte = data[offset] & 0xFF;
-                
-                if ((firstByte & 0x80) != 0) {
-                    // TV Parameter (1-byte type)
-                    int tvType = firstByte & 0x7F;
-                    
-                    if (tvType == 1) { // AntennaID
-                        antenna = ((data[offset + 1] & 0xFF) << 8) | (data[offset + 2] & 0xFF);
-                        offset += 3;
-                    } else if (tvType == 6) { // PeakRSSI
-                        rssi = data[offset + 1]; // signed byte
-                        offset += 2;
-                    } else if (tvType == 14) { // C1G2PC + EPC (EPCData)
-                        // EPC-96 inline format
-                        int epcBitCount = ((data[offset + 1] & 0xFF) << 8) | (data[offset + 2] & 0xFF);
-                        int epcByteCount = (epcBitCount + 7) / 8;
-                        if (epcByteCount > 0 && offset + 3 + epcByteCount <= end) {
-                            StringBuilder sb = new StringBuilder();
-                            for (int i = 0; i < epcByteCount; i++) {
-                                sb.append(String.format("%02X", data[offset + 3 + i]));
-                            }
-                            epc = sb.toString();
+            // Obtener EPC
+            EPCParameter epcParam = tagReport.epcParameter();
+            if (epcParam != null) {
+                if (epcParam instanceof EPC_96) {
+                    EPC_96 epc96 = (EPC_96) epcParam;
+                    BigInteger epcValue = epc96.epc();
+                    if (epcValue != null) {
+                        // Convertir BigInteger a hex string con padding a 24 caracteres
+                        String hexStr = epcValue.toString(16).toUpperCase();
+                        while (hexStr.length() < 24) {
+                            hexStr = "0" + hexStr;
                         }
-                        offset += 3 + epcByteCount;
-                    } else {
-                        // Skip unknown TV parameter - estimate 2-4 bytes
-                        offset += 2;
+                        epc = hexStr;
                     }
-                } else {
-                    // TLV Parameter
-                    int tlvType = ((data[offset] & 0x3F) << 8) | (data[offset + 1] & 0xFF);
-                    int tlvLen = ((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF);
-                    
-                    if (tlvType == 241) { // EPC-96
-                        // EPC dentro del TLV
-                        if (tlvLen >= 16) { // 4 header + 12 EPC
-                            StringBuilder sb = new StringBuilder();
-                            for (int i = 4; i < Math.min(16, tlvLen); i++) {
-                                sb.append(String.format("%02X", data[offset + i]));
-                            }
-                            if (sb.length() > 0) {
-                                epc = sb.toString();
-                            }
-                        }
+                } else if (epcParam instanceof EPCData) {
+                    EPCData epcData = (EPCData) epcParam;
+                    BitList bits = epcData.epc();
+                    if (bits != null) {
+                        epc = bits.toHexString().toUpperCase();
                     }
-                    
-                    offset += tlvLen;
-                    if (tlvLen <= 0) break;
                 }
             }
             
-            // Si encontramos EPC, notificar
-            if (epc != null && !epc.isEmpty() && tagCallback != null) {
-                totalTagsRead++;
-                sessionTagsRead++;
-                
-                String[] tagData = new String[] {
-                    epc,
-                    String.valueOf(antenna),
-                    String.valueOf(rssi),
-                    String.valueOf(timestamp)
-                };
-                
-                tagCallback.accept(tagData);
+            // Obtener antena
+            AntennaID antennaID = tagReport.antennaID();
+            if (antennaID != null) {
+                antenna = antennaID.antennaID();
             }
             
-        } catch (Exception e) {
-            // Ignorar errores de parsing individuales
-        }
-    }
-    
-    private LLRPResponse waitForResponse(int expectedType, int timeoutMs) {
-        long startTime = System.currentTimeMillis();
-        byte[] header = new byte[10];
-        
-        while (System.currentTimeMillis() - startTime < timeoutMs) {
-            try {
-                int bytesRead = 0;
-                while (bytesRead < 10) {
-                    try {
-                        int read = in.read(header, bytesRead, 10 - bytesRead);
-                        if (read == -1) return null;
-                        bytesRead += read;
-                    } catch (SocketTimeoutException e) {
-                        if (System.currentTimeMillis() - startTime >= timeoutMs) {
-                            return null;
-                        }
-                        continue;
-                    }
+            // Obtener RSSI
+            PeakRSSI peakRSSI = tagReport.peakRSSI();
+            if (peakRSSI != null) {
+                rssi = peakRSSI.peakRSSI();
+            }
+            
+            // Obtener timestamp
+            FirstSeenTimestampUTC firstSeen = tagReport.firstSeenTimestampUTC();
+            if (firstSeen != null) {
+                BigInteger microseconds = firstSeen.microseconds();
+                if (microseconds != null) {
+                    timestamp = microseconds.divide(BigInteger.valueOf(1000)).longValue();
                 }
+            }
+            
+            // Obtener conteo
+            TagSeenCount seenCount = tagReport.tagSeenCount();
+            if (seenCount != null) {
+                readCount = seenCount.tagCount();
+            }
+            
+            // Notificar callback
+            if (epc != null && !epc.isEmpty()) {
+                log("Tag leído: " + epc + " (Antena: " + antenna + ", RSSI: " + rssi + ")");
                 
-                int typeWord = ((header[0] & 0xFF) << 8) | (header[1] & 0xFF);
-                int messageType = typeWord & 0x03FF;
-                long messageLength = ((long)(header[2] & 0xFF) << 24) |
-                                    ((long)(header[3] & 0xFF) << 16) |
-                                    ((long)(header[4] & 0xFF) << 8) |
-                                    ((long)(header[5] & 0xFF));
-                
-                int bodyLength = (int)(messageLength - 10);
-                byte[] body = new byte[bodyLength];
-                if (bodyLength > 0) {
-                    in.readFully(body);
+                if (tagCallback != null) {
+                    String[] tagData = new String[]{
+                        epc,
+                        String.valueOf(antenna),
+                        String.valueOf(rssi),
+                        String.valueOf(timestamp),
+                        String.valueOf(readCount)
+                    };
+                    tagCallback.accept(tagData);
                 }
-                
-                if (messageType == expectedType) {
-                    LLRPResponse resp = new LLRPResponse();
-                    resp.type = messageType;
-                    if (bodyLength >= 8) {
-                        // LLRPStatus: Type(2) + Len(2) + StatusCode(2) + ErrorDescByteCount(2)
-                        resp.statusCode = ((body[4] & 0xFF) << 8) | (body[5] & 0xFF);
-                    }
-                    return resp;
-                }
-                
-            } catch (Exception e) {
-                return null;
             }
         }
-        return null;
     }
-    
-    private static class LLRPResponse {
-        int type;
-        int statusCode;
-    }
-    
-    // ==================== Métodos de envío LLRP ====================
-    
-    private void sendMessage(int type, int msgId, byte[] body) throws IOException {
-        int length = 10 + body.length;
-        // Header: Reserved (3 bits) + Version (3 bits) + Type (10 bits)
-        // Version 1 = LLRP 1.0.1
-        int typeWord = (1 << 10) | (type & 0x3FF);
-        
-        out.writeShort(typeWord);
-        out.writeInt(length);
-        out.writeInt(msgId);
-        out.write(body);
-        out.flush();
-    }
-    
-    private void writeParameter(DataOutputStream dos, int type, byte[] data) throws IOException {
-        int length = 4 + data.length;
-        dos.writeShort(type & 0x3FF);
-        dos.writeShort(length);
-        dos.write(data);
-    }
-    
-    private void sendDeleteRoSpec(int roSpecId, int msgId) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dos = new DataOutputStream(baos);
-        dos.writeInt(roSpecId);
-        sendMessage(21, msgId, baos.toByteArray());
-    }
-    
-    private void sendAddRoSpec(int msgId) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dos = new DataOutputStream(baos);
-        
-        // ROSpec Parameter (Type 177)
-        ByteArrayOutputStream rospecBaos = new ByteArrayOutputStream();
-        DataOutputStream rospecDos = new DataOutputStream(rospecBaos);
-        
-        rospecDos.writeInt(1);  // ROSpecID
-        rospecDos.writeByte(0); // Priority
-        rospecDos.writeByte(0); // CurrentState (Disabled)
-        
-        // ROBoundarySpec (Type 178)
-        ByteArrayOutputStream boundaryBaos = new ByteArrayOutputStream();
-        DataOutputStream boundaryDos = new DataOutputStream(boundaryBaos);
-        
-        // ROSpecStartTrigger (Type 179) - Null trigger
-        writeParameter(boundaryDos, 179, new byte[]{0});
-        
-        // ROSpecStopTrigger (Type 182) - Null trigger
-        ByteArrayOutputStream stopBaos = new ByteArrayOutputStream();
-        DataOutputStream stopDos = new DataOutputStream(stopBaos);
-        stopDos.writeByte(0); // TriggerType = Null
-        stopDos.writeInt(0);  // DurationTriggerValue
-        writeParameter(boundaryDos, 182, stopBaos.toByteArray());
-        
-        writeParameter(rospecDos, 178, boundaryBaos.toByteArray());
-        
-        // AISpec (Type 183)
-        ByteArrayOutputStream aispecBaos = new ByteArrayOutputStream();
-        DataOutputStream aispecDos = new DataOutputStream(aispecBaos);
-        
-        aispecDos.writeShort(1); // AntennaIDs count
-        aispecDos.writeShort(1); // AntennaID = 1
-        
-        // AISpecStopTrigger (Type 184) - Null trigger
-        ByteArrayOutputStream aiStopBaos = new ByteArrayOutputStream();
-        DataOutputStream aiStopDos = new DataOutputStream(aiStopBaos);
-        aiStopDos.writeByte(0); // TriggerType = Null
-        aiStopDos.writeInt(0);  // DurationTrigger
-        writeParameter(aispecDos, 184, aiStopBaos.toByteArray());
-        
-        // InventoryParameterSpec (Type 186)
-        ByteArrayOutputStream invBaos = new ByteArrayOutputStream();
-        DataOutputStream invDos = new DataOutputStream(invBaos);
-        invDos.writeShort(1); // InventoryParameterSpecID
-        invDos.writeByte(1);  // ProtocolID = EPCGlobalClass1Gen2
-        writeParameter(aispecDos, 186, invBaos.toByteArray());
-        
-        writeParameter(rospecDos, 183, aispecBaos.toByteArray());
-        
-        // ROReportSpec (Type 237)
-        ByteArrayOutputStream reportBaos = new ByteArrayOutputStream();
-        DataOutputStream reportDos = new DataOutputStream(reportBaos);
-        reportDos.writeByte(1);  // ROReportTrigger = Upon_N_Tags_Or_End_Of_ROSpec
-        reportDos.writeShort(1); // N = 1 (report immediately)
-        
-        // TagReportContentSelector (Type 238)
-        ByteArrayOutputStream tagContentBaos = new ByteArrayOutputStream();
-        DataOutputStream tagContentDos = new DataOutputStream(tagContentBaos);
-        // EnableMask bits for: ROSpecID, SpecIndex, InvParamSpecID, AntennaID, PeakRSSI, FirstSeenTimestamp, LastSeenTimestamp, TagSeenCount
-        short enableMask = (short)0b1111011110;
-        tagContentDos.writeShort(enableMask);
-        writeParameter(reportDos, 238, tagContentBaos.toByteArray());
-        
-        writeParameter(rospecDos, 237, reportBaos.toByteArray());
-        
-        writeParameter(dos, 177, rospecBaos.toByteArray());
-        
-        sendMessage(20, msgId, baos.toByteArray());
-    }
-    
-    private void sendEnableRoSpec(int msgId) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dos = new DataOutputStream(baos);
-        dos.writeInt(1); // ROSpecID
-        sendMessage(24, msgId, baos.toByteArray());
-    }
-    
-    private void sendStartRoSpec(int msgId) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dos = new DataOutputStream(baos);
-        dos.writeInt(1); // ROSpecID
-        sendMessage(22, msgId, baos.toByteArray());
-    }
-    
-    private void sendStopRoSpec(int msgId) throws IOException {
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        DataOutputStream dos = new DataOutputStream(baos);
-        dos.writeInt(1); // ROSpecID
-        sendMessage(23, msgId, baos.toByteArray());
-    }
-    
-    private void sendKeepaliveAck() throws IOException {
-        sendMessage(72, 0, new byte[0]);
-    }
-    
-    // ==================== Métodos públicos adicionales ====================
     
     public boolean isConnected() {
-        return connected && socket != null && !socket.isClosed();
+        return connected;
     }
     
     public boolean isReading() {
         return reading;
     }
     
-    public long getTotalTagsRead() {
-        return totalTagsRead;
-    }
-    
-    public long getSessionTagsRead() {
-        return sessionTagsRead;
-    }
-    
-    public String getReaderIP() {
-        return readerIP;
-    }
-    
     @Override
     public void close() {
         disconnect();
+    }
+    
+    /**
+     * Método de prueba simple.
+     */
+    public static void main(String[] args) {
+        if (args.length < 1) {
+            System.out.println("Uso: java LLRP4JReader <IP_del_lector>");
+            return;
+        }
+        
+        String readerIP = args[0];
+        
+        try (LLRP4JReader reader = new LLRP4JReader(readerIP)) {
+            reader.setTagCallback(tagData -> {
+                System.out.println(">>> TAG: EPC=" + tagData[0] + 
+                    ", Antena=" + tagData[1] + 
+                    ", RSSI=" + tagData[2]);
+            });
+            
+            if (reader.connect()) {
+                System.out.println("Conectado! Iniciando lectura...");
+                
+                if (reader.startReading()) {
+                    System.out.println("Leyendo tags por 30 segundos...");
+                    Thread.sleep(30000);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
