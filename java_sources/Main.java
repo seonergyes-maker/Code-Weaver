@@ -54,6 +54,9 @@ public class Main {
     /** Flag para modo prueba LLRP4J */
     private static boolean llrp4jTest = false;
     
+    /** Flag para modo debug LLRP bajo nivel */
+    private static boolean llrpDebug = false;
+    
     /** Duración de la prueba LLRP4J en segundos */
     private static int llrp4jTestDuration = 30;
     
@@ -96,7 +99,9 @@ public class Main {
         }
         
         // Iniciar en modo apropiado
-        if (llrp4jTest) {
+        if (llrpDebug) {
+            runLLRPDebug();
+        } else if (llrp4jTest) {
             runLLRP4JTest();
         } else if (noGui) {
             runConsoleMode();
@@ -190,6 +195,28 @@ public class Main {
                     }
                     break;
                     
+                case "--llrp-debug":
+                case "--debug-llrp":
+                case "-d":
+                    llrpDebug = true;
+                    noGui = true;  // Debug es sin GUI
+                    System.out.println("[Args] Modo debug LLRP habilitado");
+                    // Verificar si hay argumentos adicionales (IP y duración)
+                    if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+                        readerIp = args[++i];
+                        System.out.println("[Args] IP del lector: " + readerIp);
+                    }
+                    if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+                        try {
+                            llrp4jTestDuration = Integer.parseInt(args[++i]);
+                            System.out.println("[Args] Duración: " + llrp4jTestDuration + " segundos");
+                        } catch (NumberFormatException e) {
+                            // No es un número, ignorar
+                            i--;
+                        }
+                    }
+                    break;
+                    
                 default:
                     if (arg.startsWith("-")) {
                         System.err.println("Argumento desconocido: " + args[i]);
@@ -218,6 +245,8 @@ public class Main {
         System.out.println("  --llrp4j-test [IP] [S]  Ejecutar prueba de conexión LLRP4J");
         System.out.println("                          IP: dirección del lector (opcional)");
         System.out.println("                          S: duración en segundos (opcional, def: 30)");
+        System.out.println("  --llrp-debug [IP] [S]   Debug LLRP a bajo nivel (socket crudo)");
+        System.out.println("                          Muestra bytes crudos de cada mensaje");
         System.out.println("  --help, -h              Mostrar esta ayuda");
         System.out.println("  --version, -v           Mostrar versión");
         System.out.println();
@@ -226,6 +255,7 @@ public class Main {
         System.out.println("  java -jar Main.jar --nogui --ip 192.168.1.100   # Modo consola");
         System.out.println("  java -jar Main.jar --llrp4j-test 192.168.1.117  # Probar conexión");
         System.out.println("  java -jar Main.jar --llrp4j-test 192.168.1.117 60  # Prueba 60 seg");
+        System.out.println("  java -jar Main.jar --llrp-debug 192.168.1.117   # Debug bajo nivel");
         System.out.println();
     }
     
@@ -275,6 +305,33 @@ public class Main {
             TestLLRP4J.main(testArgs);
         } catch (Exception e) {
             System.err.println("Error en prueba LLRP4J: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Ejecuta el diagnóstico LLRP a bajo nivel.
+     * Lee bytes crudos del socket para analizar exactamente qué envía el lector.
+     */
+    private static void runLLRPDebug() {
+        String testIp = (readerIp != null && !readerIp.isEmpty()) ? readerIp : config.getReaderIP();
+        
+        System.out.println();
+        System.out.println("========================================");
+        System.out.println("  DEBUG LLRP - Análisis de tráfico");
+        System.out.println("========================================");
+        System.out.println("IP del lector: " + testIp);
+        System.out.println("Duración: " + llrp4jTestDuration + " segundos");
+        System.out.println();
+        
+        // Ejecutar LLRPDebug con los argumentos
+        String[] debugArgs = new String[] { testIp, String.valueOf(llrp4jTestDuration) };
+        
+        try {
+            // Invocar el método main de LLRPDebug
+            LLRPDebug.main(debugArgs);
+        } catch (Exception e) {
+            System.err.println("Error en debug LLRP: " + e.getMessage());
             e.printStackTrace();
         }
     }
