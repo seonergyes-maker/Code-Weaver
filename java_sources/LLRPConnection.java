@@ -731,21 +731,72 @@ public class LLRPConnection implements AutoCloseable {
         int roSpecId = config.getRoSpecId();
         int[] antennaPorts = config.getEnabledAntennaPorts();
         
-        deleteROSpec(0);
+        System.out.println("[LLRP] Iniciando lectura - ROSpec ID: " + roSpecId);
+        System.out.println("[LLRP] Antenas habilitadas: " + java.util.Arrays.toString(antennaPorts));
         
-        if (!setReaderConfig(config.getAntennaConfigs())) {
-            return false;
+        // Paso 1: Eliminar ROSpecs existentes
+        System.out.println("[LLRP] Paso 1: Eliminando ROSpecs existentes...");
+        try {
+            deleteROSpec(0);
+            System.out.println("[LLRP] ROSpecs eliminados OK");
+        } catch (Exception e) {
+            System.out.println("[LLRP] Advertencia al eliminar ROSpecs: " + e.getMessage());
+            // Continuar aunque falle (puede que no haya ROSpecs)
         }
         
-        if (!addROSpec(roSpecId, antennaPorts)) {
-            return false;
+        // Paso 2: Configurar antenas
+        System.out.println("[LLRP] Paso 2: Configurando antenas...");
+        try {
+            if (!setReaderConfig(config.getAntennaConfigs())) {
+                System.err.println("[LLRP] ERROR: Fallo al configurar antenas");
+                throw new IOException("Fallo al configurar antenas del lector");
+            }
+            System.out.println("[LLRP] Antenas configuradas OK");
+        } catch (Exception e) {
+            System.err.println("[LLRP] ERROR en configuración de antenas: " + e.getMessage());
+            throw new IOException("Error configurando antenas: " + e.getMessage());
         }
         
-        if (!enableROSpec(roSpecId)) {
-            return false;
+        // Paso 3: Agregar ROSpec
+        System.out.println("[LLRP] Paso 3: Agregando ROSpec...");
+        try {
+            if (!addROSpec(roSpecId, antennaPorts)) {
+                System.err.println("[LLRP] ERROR: Fallo al agregar ROSpec");
+                throw new IOException("Fallo al agregar ROSpec al lector");
+            }
+            System.out.println("[LLRP] ROSpec agregado OK");
+        } catch (Exception e) {
+            System.err.println("[LLRP] ERROR al agregar ROSpec: " + e.getMessage());
+            throw new IOException("Error agregando ROSpec: " + e.getMessage());
         }
         
-        return startROSpec(roSpecId);
+        // Paso 4: Habilitar ROSpec
+        System.out.println("[LLRP] Paso 4: Habilitando ROSpec...");
+        try {
+            if (!enableROSpec(roSpecId)) {
+                System.err.println("[LLRP] ERROR: Fallo al habilitar ROSpec");
+                throw new IOException("Fallo al habilitar ROSpec");
+            }
+            System.out.println("[LLRP] ROSpec habilitado OK");
+        } catch (Exception e) {
+            System.err.println("[LLRP] ERROR al habilitar ROSpec: " + e.getMessage());
+            throw new IOException("Error habilitando ROSpec: " + e.getMessage());
+        }
+        
+        // Paso 5: Iniciar ROSpec
+        System.out.println("[LLRP] Paso 5: Iniciando ROSpec...");
+        try {
+            if (!startROSpec(roSpecId)) {
+                System.err.println("[LLRP] ERROR: Fallo al iniciar ROSpec");
+                throw new IOException("Fallo al iniciar ROSpec");
+            }
+            System.out.println("[LLRP] ROSpec iniciado OK - Lectura activa!");
+        } catch (Exception e) {
+            System.err.println("[LLRP] ERROR al iniciar ROSpec: " + e.getMessage());
+            throw new IOException("Error iniciando ROSpec: " + e.getMessage());
+        }
+        
+        return true;
     }
     
     /**
