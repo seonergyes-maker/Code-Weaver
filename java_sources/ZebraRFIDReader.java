@@ -62,19 +62,23 @@ public class ZebraRFIDReader implements RfidEventsListener {
             singulation.Action.setSLFlag(SL_FLAG.SL_ALL);
             reader.Config.Antennas.setSingulationControl(1, singulation);
             
-            System.out.println("[5] Iniciando lectura de tags...");
+            System.out.println("[5] Iniciando lectura continua de tags...");
             System.out.println();
             System.out.println("===========================================");
             System.out.println("  LEYENDO TAGS (Ctrl+C para detener)");
             System.out.println("===========================================");
             System.out.println();
             
-            reader.Actions.Inventory.perform();
-            
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
                 running = false;
                 stop();
             }));
+            
+            TriggerInfo triggerInfo = new TriggerInfo();
+            triggerInfo.StartTrigger.setTriggerType(START_TRIGGER_TYPE.START_TRIGGER_TYPE_IMMEDIATE);
+            triggerInfo.StopTrigger.setTriggerType(STOP_TRIGGER_TYPE.STOP_TRIGGER_TYPE_IMMEDIATE);
+            
+            reader.Actions.Inventory.perform(null, triggerInfo, null);
             
             while (running) {
                 Thread.sleep(100);
