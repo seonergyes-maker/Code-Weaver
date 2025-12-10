@@ -1,0 +1,403 @@
+import java.io.*;
+import java.net.*;
+import java.nio.*;
+import java.util.concurrent.*;
+
+/**
+ * Debug de conexión LLRP a bajo nivel.
+ * Lee bytes crudos del socket para ver exactamente qué envía el lector.
+ */
+public class LLRPDebug {
+    
+    private static final int LLRP_PORT = 5084;
+    private static volatile boolean running = true;
+    
+    public static void main(String[] args) {
+        String readerIP = args.length > 0 ? args[0] : "192.168.1.117";
+        int testDuration = args.length > 1 ? Integer.parseInt(args[1]) : 30;
+        
+        System.out.println("========================================");
+        System.out.println("  DEBUG LLRP - Análisis de tráfico");
+        System.out.println("========================================");
+        System.out.println("IP: " + readerIP);
+        System.out.println("Puerto: " + LLRP_PORT);
+        System.out.println("Duración: " + testDuration + " segundos");
+        System.out.println();
+        
+        try (Socket socket = new Socket()) {
+            // Conectar con timeout
+            System.out.println("[1] Conectando...");
+            socket.connect(new InetSocketAddress(readerIP, LLRP_PORT), 5000);
+            socket.setSoTimeout(1000); // 1 segundo timeout para lecturas
+            System.out.println("    OK - Conectado a " + socket.getRemoteSocketAddress());
+            
+            DataInputStream in = new DataInputStream(new BufferedInputStream(socket.getInputStream()));
+            DataOutputStream out = new DataOutputStream(new BufferedOutputStream(socket.getOutputStream()));
+            
+            // Thread para leer mensajes entrantes
+            ExecutorService executor = Executors.newSingleThreadExecutor();
+            final int[] messageCount = {0};
+            final int[] roAccessReportCount = {0};
+            
+            Future<?> readerTask = executor.submit(() -> {
+                System.out.println("[READER] Thread de lectura iniciado");
+                byte[] header = new byte[10];
+                
+                while (running && !Thread.currentThread().isInterrupted()) {
+                    try {
+                        // Leer header LLRP (10 bytes)
+                        int bytesRead = 0;
+                        while (bytesRead < 10) {
+                            int read = in.read(header, bytesRead, 10 - bytesRead);
+                            if (read == -1) {
+                                System.out.println("[READER] Conexión cerrada por el lector");
+                                return;
+                            }
+                            bytesRead += read;
+                        }
+                        
+                        // Parsear header
+                        // Bytes 0-1: Version (3 bits) + Reserved (3 bits) + Message Type (10 bits)
+                        // Bytes 2-5: Message Length (32 bits)
+                        // Bytes 6-9: Message ID (32 bits)
+                        
+                        int typeWord = ((header[0] & 0xFF) << 8) | (header[1] & 0xFF);
+                        int version = (typeWord >> 13) & 0x07;
+                        int messageType = typeWord & 0x03FF;
+                        
+                        long messageLength = ((long)(header[2] & 0xFF) << 24) |
+                                            ((long)(header[3] & 0xFF) << 16) |
+                                            ((long)(header[4] & 0xFF) << 8) |
+                                            ((long)(header[5] & 0xFF));
+                        
+                        long messageId = ((long)(header[6] & 0xFF) << 24) |
+                                        ((long)(header[7] & 0xFF) << 16) |
+                                        ((long)(header[8] & 0xFF) << 8) |
+                                        ((long)(header[9] & 0xFF));
+                        
+                        // Leer cuerpo del mensaje
+                        int bodyLength = (int)(messageLength - 10);
+                        byte[] body = new byte[bodyLength];
+                        if (bodyLength > 0) {
+                            int bodyRead = 0;
+                            while (bodyRead < bodyLength) {
+                                int read = in.read(body, bodyRead, bodyLength - bodyRead);
+                                if (read == -1) break;
+                                bodyRead += read;
+                            }
+                        }
+                        
+                        messageCount[0]++;
+                        String msgName = getMessageTypeName(messageType);
+                        
+                        // Mostrar mensaje recibido
+                        if (messageType == 61) { // RO_ACCESS_REPORT
+                            roAccessReportCount[0]++;
+                            System.out.println("[>>> RO_ACCESS_REPORT] ID:" + messageId + " Len:" + messageLength + " Body:" + bodyLength + " bytes");
+                            // Mostrar primeros bytes del body para debug
+                            if (bodyLength > 0) {
+                                StringBuilder hex = new StringBuilder();
+                                for (int i = 0; i < Math.min(50, bodyLength); i++) {
+                                    hex.append(String.format("%02X ", body[i]));
+                                }
+                                System.out.println("    Data: " + hex.toString() + (bodyLength > 50 ? "..." : ""));
+                            }
+                        } else if (messageType == 62) { // KEEPALIVE
+                            // Responder KEEPALIVE_ACK silenciosamente
+                            sendKeepaliveAck(out, messageId);
+                        } else if (messageType == 63) { // READER_EVENT_NOTIFICATION
+                            System.out.println("[EVENTO] READER_EVENT_NOTIFICATION ID:" + messageId);
+                        } else {
+                            System.out.println("[MSG] " + msgName + " (Type:" + messageType + ") ID:" + messageId + " Len:" + messageLength);
+                        }
+                        
+                    } catch (SocketTimeoutException e) {
+                        // Timeout normal, continuar
+                    } catch (IOException e) {
+                        if (running) {
+                            System.err.println("[READER] Error: " + e.getMessage());
+                        }
+                        break;
+                    }
+                }
+                System.out.println("[READER] Thread de lectura terminado");
+            });
+            
+            // Esperar un momento para recibir READER_EVENT_NOTIFICATION inicial
+            Thread.sleep(1000);
+            
+            // Enviar DELETE_ROSPEC(0) para limpiar
+            System.out.println("[2] Enviando DELETE_ROSPEC(0)...");
+            sendDeleteRoSpec(out, 0, 1);
+            Thread.sleep(500);
+            
+            // Enviar ADD_ROSPEC
+            System.out.println("[3] Enviando ADD_ROSPEC...");
+            sendAddRoSpec(out, 2);
+            Thread.sleep(500);
+            
+            // Enviar ENABLE_ROSPEC
+            System.out.println("[4] Enviando ENABLE_ROSPEC...");
+            sendEnableRoSpec(out, 3);
+            Thread.sleep(500);
+            
+            // Enviar START_ROSPEC
+            System.out.println("[5] Enviando START_ROSPEC...");
+            sendStartRoSpec(out, 4);
+            Thread.sleep(500);
+            
+            System.out.println();
+            System.out.println("========================================");
+            System.out.println("  MONITOREANDO TRÁFICO (" + testDuration + "s)");
+            System.out.println("========================================");
+            System.out.println();
+            
+            // Monitorear por la duración especificada
+            long startTime = System.currentTimeMillis();
+            int lastMsgCount = 0;
+            int lastReportCount = 0;
+            
+            for (int i = 0; i < testDuration && running; i++) {
+                Thread.sleep(1000);
+                long elapsed = (System.currentTimeMillis() - startTime) / 1000;
+                int newMsgs = messageCount[0] - lastMsgCount;
+                int newReports = roAccessReportCount[0] - lastReportCount;
+                
+                System.out.printf("[%3ds] Mensajes: %d (+%d) | RO_ACCESS_REPORT: %d (+%d)\n",
+                    elapsed, messageCount[0], newMsgs, roAccessReportCount[0], newReports);
+                
+                // Cada 5 segundos, enviar GET_REPORT
+                if (i > 0 && i % 5 == 0) {
+                    System.out.println("    [Enviando GET_REPORT...]");
+                    sendGetReport(out, 100 + i);
+                }
+                
+                lastMsgCount = messageCount[0];
+                lastReportCount = roAccessReportCount[0];
+            }
+            
+            running = false;
+            
+            // Detener ROSpec
+            System.out.println();
+            System.out.println("[6] Deteniendo ROSpec...");
+            sendStopRoSpec(out, 5);
+            Thread.sleep(300);
+            
+            sendDeleteRoSpec(out, 1, 6);
+            Thread.sleep(300);
+            
+            // Cerrar
+            System.out.println("[7] Cerrando conexión...");
+            executor.shutdownNow();
+            
+            System.out.println();
+            System.out.println("========================================");
+            System.out.println("  RESULTADOS");
+            System.out.println("========================================");
+            System.out.println("Total mensajes recibidos: " + messageCount[0]);
+            System.out.println("Total RO_ACCESS_REPORT: " + roAccessReportCount[0]);
+            
+            if (roAccessReportCount[0] == 0) {
+                System.out.println();
+                System.out.println("DIAGNÓSTICO: No se recibieron RO_ACCESS_REPORT");
+                System.out.println("Posibles causas:");
+                System.out.println("  1. El ROSpec no se inició correctamente");
+                System.out.println("  2. No hay tags en el rango de la antena");
+                System.out.println("  3. Problema de configuración del lector");
+                System.out.println("  4. El lector no está enviando reportes por esta conexión");
+            }
+            
+        } catch (Exception e) {
+            System.err.println("ERROR: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private static String getMessageTypeName(int type) {
+        switch (type) {
+            case 1: return "GET_READER_CAPABILITIES";
+            case 2: return "GET_READER_CONFIG";
+            case 3: return "SET_READER_CONFIG";
+            case 11: return "GET_READER_CAPABILITIES_RESPONSE";
+            case 12: return "GET_READER_CONFIG_RESPONSE";
+            case 13: return "SET_READER_CONFIG_RESPONSE";
+            case 20: return "ADD_ROSPEC";
+            case 21: return "DELETE_ROSPEC";
+            case 22: return "START_ROSPEC";
+            case 23: return "STOP_ROSPEC";
+            case 24: return "ENABLE_ROSPEC";
+            case 30: return "ADD_ROSPEC_RESPONSE";
+            case 31: return "DELETE_ROSPEC_RESPONSE";
+            case 32: return "START_ROSPEC_RESPONSE";
+            case 33: return "STOP_ROSPEC_RESPONSE";
+            case 34: return "ENABLE_ROSPEC_RESPONSE";
+            case 60: return "GET_REPORT";
+            case 61: return "RO_ACCESS_REPORT";
+            case 62: return "KEEPALIVE";
+            case 63: return "READER_EVENT_NOTIFICATION";
+            case 72: return "KEEPALIVE_ACK";
+            default: return "UNKNOWN(" + type + ")";
+        }
+    }
+    
+    private static void sendKeepaliveAck(DataOutputStream out, long messageId) throws IOException {
+        // KEEPALIVE_ACK: Type 72
+        byte[] msg = new byte[10];
+        int typeWord = (1 << 13) | 72; // Version 1, Type 72
+        msg[0] = (byte)((typeWord >> 8) & 0xFF);
+        msg[1] = (byte)(typeWord & 0xFF);
+        // Length = 10
+        msg[2] = 0; msg[3] = 0; msg[4] = 0; msg[5] = 10;
+        // Message ID
+        msg[6] = (byte)((messageId >> 24) & 0xFF);
+        msg[7] = (byte)((messageId >> 16) & 0xFF);
+        msg[8] = (byte)((messageId >> 8) & 0xFF);
+        msg[9] = (byte)(messageId & 0xFF);
+        out.write(msg);
+        out.flush();
+    }
+    
+    private static void sendDeleteRoSpec(DataOutputStream out, int roSpecId, int msgId) throws IOException {
+        // DELETE_ROSPEC: Type 21
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        
+        // ROSpecID (4 bytes)
+        dos.writeInt(roSpecId);
+        
+        byte[] body = baos.toByteArray();
+        sendMessage(out, 21, msgId, body);
+    }
+    
+    private static void sendAddRoSpec(DataOutputStream out, int msgId) throws IOException {
+        // ADD_ROSPEC: Type 20
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        
+        // ROSpec Parameter (Type 177)
+        ByteArrayOutputStream rospecBaos = new ByteArrayOutputStream();
+        DataOutputStream rospecDos = new DataOutputStream(rospecBaos);
+        
+        // ROSpecID
+        rospecDos.writeInt(1);
+        // Priority
+        rospecDos.writeByte(0);
+        // CurrentState (Disabled = 0)
+        rospecDos.writeByte(0);
+        
+        // ROBoundarySpec (Type 178)
+        ByteArrayOutputStream boundaryBaos = new ByteArrayOutputStream();
+        DataOutputStream boundaryDos = new DataOutputStream(boundaryBaos);
+        
+        // ROSpecStartTrigger (Type 179)
+        // TriggerType = Null (0), Length = 5
+        writeParameter(boundaryDos, 179, new byte[]{0});
+        
+        // ROSpecStopTrigger (Type 182)
+        // TriggerType = Null (0), DurationTriggerValue = 0
+        ByteArrayOutputStream stopBaos = new ByteArrayOutputStream();
+        DataOutputStream stopDos = new DataOutputStream(stopBaos);
+        stopDos.writeByte(0); // TriggerType
+        stopDos.writeInt(0);  // DurationTriggerValue
+        writeParameter(boundaryDos, 182, stopBaos.toByteArray());
+        
+        writeParameter(rospecDos, 178, boundaryBaos.toByteArray());
+        
+        // AISpec (Type 183)
+        ByteArrayOutputStream aispecBaos = new ByteArrayOutputStream();
+        DataOutputStream aispecDos = new DataOutputStream(aispecBaos);
+        
+        // AntennaIDs count
+        aispecDos.writeShort(1);
+        // AntennaID = 1
+        aispecDos.writeShort(1);
+        
+        // AISpecStopTrigger (Type 184)
+        ByteArrayOutputStream aiStopBaos = new ByteArrayOutputStream();
+        DataOutputStream aiStopDos = new DataOutputStream(aiStopBaos);
+        aiStopDos.writeByte(0); // TriggerType = Null
+        aiStopDos.writeInt(0);  // DurationTrigger
+        writeParameter(aispecDos, 184, aiStopBaos.toByteArray());
+        
+        // InventoryParameterSpec (Type 186)
+        ByteArrayOutputStream invBaos = new ByteArrayOutputStream();
+        DataOutputStream invDos = new DataOutputStream(invBaos);
+        invDos.writeShort(1);  // InventoryParameterSpecID
+        invDos.writeByte(1);   // ProtocolID = EPCGlobalClass1Gen2
+        writeParameter(aispecDos, 186, invBaos.toByteArray());
+        
+        writeParameter(rospecDos, 183, aispecBaos.toByteArray());
+        
+        // ROReportSpec (Type 237)
+        ByteArrayOutputStream reportBaos = new ByteArrayOutputStream();
+        DataOutputStream reportDos = new DataOutputStream(reportBaos);
+        reportDos.writeByte(1); // ROReportTrigger = Upon_N_Tags_Or_End_Of_ROSpec
+        reportDos.writeShort(1); // N = 1
+        
+        // TagReportContentSelector (Type 238)
+        ByteArrayOutputStream tagContentBaos = new ByteArrayOutputStream();
+        DataOutputStream tagContentDos = new DataOutputStream(tagContentBaos);
+        // EnableMask: ROSpecID, SpecIndex, InvParamSpecID, AntennaID, ChannelIndex, PeakRSSI, FirstSeen, LastSeen, TagSeenCount, AccessSpecID
+        // Bits: ROSpecID=1, SpecIndex=1, InvParamSpecID=1, AntennaID=1, ChannelIndex=0, PeakRSSI=1, FirstSeen=1, LastSeen=1, TagSeenCount=1, AccessSpecID=0
+        // = 1111011110 = 0x1EF (pero en formato LLRP es diferente)
+        short enableMask = (short)0b1111011110;
+        tagContentDos.writeShort(enableMask);
+        writeParameter(reportDos, 238, tagContentBaos.toByteArray());
+        
+        writeParameter(rospecDos, 237, reportBaos.toByteArray());
+        
+        writeParameter(dos, 177, rospecBaos.toByteArray());
+        
+        byte[] body = baos.toByteArray();
+        sendMessage(out, 20, msgId, body);
+    }
+    
+    private static void sendEnableRoSpec(DataOutputStream out, int msgId) throws IOException {
+        // ENABLE_ROSPEC: Type 24
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        dos.writeInt(1); // ROSpecID
+        sendMessage(out, 24, msgId, baos.toByteArray());
+    }
+    
+    private static void sendStartRoSpec(DataOutputStream out, int msgId) throws IOException {
+        // START_ROSPEC: Type 22
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        dos.writeInt(1); // ROSpecID
+        sendMessage(out, 22, msgId, baos.toByteArray());
+    }
+    
+    private static void sendStopRoSpec(DataOutputStream out, int msgId) throws IOException {
+        // STOP_ROSPEC: Type 23
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        dos.writeInt(1); // ROSpecID
+        sendMessage(out, 23, msgId, baos.toByteArray());
+    }
+    
+    private static void sendGetReport(DataOutputStream out, int msgId) throws IOException {
+        // GET_REPORT: Type 60
+        sendMessage(out, 60, msgId, new byte[0]);
+    }
+    
+    private static void writeParameter(DataOutputStream out, int type, byte[] data) throws IOException {
+        // TLV Parameter header: Type (10 bits) + Length (16 bits)
+        int length = 4 + data.length;
+        out.writeShort((1 << 10) | (type & 0x3FF)); // Reserved bit + type
+        out.writeShort(length);
+        out.write(data);
+    }
+    
+    private static void sendMessage(DataOutputStream out, int type, int msgId, byte[] body) throws IOException {
+        int length = 10 + body.length;
+        int typeWord = (1 << 13) | (type & 0x3FF); // Version 1 + Type
+        
+        out.writeShort(typeWord);
+        out.writeInt(length);
+        out.writeInt(msgId);
+        out.write(body);
+        out.flush();
+    }
+}
