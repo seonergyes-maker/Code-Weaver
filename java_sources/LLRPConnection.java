@@ -663,8 +663,13 @@ public class LLRPConnection implements AutoCloseable {
      */
     public boolean addROSpec(int roSpecId, int[] antennaPorts) throws IOException, TimeoutException {
         LLRPMessage request = LLRPMessage.createAddROSpec(roSpecId, antennaPorts, 1);
+        byte[] payload = request.getPayload();
         System.out.println("[LLRP] Enviando ADD_ROSPEC, tamaño payload: " + 
-            (request.getPayload() != null ? request.getPayload().length : 0) + " bytes");
+            (payload != null ? payload.length : 0) + " bytes");
+        
+        if (payload != null) {
+            System.out.println("[LLRP] ADD_ROSPEC payload HEX: " + LLRPMessage.bytesToHex(payload));
+        }
         
         LLRPMessage response = sendAndReceive(request);
         
