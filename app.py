@@ -110,6 +110,10 @@ if 'current_project_name' not in st.session_state:
     st.session_state.current_project_name = "Proyecto Sin Guardar"
 if 'saved_projects' not in st.session_state:
     st.session_state.saved_projects = list_projects()
+if 'run_on_save' not in st.session_state:
+    st.session_state.run_on_save = True
+if 'previous_code' not in st.session_state:
+    st.session_state.previous_code = st.session_state.code
 
 with st.sidebar:
     st.markdown("### ☕ Java IDE")
@@ -663,6 +667,15 @@ echo ""
             st.warning("No hay proyecto para desplegar")
     
     st.markdown("---")
+    st.markdown("**⚙️ Configuración**")
+    
+    st.session_state.run_on_save = st.checkbox(
+        "Ejecutar al guardar",
+        value=st.session_state.run_on_save,
+        help="Ejecuta automáticamente la aplicación cuando se actualiza el código"
+    )
+    
+    st.markdown("---")
     st.markdown("**Información**")
     java_version = get_java_version()
     st.code(java_version, language=None)
@@ -696,9 +709,30 @@ code = st_ace(
     key=f'code_editor_{st.session_state.current_file}'
 )
 
-if code != st.session_state.code:
+code_changed = code != st.session_state.code
+if code_changed:
     st.session_state.code = code
     st.session_state.files[st.session_state.current_file] = code
+    
+    if st.session_state.run_on_save:
+        dep_result = install_detected_dependencies(st.session_state.files)
+        dep_msg = ""
+        if dep_result.get('installed'):
+            dep_msg = f"📦 {dep_result['message']}\n\n"
+        
+        if len(st.session_state.files) == 1:
+            result = run_java(list(st.session_state.files.values())[0])
+            class_info = result.get('class_name', 'Main')
+        else:
+            result = run_multi_file(st.session_state.files)
+            class_info = result.get('main_class', 'Main')
+        
+        if result['success']:
+            st.session_state.console_output = f"{dep_msg}🔄 Auto-ejecución de {class_info}:\n\n{result['output']}"
+        elif 'error' in result:
+            st.session_state.console_output = f"{dep_msg}❌ Error:\n{result['error']}"
+        else:
+            st.session_state.console_output = f"{dep_msg}⚠️ Código de salida: {result['return_code']}\n{result.get('output', '')}"
 
 btn_col1, btn_col2, btn_col3, btn_col4 = st.columns(4)
 
