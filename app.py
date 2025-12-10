@@ -772,6 +772,57 @@ with btn_col4:
         st.session_state.console_output = ""
         st.rerun()
 
+# Botón especial para probar conexión LLRP4J (solo si está TestLLRP4J.java)
+if 'TestLLRP4J.java' in st.session_state.files or 'LLRP4JReader.java' in st.session_state.files:
+    st.markdown("---")
+    st.markdown("### 📡 Prueba de Conexión RFID")
+    
+    llrp_col1, llrp_col2 = st.columns([3, 1])
+    
+    with llrp_col1:
+        reader_ip = st.text_input("IP del Lector FX7500:", value="192.168.1.117", key="reader_ip_input")
+    
+    with llrp_col2:
+        test_duration = st.number_input("Duración (seg):", min_value=5, max_value=120, value=30, key="test_duration")
+    
+    if st.button("📡 Probar Conexión LLRP4J", type="primary", use_container_width=True):
+        st.session_state.files[st.session_state.current_file] = st.session_state.code
+        
+        # Actualizar la IP en TestLLRP4J.java si existe
+        if 'TestLLRP4J.java' in st.session_state.files:
+            test_code = st.session_state.files['TestLLRP4J.java']
+            # Reemplazar la IP en el código
+            import re
+            test_code = re.sub(
+                r'String readerIP = args\.length > 0 \? args\[0\] : "[^"]+";',
+                f'String readerIP = args.length > 0 ? args[0] : "{reader_ip}";',
+                test_code
+            )
+            st.session_state.files['TestLLRP4J.java'] = test_code
+        
+        with st.spinner(f"Conectando a {reader_ip}..."):
+            # Compilar y ejecutar TestLLRP4J con argumentos
+            dep_result = install_detected_dependencies(st.session_state.files)
+            dep_msg = ""
+            if dep_result.get('installed'):
+                dep_msg = f"📦 Librerías instaladas: {', '.join(dep_result['installed'])}\n\n"
+            
+            # Ejecutar con argumentos IP y duración
+            from java_compiler import run_multi_file_with_args
+            result = run_multi_file_with_args(
+                st.session_state.files, 
+                main_class="TestLLRP4J",
+                args=[reader_ip, str(test_duration)],
+                timeout=test_duration + 30
+            )
+            
+            if result['success']:
+                st.session_state.console_output = f"{dep_msg}📡 Prueba LLRP4J con {reader_ip}:\n\n{result['output']}"
+            elif 'error' in result:
+                st.session_state.console_output = f"{dep_msg}❌ Error de conexión:\n{result['error']}"
+            else:
+                st.session_state.console_output = f"{dep_msg}⚠️ Resultado:\n{result.get('output', '')}"
+
 st.markdown("### Consola de Salida")
 if st.session_state.console_output:
     if st.session_state.console_output.startswith("✅") or st.session_state.console_output.startswith("▶️") or st.session_state.console_output.startswith("📦"):

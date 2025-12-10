@@ -489,6 +489,83 @@ def run_multi_file(files: dict, main_class: Optional[str] = None) -> dict:
             }
 
 
+def run_multi_file_with_args(files: dict, main_class: str, args: list = None, timeout: int = 60) -> dict:
+    """Ejecuta un proyecto multi-archivo con argumentos de línea de comandos."""
+    if not files:
+        return {'success': False, 'error': 'No hay archivos para ejecutar'}
+    
+    if args is None:
+        args = []
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        for filename, code in files.items():
+            if not filename.endswith('.java'):
+                filename = f"{filename}.java"
+            file_path = os.path.join(temp_dir, filename)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(code)
+        
+        java_files = [os.path.join(temp_dir, f) for f in os.listdir(temp_dir) if f.endswith('.java')]
+        
+        classpath = get_classpath()
+        compile_cmd = ['javac', '-encoding', 'UTF-8', '--release', JAVA_TARGET_VERSION]
+        if classpath:
+            compile_cmd.extend(['-cp', classpath])
+        compile_cmd.extend(java_files)
+        
+        try:
+            compile_result = subprocess.run(
+                compile_cmd,
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+            
+            if compile_result.returncode != 0:
+                return {
+                    'success': False,
+                    'error': f'Error de compilación:\n{compile_result.stderr}',
+                    'main_class': main_class
+                }
+            
+            run_classpath = temp_dir
+            if classpath:
+                run_classpath = temp_dir + os.pathsep + classpath
+            
+            run_cmd = ['java', '-Xmx256m', '-Xms64m', '-cp', run_classpath, main_class] + args
+            
+            run_result = subprocess.run(
+                run_cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout
+            )
+            
+            output = run_result.stdout
+            if run_result.stderr:
+                output += f'\n[stderr]\n{run_result.stderr}'
+            
+            return {
+                'success': run_result.returncode == 0,
+                'output': output if output else '(Sin salida)',
+                'return_code': run_result.returncode,
+                'main_class': main_class
+            }
+                
+        except subprocess.TimeoutExpired:
+            return {
+                'success': False,
+                'error': f'Tiempo de ejecución agotado ({timeout} segundos)',
+                'main_class': main_class
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'main_class': main_class
+            }
+
+
 def create_multi_jar(files: dict, jar_name: Optional[str] = None, main_class: Optional[str] = None) -> dict:
     if not files:
         return {'success': False, 'error': 'No hay archivos para empaquetar'}
