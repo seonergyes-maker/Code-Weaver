@@ -477,7 +477,7 @@ public class LLRPMessage {
     }
     
     /**
-     * Escribe un ROSpec completo.
+     * Escribe un ROSpec completo simplificado para FX7500.
      */
     private static void writeROSpec(DataOutputStream dos, int roSpecId, 
                                      int[] antennaPorts, int inventoryParamSpecId) 
@@ -485,24 +485,154 @@ public class LLRPMessage {
         ByteArrayOutputStream roSpecBaos = new ByteArrayOutputStream();
         DataOutputStream roSpecDos = new DataOutputStream(roSpecBaos);
         
+        // ROSpecID (4 bytes)
         roSpecDos.writeInt(roSpecId);
+        // Priority (1 byte)
         roSpecDos.writeByte(0);
+        // CurrentState (1 byte) - 0 = Disabled
         roSpecDos.writeByte(0);
         
-        writeROBoundarySpec(roSpecDos);
+        // ROBoundarySpec
+        writeROBoundarySpecSimple(roSpecDos);
         
-        writeAISpec(roSpecDos, antennaPorts, inventoryParamSpecId);
+        // AISpec (Antenna Inventory Spec)
+        writeAISpecSimple(roSpecDos, antennaPorts, inventoryParamSpecId);
         
-        writeROReportSpec(roSpecDos);
-        
-        writeMotoDefaultSpec(roSpecDos);
+        // ROReportSpec
+        writeROReportSpecSimple(roSpecDos);
         
         roSpecDos.flush();
         byte[] roSpecData = roSpecBaos.toByteArray();
         
+        // TLV header for ROSpec (type 177)
         dos.writeShort((PARAM_ROSPEC & 0x03FF) | 0x0400);
         dos.writeShort(4 + roSpecData.length);
         dos.write(roSpecData);
+    }
+    
+    /**
+     * Escribe ROBoundarySpec simplificado.
+     */
+    private static void writeROBoundarySpecSimple(DataOutputStream dos) throws IOException {
+        ByteArrayOutputStream boundaryBaos = new ByteArrayOutputStream();
+        DataOutputStream boundaryDos = new DataOutputStream(boundaryBaos);
+        
+        // ROSpecStartTrigger (type 179) - Null trigger (start immediately when enabled)
+        boundaryDos.writeShort((PARAM_ROSPEC_START_TRIGGER & 0x03FF) | 0x0400);
+        boundaryDos.writeShort(5); // length = 4 header + 1 byte trigger type
+        boundaryDos.writeByte(0);  // ROSpecStartTriggerType = 0 (Null)
+        
+        // ROSpecStopTrigger (type 182) - Null trigger (run forever)
+        boundaryDos.writeShort((PARAM_ROSPEC_STOP_TRIGGER & 0x03FF) | 0x0400);
+        boundaryDos.writeShort(9); // length = 4 header + 1 byte type + 4 bytes duration
+        boundaryDos.writeByte(0);  // ROSpecStopTriggerType = 0 (Null)
+        boundaryDos.writeInt(0);   // DurationTriggerValue = 0
+        
+        boundaryDos.flush();
+        byte[] boundaryData = boundaryBaos.toByteArray();
+        
+        // ROBoundarySpec (type 178)
+        dos.writeShort((PARAM_RO_BOUNDARY_SPEC & 0x03FF) | 0x0400);
+        dos.writeShort(4 + boundaryData.length);
+        dos.write(boundaryData);
+    }
+    
+    /**
+     * Escribe AISpec simplificado.
+     */
+    private static void writeAISpecSimple(DataOutputStream dos, int[] antennaPorts, 
+                                           int inventoryParamSpecId) throws IOException {
+        ByteArrayOutputStream aiSpecBaos = new ByteArrayOutputStream();
+        DataOutputStream aiSpecDos = new DataOutputStream(aiSpecBaos);
+        
+        // AntennaIDs (count + list of antenna IDs)
+        aiSpecDos.writeShort(antennaPorts.length);
+        for (int port : antennaPorts) {
+            aiSpecDos.writeShort(port);
+        }
+        
+        // AISpecStopTrigger (type 184) - Null trigger
+        aiSpecDos.writeShort((PARAM_AISPEC_STOP_TRIGGER & 0x03FF) | 0x0400);
+        aiSpecDos.writeShort(9); // length = 4 header + 1 type + 4 duration
+        aiSpecDos.writeByte(0);  // AISpecStopTriggerType = 0 (Null)
+        aiSpecDos.writeInt(0);   // DurationTrigger = 0
+        
+        // InventoryParameterSpec (type 186)
+        writeInventoryParameterSpecSimple(aiSpecDos, inventoryParamSpecId);
+        
+        aiSpecDos.flush();
+        byte[] aiSpecData = aiSpecBaos.toByteArray();
+        
+        // AISpec (type 183)
+        dos.writeShort((PARAM_AISPEC & 0x03FF) | 0x0400);
+        dos.writeShort(4 + aiSpecData.length);
+        dos.write(aiSpecData);
+    }
+    
+    /**
+     * Escribe InventoryParameterSpec simplificado.
+     */
+    private static void writeInventoryParameterSpecSimple(DataOutputStream dos, int specId) 
+            throws IOException {
+        ByteArrayOutputStream invBaos = new ByteArrayOutputStream();
+        DataOutputStream invDos = new DataOutputStream(invBaos);
+        
+        // InventoryParameterSpecID (2 bytes)
+        invDos.writeShort(specId);
+        // ProtocolID (1 byte) - 1 = EPCGlobalClass1Gen2
+        invDos.writeByte(1);
+        
+        invDos.flush();
+        byte[] invData = invBaos.toByteArray();
+        
+        // InventoryParameterSpec (type 186)
+        dos.writeShort((PARAM_INVENTORY_PARAMETER_SPEC & 0x03FF) | 0x0400);
+        dos.writeShort(4 + invData.length);
+        dos.write(invData);
+    }
+    
+    /**
+     * Escribe ROReportSpec simplificado.
+     */
+    private static void writeROReportSpecSimple(DataOutputStream dos) throws IOException {
+        ByteArrayOutputStream reportBaos = new ByteArrayOutputStream();
+        DataOutputStream reportDos = new DataOutputStream(reportBaos);
+        
+        // ROReportTrigger (1 byte) - 1 = Upon_N_Tags_Or_End_Of_AISpec
+        reportDos.writeByte(1);
+        // N (2 bytes) - Report every 1 tag
+        reportDos.writeShort(1);
+        
+        // TagReportContentSelector (type 238)
+        ByteArrayOutputStream selectorBaos = new ByteArrayOutputStream();
+        DataOutputStream selectorDos = new DataOutputStream(selectorBaos);
+        
+        // EnableROSpecID, EnableSpecIndex, EnableInventoryParameterSpecID, 
+        // EnableAntennaID, EnableChannelIndex, EnablePeakRSSI, 
+        // EnableFirstSeenTimestamp, EnableLastSeenTimestamp, 
+        // EnableTagSeenCount, EnableAccessSpecID
+        // All enabled = 0x03FF (10 flags in 2 bytes)
+        selectorDos.writeShort(0x03FF);
+        
+        // C1G2EPCMemorySelector (type 348)
+        selectorDos.writeShort((348 & 0x03FF) | 0x0400);
+        selectorDos.writeShort(5); // 4 header + 1 byte
+        selectorDos.writeByte(0xC0); // EnableCRC=1, EnablePCBits=1
+        
+        selectorDos.flush();
+        byte[] selectorData = selectorBaos.toByteArray();
+        
+        reportDos.writeShort((PARAM_TAG_REPORT_CONTENT_SELECTOR & 0x03FF) | 0x0400);
+        reportDos.writeShort(4 + selectorData.length);
+        reportDos.write(selectorData);
+        
+        reportDos.flush();
+        byte[] reportData = reportBaos.toByteArray();
+        
+        // ROReportSpec (type 237)
+        dos.writeShort((PARAM_RO_REPORT_SPEC & 0x03FF) | 0x0400);
+        dos.writeShort(4 + reportData.length);
+        dos.write(reportData);
     }
     
     /**
