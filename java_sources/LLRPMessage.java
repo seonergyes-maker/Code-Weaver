@@ -871,7 +871,8 @@ public class LLRPMessage {
         while (buffer.remaining() >= 4) {
             int typeAndFlags = buffer.getShort() & 0xFFFF;
             
-            boolean isTLV = (typeAndFlags & 0x0400) != 0;
+            // TLV si bit 15 NO está establecido (TV tiene bit 15 = 1)
+            boolean isTLV = (typeAndFlags & 0x8000) == 0;
             int paramType = typeAndFlags & 0x03FF;
             
             if (isTLV) {
@@ -1021,7 +1022,8 @@ public class LLRPMessage {
         
         while (buffer.remaining() >= 4) {
             int typeAndFlags = buffer.getShort() & 0xFFFF;
-            boolean isTLV = (typeAndFlags & 0x0400) != 0;
+            // TLV si bit 15 NO está establecido (TV tiene bit 15 = 1)
+            boolean isTLV = (typeAndFlags & 0x8000) == 0;
             int paramType = typeAndFlags & 0x03FF;
             
             if (isTLV) {
