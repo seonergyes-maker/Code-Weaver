@@ -350,7 +350,7 @@ public class TestLLRP4J {
         
         // ROReportSpec - Reporte por cada N tags
         ROReportSpec reportSpec = new ROReportSpec();
-        reportSpec.roReportTrigger(ROReportTriggerType.Upon_N_Tags_Or_End_Of_AISpec);
+        reportSpec.roReportTrigger(ROReportTriggerType.Upon_N_Tags_Or_End_Of_AISpec_Or_End_Of_RFSurveySpec);
         reportSpec.n(1);  // Reportar cada tag
         
         TagReportContentSelector contentSelector = new TagReportContentSelector();
