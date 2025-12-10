@@ -543,15 +543,13 @@ public class LLRPDebug {
         ByteArrayOutputStream boundaryBaos = new ByteArrayOutputStream();
         DataOutputStream boundaryDos = new DataOutputStream(boundaryBaos);
         
-        // ROSpecStartTrigger (Type 179)
-        // TriggerType = Null (0), Length = 5
+        // ROSpecStartTrigger (Type 179) - TriggerType = Null
         writeParameter(boundaryDos, 179, new byte[]{0});
         
-        // ROSpecStopTrigger (Type 182)
-        // TriggerType = Null (0), DurationTriggerValue = 0
+        // ROSpecStopTrigger (Type 182) - TriggerType = Null
         ByteArrayOutputStream stopBaos = new ByteArrayOutputStream();
         DataOutputStream stopDos = new DataOutputStream(stopBaos);
-        stopDos.writeByte(0); // TriggerType
+        stopDos.writeByte(0); // TriggerType = Null
         stopDos.writeInt(0);  // DurationTriggerValue
         writeParameter(boundaryDos, 182, stopBaos.toByteArray());
         
@@ -561,44 +559,72 @@ public class LLRPDebug {
         ByteArrayOutputStream aispecBaos = new ByteArrayOutputStream();
         DataOutputStream aispecDos = new DataOutputStream(aispecBaos);
         
-        // AntennaIDs count
-        aispecDos.writeShort(1);
-        // AntennaID = 1
-        aispecDos.writeShort(1);
+        // AntennaIDs: usar antena 1
+        aispecDos.writeShort(1);  // Count
+        aispecDos.writeShort(1);  // AntennaID = 1
         
-        // AISpecStopTrigger (Type 184)
-        // TriggerType: 0=Null, 1=Duration, 2=GPI, 3=TagObservation
+        // AISpecStopTrigger (Type 184) - TriggerType = Null (continuo)
         ByteArrayOutputStream aiStopBaos = new ByteArrayOutputStream();
         DataOutputStream aiStopDos = new DataOutputStream(aiStopBaos);
-        aiStopDos.writeByte(0); // TriggerType = Null (continuo)
-        aiStopDos.writeInt(0);  // No duration
+        aiStopDos.writeByte(0); // TriggerType = Null
+        aiStopDos.writeInt(0);  // Duration (ignored for Null)
         writeParameter(aispecDos, 184, aiStopBaos.toByteArray());
         
-        // InventoryParameterSpec (Type 186)
+        // InventoryParameterSpec (Type 186) con C1G2InventoryCommand
         ByteArrayOutputStream invBaos = new ByteArrayOutputStream();
         DataOutputStream invDos = new DataOutputStream(invBaos);
         invDos.writeShort(1);  // InventoryParameterSpecID
-        invDos.writeByte(1);   // ProtocolID = EPCGlobalClass1Gen2
+        invDos.writeByte(1);   // ProtocolID = EPCGlobalClass1Gen2 (1)
+        
+        // C1G2InventoryCommand (Type 330)
+        ByteArrayOutputStream c1g2Baos = new ByteArrayOutputStream();
+        DataOutputStream c1g2Dos = new DataOutputStream(c1g2Baos);
+        c1g2Dos.writeByte(0);  // TagInventoryStateAware = false
+        
+        // C1G2RFControl (Type 335)
+        ByteArrayOutputStream rfBaos = new ByteArrayOutputStream();
+        DataOutputStream rfDos = new DataOutputStream(rfBaos);
+        rfDos.writeShort(1);   // ModeIndex = 1 (modo estándar)
+        rfDos.writeShort(0);   // Tari = 0 (usar default del modo)
+        writeParameter(c1g2Dos, 335, rfBaos.toByteArray());
+        
+        // C1G2SingulationControl (Type 336) - Session S0
+        ByteArrayOutputStream singBaos = new ByteArrayOutputStream();
+        DataOutputStream singDos = new DataOutputStream(singBaos);
+        singDos.writeByte(0);  // Session = S0 (bits 7-6)
+        singDos.writeShort(0); // TagPopulation = 0 (auto)
+        singDos.writeInt(0);   // TagTransitTime = 0 (auto)
+        writeParameter(c1g2Dos, 336, singBaos.toByteArray());
+        
+        writeParameter(invDos, 330, c1g2Baos.toByteArray());
         writeParameter(aispecDos, 186, invBaos.toByteArray());
         
         writeParameter(rospecDos, 183, aispecBaos.toByteArray());
         
-        // ROReportSpec (Type 237)
+        // ROReportSpec (Type 237) - Reportar cada tag inmediatamente
         ByteArrayOutputStream reportBaos = new ByteArrayOutputStream();
         DataOutputStream reportDos = new DataOutputStream(reportBaos);
-        reportDos.writeByte(1); // ROReportTrigger = Upon_N_Tags_Or_End_Of_ROSpec
-        reportDos.writeShort(1); // N = 1
+        reportDos.writeByte(1);  // ROReportTrigger = Upon_N_Tags_Or_End_Of_AISpec
+        reportDos.writeShort(1); // N = 1 (cada tag)
         
         // TagReportContentSelector (Type 238)
         ByteArrayOutputStream tagContentBaos = new ByteArrayOutputStream();
         DataOutputStream tagContentDos = new DataOutputStream(tagContentBaos);
-        // EnableMask: ROSpecID, SpecIndex, InvParamSpecID, AntennaID, ChannelIndex, PeakRSSI, FirstSeen, LastSeen, TagSeenCount, AccessSpecID
-        // Bits: ROSpecID=1, SpecIndex=1, InvParamSpecID=1, AntennaID=1, ChannelIndex=0, PeakRSSI=1, FirstSeen=1, LastSeen=1, TagSeenCount=1, AccessSpecID=0
-        // = 1111011110 = 0x1EF (pero en formato LLRP es diferente)
-        short enableMask = (short)0b1111011110;
+        // Bits (MSB first): EnableROSpecID, EnableSpecIndex, EnableInvParamSpecID, 
+        // EnableAntennaID, EnableChannelIndex, EnablePeakRSSI, EnableFirstSeenTimestamp,
+        // EnableLastSeenTimestamp, EnableTagSeenCount, EnableAccessSpecID, C1G2EPCSelectorPresent
+        // Enable: AntennaID, PeakRSSI, FirstSeen, LastSeen, TagSeenCount + C1G2EPC
+        short enableMask = (short)0b0001011111_100000;  // AntennaID, PeakRSSI, FirstSeen, LastSeen, TagSeenCount, C1G2EPC
         tagContentDos.writeShort(enableMask);
-        writeParameter(reportDos, 238, tagContentBaos.toByteArray());
         
+        // C1G2EPCMemorySelector (Type 348) - Para obtener EPC
+        ByteArrayOutputStream epcSelBaos = new ByteArrayOutputStream();
+        DataOutputStream epcSelDos = new DataOutputStream(epcSelBaos);
+        // Bits: EnableCRC (1), EnablePCBits (1), EnableEPCMemory (1), Reserved (5)
+        epcSelDos.writeByte(0b11100000);  // Enable CRC, PC, EPC
+        writeParameter(tagContentDos, 348, epcSelBaos.toByteArray());
+        
+        writeParameter(reportDos, 238, tagContentBaos.toByteArray());
         writeParameter(rospecDos, 237, reportBaos.toByteArray());
         
         writeParameter(dos, 177, rospecBaos.toByteArray());
