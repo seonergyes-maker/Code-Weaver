@@ -1,17 +1,22 @@
 package com.rfid.zebra;
 
 import net.enilink.llrp4j.LlrpContext;
-import net.enilink.llrp4j.LlrpEndpoint;
 import net.enilink.llrp4j.net.LlrpClient;
+import net.enilink.llrp4j.net.LlrpEndpoint;
 import net.enilink.llrp4j.types.LlrpMessage;
-import org.llrp.ltk.generated.messages.*;
-import org.llrp.ltk.generated.parameters.*;
-import org.llrp.ltk.generated.enumerations.*;
-import org.llrp.ltk.generated.LLRPModule;
+import net.enilink.llrp4j.types.BitList;
 
+import org.llrp.modules.LlrpModule;
+import org.llrp.messages.*;
+import org.llrp.parameters.*;
+import org.llrp.enumerations.*;
+import org.llrp.interfaces.EPCParameter;
+import org.llrp.interfaces.SpecParameter;
+import org.llrp.interfaces.AirProtocolEPCMemorySelector;
+
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 
 /**
@@ -27,11 +32,9 @@ public class LLRP4JReader implements AutoCloseable {
     private volatile boolean connected = false;
     private volatile boolean reading = false;
     
-    private Consumer<TagData> tagCallback;
+    private Consumer<String[]> tagCallback; // [epc, antenna, rssi, timestamp]
     private Consumer<String> statusCallback;
     private Consumer<Exception> errorCallback;
-    
-    private final ConcurrentLinkedQueue<TagData> tagQueue = new ConcurrentLinkedQueue<>();
     
     public LLRP4JReader(String readerIP) {
         this(readerIP, 5084);
@@ -42,7 +45,7 @@ public class LLRP4JReader implements AutoCloseable {
         this.port = port;
     }
     
-    public void setTagCallback(Consumer<TagData> callback) {
+    public void setTagCallback(Consumer<String[]> callback) {
         this.tagCallback = callback;
     }
     
@@ -78,7 +81,7 @@ public class LLRP4JReader implements AutoCloseable {
         try {
             log("Conectando a " + readerIP + ":" + port + "...");
             
-            context = LlrpContext.create(new LLRPModule());
+            context = LlrpContext.create(new LlrpModule());
             
             LlrpEndpoint endpoint = new LlrpEndpoint() {
                 @Override
@@ -221,7 +224,7 @@ public class LLRP4JReader implements AutoCloseable {
         
         ROSpec rospec = new ROSpec();
         rospec.roSpecID(1);
-        rospec.priority((short) 0);
+        rospec.priority(0);
         rospec.currentState(ROSpecState.Disabled);
         
         // ROBoundarySpec
@@ -244,9 +247,7 @@ public class LLRP4JReader implements AutoCloseable {
         AISpec aiSpec = new AISpec();
         
         // Usar todas las antenas (ID = 0)
-        List<Integer> antennaIDs = new ArrayList<>();
-        antennaIDs.add(0);
-        aiSpec.antennaIDs(antennaIDs);
+        aiSpec.antennaIDs(new int[]{0});
         
         // AISpec stop trigger
         AISpecStopTrigger aiStopTrigger = new AISpecStopTrigger();
@@ -261,16 +262,17 @@ public class LLRP4JReader implements AutoCloseable {
         
         List<InventoryParameterSpec> invSpecs = new ArrayList<>();
         invSpecs.add(invSpec);
-        aiSpec.inventoryParameterSpecs(invSpecs);
+        aiSpec.inventoryParameterSpec(invSpecs);
         
-        List<AISpec> aiSpecs = new ArrayList<>();
-        aiSpecs.add(aiSpec);
-        rospec.specParameters(aiSpecs);
+        // Agregar AISpec como SpecParameter
+        List<SpecParameter> specParams = new ArrayList<>();
+        specParams.add(aiSpec);
+        rospec.specParameter(specParams);
         
         // ROReportSpec
         ROReportSpec reportSpec = new ROReportSpec();
-        reportSpec.roReportTrigger(ROReportTriggerType.Upon_N_Tags_Or_End_Of_AISpec);
-        reportSpec.n((short) 1); // Reportar cada tag
+        reportSpec.roReportTrigger(ROReportTriggerType.Upon_N_Tags_Or_End_Of_AISpec_Or_End_Of_RFSurveySpec);
+        reportSpec.n(1); // Reportar cada tag
         
         TagReportContentSelector contentSelector = new TagReportContentSelector();
         contentSelector.enableROSpecID(true);
@@ -289,9 +291,9 @@ public class LLRP4JReader implements AutoCloseable {
         epcSelector.enableCRC(true);
         epcSelector.enablePCBits(true);
         
-        List<C1G2EPCMemorySelector> epcSelectors = new ArrayList<>();
+        List<AirProtocolEPCMemorySelector> epcSelectors = new ArrayList<>();
         epcSelectors.add(epcSelector);
-        contentSelector.c1g2EPCMemorySelectors(epcSelectors);
+        contentSelector.airProtocolEPCMemorySelector(epcSelectors);
         
         reportSpec.tagReportContentSelector(contentSelector);
         rospec.roReportSpec(reportSpec);
@@ -327,7 +329,7 @@ public class LLRP4JReader implements AutoCloseable {
      * Procesa un reporte de tags.
      */
     private void processTagReport(RO_ACCESS_REPORT report) {
-        List<TagReportData> tagReports = report.tagReportDatas();
+        List<TagReportData> tagReports = report.tagReportData();
         
         if (tagReports == null || tagReports.isEmpty()) {
             return;
@@ -336,57 +338,78 @@ public class LLRP4JReader implements AutoCloseable {
         log("Recibidos " + tagReports.size() + " tags");
         
         for (TagReportData tagReport : tagReports) {
-            TagData tag = new TagData();
+            String epc = "";
+            int antenna = 0;
+            int rssi = 0;
+            long timestamp = System.currentTimeMillis();
+            int readCount = 1;
             
             // Obtener EPC
-            if (tagReport.epcParameter() != null) {
-                if (tagReport.epcParameter() instanceof EPC_96) {
-                    EPC_96 epc96 = (EPC_96) tagReport.epcParameter();
-                    tag.setEpc(bytesToHex(epc96.epc()));
-                } else if (tagReport.epcParameter() instanceof EPCData) {
-                    EPCData epcData = (EPCData) tagReport.epcParameter();
-                    tag.setEpc(bytesToHex(epcData.epc()));
+            EPCParameter epcParam = tagReport.epcParameter();
+            if (epcParam != null) {
+                if (epcParam instanceof EPC_96) {
+                    EPC_96 epc96 = (EPC_96) epcParam;
+                    BigInteger epcValue = epc96.epc();
+                    if (epcValue != null) {
+                        // Convertir BigInteger a hex string con padding a 24 caracteres
+                        String hexStr = epcValue.toString(16).toUpperCase();
+                        while (hexStr.length() < 24) {
+                            hexStr = "0" + hexStr;
+                        }
+                        epc = hexStr;
+                    }
+                } else if (epcParam instanceof EPCData) {
+                    EPCData epcData = (EPCData) epcParam;
+                    BitList bits = epcData.epc();
+                    if (bits != null) {
+                        epc = bits.toHexString().toUpperCase();
+                    }
                 }
             }
             
             // Obtener antena
-            if (tagReport.antennaID() != null) {
-                tag.setAntennaPort(tagReport.antennaID());
+            AntennaID antennaID = tagReport.antennaID();
+            if (antennaID != null) {
+                antenna = antennaID.antennaID();
             }
             
             // Obtener RSSI
-            if (tagReport.peakRSSI() != null) {
-                tag.setRssi(tagReport.peakRSSI());
+            PeakRSSI peakRSSI = tagReport.peakRSSI();
+            if (peakRSSI != null) {
+                rssi = peakRSSI.peakRSSI();
             }
             
             // Obtener timestamp
-            if (tagReport.firstSeenTimestampUTC() != null) {
-                tag.setTimestamp(tagReport.firstSeenTimestampUTC() / 1000);
+            FirstSeenTimestampUTC firstSeen = tagReport.firstSeenTimestampUTC();
+            if (firstSeen != null) {
+                BigInteger microseconds = firstSeen.microseconds();
+                if (microseconds != null) {
+                    timestamp = microseconds.divide(BigInteger.valueOf(1000)).longValue();
+                }
             }
             
             // Obtener conteo
-            if (tagReport.tagSeenCount() != null) {
-                tag.setReadCount(tagReport.tagSeenCount());
+            TagSeenCount seenCount = tagReport.tagSeenCount();
+            if (seenCount != null) {
+                readCount = seenCount.tagCount();
             }
             
             // Notificar callback
-            if (tag.getEpc() != null && !tag.getEpc().isEmpty()) {
-                log("Tag leído: " + tag.getEpc() + " (Antena: " + tag.getAntennaPort() + ", RSSI: " + tag.getRssi() + ")");
+            if (epc != null && !epc.isEmpty()) {
+                log("Tag leído: " + epc + " (Antena: " + antenna + ", RSSI: " + rssi + ")");
                 
                 if (tagCallback != null) {
-                    tagCallback.accept(tag);
+                    String[] tagData = new String[]{
+                        epc,
+                        String.valueOf(antenna),
+                        String.valueOf(rssi),
+                        String.valueOf(timestamp),
+                        String.valueOf(readCount)
+                    };
+                    tagCallback.accept(tagData);
                 }
             }
         }
-    }
-    
-    private static String bytesToHex(byte[] bytes) {
-        if (bytes == null) return "";
-        StringBuilder sb = new StringBuilder();
-        for (byte b : bytes) {
-            sb.append(String.format("%02X", b));
-        }
-        return sb.toString();
     }
     
     public boolean isConnected() {
@@ -400,5 +423,36 @@ public class LLRP4JReader implements AutoCloseable {
     @Override
     public void close() {
         disconnect();
+    }
+    
+    /**
+     * Método de prueba simple.
+     */
+    public static void main(String[] args) {
+        if (args.length < 1) {
+            System.out.println("Uso: java LLRP4JReader <IP_del_lector>");
+            return;
+        }
+        
+        String readerIP = args[0];
+        
+        try (LLRP4JReader reader = new LLRP4JReader(readerIP)) {
+            reader.setTagCallback(tagData -> {
+                System.out.println(">>> TAG: EPC=" + tagData[0] + 
+                    ", Antena=" + tagData[1] + 
+                    ", RSSI=" + tagData[2]);
+            });
+            
+            if (reader.connect()) {
+                System.out.println("Conectado! Iniciando lectura...");
+                
+                if (reader.startReading()) {
+                    System.out.println("Leyendo tags por 30 segundos...");
+                    Thread.sleep(30000);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
