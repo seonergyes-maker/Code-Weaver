@@ -196,11 +196,21 @@ public class TestLLRP4J {
                 lastCount = currentCount;
                 lastMsgCount = currentMsgCount;
                 
-                // Cada 5 segundos, solicitar reporte manualmente
-                if (i > 0 && i % 5 == 0) {
+                // Cada 2 segundos, solicitar reporte y esperar respuesta
+                if (i > 0 && i % 2 == 0) {
                     System.out.println("    [Solicitando reporte...]");
-                    GET_REPORT getReport = new GET_REPORT();
-                    client.send(getReport);
+                    try {
+                        GET_REPORT getReport = new GET_REPORT();
+                        LlrpMessage reportResp = client.transact(getReport, 2000); // 2 seg timeout
+                        if (reportResp != null) {
+                            System.out.println("    [Respuesta: " + reportResp.getClass().getSimpleName() + "]");
+                            if (reportResp instanceof RO_ACCESS_REPORT) {
+                                processMessage(reportResp);
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.out.println("    [Sin respuesta a GET_REPORT]");
+                    }
                 }
             }
             
