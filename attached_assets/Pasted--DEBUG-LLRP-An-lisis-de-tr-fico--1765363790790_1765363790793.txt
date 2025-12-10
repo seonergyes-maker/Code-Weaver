@@ -1,0 +1,83 @@
+========================================
+  DEBUG LLRP - Análisis de tráfico
+========================================
+IP del lector: 192.168.1.117
+Duración: 30 segundos
+
+========================================
+  DEBUG LLRP - Análisis de tráfico
+========================================
+IP: 192.168.1.117
+Puerto: 5084
+Duración: 30 segundos
+
+[1] Conectando...
+    OK - Conectado a /192.168.1.117:5084
+[READER] Thread de lectura iniciado
+[EVENTO] READER_EVENT_NOTIFICATION ID:340
+[2] Enviando DELETE_ROSPEC(0)...
+[MSG] DELETE_ROSPEC_RESPONSE (Type:31) ID:1 Len:18
+[3] Enviando ADD_ROSPEC...
+[MSG] ADD_ROSPEC_RESPONSE (Type:30) ID:2 Len:18
+[4] Enviando ENABLE_ROSPEC...
+[MSG] ENABLE_ROSPEC_RESPONSE (Type:34) ID:3 Len:18
+[5] Enviando START_ROSPEC...
+[MSG] START_ROSPEC_RESPONSE (Type:32) ID:4 Len:18
+
+========================================
+  MONITOREANDO TRÁFICO (30s)
+========================================
+
+[  1s] Mensajes: 6 (+6) | RO_ACCESS_REPORT: 0 (+0)
+[  2s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  3s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  4s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  5s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  6s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[  7s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  8s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  9s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 10s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 11s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[ 12s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 13s] Mensajes: 6 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 14s] Mensajes: 7 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[ 15s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 16s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[ 17s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 18s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 19s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 20s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 21s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[ 22s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 23s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 24s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 25s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 26s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[ 27s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 28s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 29s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 30s] Mensajes: 8 (+1) | RO_ACCESS_REPORT: 0 (+0)
+
+[6] Deteniendo ROSpec...
+[MSG] STOP_ROSPEC_RESPONSE (Type:33) ID:5 Len:18
+[READER] Thread de lectura terminado
+[7] Cerrando conexión...
+
+========================================
+  RESULTADOS
+========================================
+Total mensajes recibidos: 9
+Total RO_ACCESS_REPORT: 0
+
+DIAGNÓSTICO: No se recibieron RO_ACCESS_REPORT
+Posibles causas:
+  1. El ROSpec no se inició correctamente
+  2. No hay tags en el rango de la antena
+  3. Problema de configuración del lector
+  4. El lector no está enviando reportes por esta conexión

@@ -57,12 +57,12 @@ public class LLRPDebug {
                         }
                         
                         // Parsear header
-                        // Bytes 0-1: Version (3 bits) + Reserved (3 bits) + Message Type (10 bits)
+                        // Bytes 0-1: Reserved (3 bits) + Version (3 bits) + Message Type (10 bits)
                         // Bytes 2-5: Message Length (32 bits)
                         // Bytes 6-9: Message ID (32 bits)
                         
                         int typeWord = ((header[0] & 0xFF) << 8) | (header[1] & 0xFF);
-                        int version = (typeWord >> 13) & 0x07;
+                        int version = (typeWord >> 10) & 0x07;
                         int messageType = typeWord & 0x03FF;
                         
                         long messageLength = ((long)(header[2] & 0xFF) << 24) |
@@ -135,6 +135,27 @@ public class LLRPDebug {
                             sendKeepaliveAck(out, messageId);
                         } else if (messageType == 63) { // READER_EVENT_NOTIFICATION
                             System.out.println("[EVENTO] READER_EVENT_NOTIFICATION ID:" + messageId);
+                        } else if (messageType >= 30 && messageType <= 34) {
+                            // *_RESPONSE messages - parsear LLRPStatus
+                            System.out.print("[MSG] " + msgName + " (Type:" + messageType + ") ID:" + messageId);
+                            if (bodyLength >= 8) {
+                                // LLRPStatus: Type (2) + Len (2) + StatusCode (2) + ErrorDescByteCount (2)
+                                int statusCode = ((body[4] & 0xFF) << 8) | (body[5] & 0xFF);
+                                String statusName = getStatusCodeName(statusCode);
+                                if (statusCode == 0) {
+                                    System.out.println(" -> OK");
+                                } else {
+                                    System.out.println(" -> ERROR: " + statusCode + " (" + statusName + ")");
+                                    // Mostrar descripción si existe
+                                    int descLen = ((body[6] & 0xFF) << 8) | (body[7] & 0xFF);
+                                    if (descLen > 0 && bodyLength >= 8 + descLen) {
+                                        String desc = new String(body, 8, descLen, "UTF-8");
+                                        System.out.println("    Descripción: " + desc);
+                                    }
+                                }
+                            } else {
+                                System.out.println();
+                            }
                         } else {
                             System.out.println("[MSG] " + msgName + " (Type:" + messageType + ") ID:" + messageId + " Len:" + messageLength);
                         }
@@ -433,9 +454,9 @@ public class LLRPDebug {
     }
     
     private static void writeParameter(DataOutputStream out, int type, byte[] data) throws IOException {
-        // TLV Parameter header: Type (10 bits) + Length (16 bits)
+        // TLV Parameter header: Reserved (6 bits, must be 0) + Type (10 bits) + Length (16 bits)
         int length = 4 + data.length;
-        out.writeShort((1 << 10) | (type & 0x3FF)); // Reserved bit + type
+        out.writeShort(type & 0x3FF); // Bits 15-10 = 0, Bits 9-0 = type
         out.writeShort(length);
         out.write(data);
     }
