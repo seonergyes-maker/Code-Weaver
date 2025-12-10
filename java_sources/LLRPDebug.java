@@ -129,6 +129,18 @@ public class LLRPDebug {
                             sendKeepaliveAck(out, messageId);
                         } else if (messageType == 63) { // READER_EVENT_NOTIFICATION
                             System.out.println("[EVENTO] READER_EVENT_NOTIFICATION ID:" + messageId);
+                        } else if (messageType == 13) { // SET_READER_CONFIG_RESPONSE
+                            System.out.print("[MSG] SET_READER_CONFIG_RESPONSE ID:" + messageId);
+                            if (bodyLength >= 8) {
+                                int statusCode = ((body[4] & 0xFF) << 8) | (body[5] & 0xFF);
+                                if (statusCode == 0) {
+                                    System.out.println(" -> OK");
+                                } else {
+                                    System.out.println(" -> ERROR: " + statusCode + " (" + getStatusCodeName(statusCode) + ")");
+                                }
+                            } else {
+                                System.out.println();
+                            }
                         } else if (messageType >= 30 && messageType <= 34) {
                             // *_RESPONSE messages - parsear LLRPStatus
                             System.out.print("[MSG] " + msgName + " (Type:" + messageType + ") ID:" + messageId);
@@ -169,24 +181,29 @@ public class LLRPDebug {
             // Esperar un momento para recibir READER_EVENT_NOTIFICATION inicial
             Thread.sleep(1000);
             
+            // Enviar SET_READER_CONFIG para configurar eventos
+            System.out.println("[2] Enviando SET_READER_CONFIG...");
+            sendSetReaderConfig(out, 1);
+            Thread.sleep(500);
+            
             // Enviar DELETE_ROSPEC(0) para limpiar
-            System.out.println("[2] Enviando DELETE_ROSPEC(0)...");
-            sendDeleteRoSpec(out, 0, 1);
+            System.out.println("[3] Enviando DELETE_ROSPEC(0)...");
+            sendDeleteRoSpec(out, 0, 2);
             Thread.sleep(500);
             
             // Enviar ADD_ROSPEC
-            System.out.println("[3] Enviando ADD_ROSPEC...");
-            sendAddRoSpec(out, 2);
+            System.out.println("[4] Enviando ADD_ROSPEC...");
+            sendAddRoSpec(out, 3);
             Thread.sleep(500);
             
             // Enviar ENABLE_ROSPEC
-            System.out.println("[4] Enviando ENABLE_ROSPEC...");
-            sendEnableRoSpec(out, 3);
+            System.out.println("[5] Enviando ENABLE_ROSPEC...");
+            sendEnableRoSpec(out, 4);
             Thread.sleep(500);
             
             // Enviar START_ROSPEC
-            System.out.println("[5] Enviando START_ROSPEC...");
-            sendStartRoSpec(out, 4);
+            System.out.println("[6] Enviando START_ROSPEC...");
+            sendStartRoSpec(out, 5);
             Thread.sleep(500);
             
             System.out.println();
@@ -223,15 +240,15 @@ public class LLRPDebug {
             
             // Detener ROSpec
             System.out.println();
-            System.out.println("[6] Deteniendo ROSpec...");
-            sendStopRoSpec(out, 5);
+            System.out.println("[7] Deteniendo ROSpec...");
+            sendStopRoSpec(out, 6);
             Thread.sleep(300);
             
-            sendDeleteRoSpec(out, 1, 6);
+            sendDeleteRoSpec(out, 1, 7);
             Thread.sleep(300);
             
             // Cerrar
-            System.out.println("[7] Cerrando conexión...");
+            System.out.println("[8] Cerrando conexión...");
             executor.shutdownNow();
             
             System.out.println();
@@ -455,6 +472,42 @@ public class LLRPDebug {
         out.flush();
     }
     
+    private static void sendSetReaderConfig(DataOutputStream out, int msgId) throws IOException {
+        // SET_READER_CONFIG: Type 3
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        
+        // ResetToFactoryDefault = false (1 byte, but only 1 bit used)
+        dos.writeByte(0);
+        
+        // ROReportSpec (Type 237) - Configuración global de reportes
+        ByteArrayOutputStream reportBaos = new ByteArrayOutputStream();
+        DataOutputStream reportDos = new DataOutputStream(reportBaos);
+        reportDos.writeByte(2); // ROReportTrigger = Upon_N_Tags_Or_End_Of_ROSpec
+        reportDos.writeShort(1); // N = 1 (reportar cada tag)
+        
+        // TagReportContentSelector (Type 238)
+        ByteArrayOutputStream tagContentBaos = new ByteArrayOutputStream();
+        DataOutputStream tagContentDos = new DataOutputStream(tagContentBaos);
+        // EnableROSpecID, EnableSpecIndex, EnableInvParamSpecID, EnableAntennaID, 
+        // EnableChannelIndex, EnablePeakRSSI, EnableFirstSeen, EnableLastSeen, 
+        // EnableTagSeenCount, EnableAccessSpecID, C1G2EPCMemorySelector, Reserved
+        short enableMask = (short)0b1111011110_000000; // EnableAntennaID, EnablePeakRSSI, etc
+        tagContentDos.writeShort(enableMask);
+        writeParameter(reportDos, 238, tagContentBaos.toByteArray());
+        
+        writeParameter(dos, 237, reportBaos.toByteArray());
+        
+        // EventsAndReports (Type 244) - No retener eventos
+        ByteArrayOutputStream eventsBaos = new ByteArrayOutputStream();
+        DataOutputStream eventsDos = new DataOutputStream(eventsBaos);
+        eventsDos.writeByte(0); // HoldEventsAndReportsUponReconnect = false
+        writeParameter(dos, 244, eventsBaos.toByteArray());
+        
+        byte[] body = baos.toByteArray();
+        sendMessage(out, 3, msgId, body);
+    }
+    
     private static void sendDeleteRoSpec(DataOutputStream out, int roSpecId, int msgId) throws IOException {
         // DELETE_ROSPEC: Type 21
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -514,8 +567,8 @@ public class LLRPDebug {
         // TriggerType: 0=Null, 1=Duration, 2=GPI, 3=TagObservation
         ByteArrayOutputStream aiStopBaos = new ByteArrayOutputStream();
         DataOutputStream aiStopDos = new DataOutputStream(aiStopBaos);
-        aiStopDos.writeByte(1); // TriggerType = Duration
-        aiStopDos.writeInt(500);  // Duration = 500ms (ciclo continuo)
+        aiStopDos.writeByte(0); // TriggerType = Null (continuo)
+        aiStopDos.writeInt(0);  // No duration
         writeParameter(aispecDos, 184, aiStopBaos.toByteArray());
         
         // InventoryParameterSpec (Type 186)
