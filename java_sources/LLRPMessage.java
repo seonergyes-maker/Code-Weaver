@@ -519,10 +519,10 @@ public class LLRPMessage {
         ByteArrayOutputStream boundaryBaos = new ByteArrayOutputStream();
         DataOutputStream boundaryDos = new DataOutputStream(boundaryBaos);
         
-        // ROSpecStartTrigger (type 179) - Immediate trigger (start when enabled)
+        // ROSpecStartTrigger (type 179) - Null trigger (start via START_ROSPEC command)
         boundaryDos.writeShort((PARAM_ROSPEC_START_TRIGGER & 0x03FF));
         boundaryDos.writeShort(5); // length = 4 header + 1 byte trigger type
-        boundaryDos.writeByte(1);  // ROSpecStartTriggerType = 1 (Immediate) <-- CAMBIADO DE 0 A 1
+        boundaryDos.writeByte(0);  // ROSpecStartTriggerType = 0 (Null) - requiere START_ROSPEC
         
         // ROSpecStopTrigger (type 182) - Null trigger (run forever)
         boundaryDos.writeShort((PARAM_ROSPEC_STOP_TRIGGER & 0x03FF));

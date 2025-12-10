@@ -771,18 +771,10 @@ public class LLRPConnection implements AutoCloseable {
             // Continuar aunque falle (puede que no haya ROSpecs)
         }
         
-        // Paso 2: Configurar antenas (opcional - si falla, usa configuración por defecto)
-        System.out.println("[LLRP] Paso 2: Configurando antenas...");
-        try {
-            if (!setReaderConfig(config.getAntennaConfigs())) {
-                System.out.println("[LLRP] Advertencia: No se pudo configurar antenas, usando configuración por defecto");
-            } else {
-                System.out.println("[LLRP] Antenas configuradas OK");
-            }
-        } catch (Exception e) {
-            System.out.println("[LLRP] Advertencia: Error en configuración de antenas: " + e.getMessage());
-            System.out.println("[LLRP] Continuando con configuración por defecto del lector...");
-        }
+        // Paso 2: Configurar antenas - OMITIDO
+        // La configuración de antenas está fallando en el FX7500
+        // Usamos la configuración por defecto del lector
+        System.out.println("[LLRP] Paso 2: Usando configuración por defecto del lector (sin SET_READER_CONFIG)");
         
         // Paso 3: Agregar ROSpec
         System.out.println("[LLRP] Paso 3: Agregando ROSpec...");
