@@ -867,129 +867,274 @@ public class RFIDMainWindow extends JFrame {
     
     /**
      * Crea el panel de configuración avanzada.
+     * Organizado en secciones lógicas con descripciones detalladas.
      * 
      * @return Panel de configuración avanzada
      */
     private JPanel createAdvancedPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        
+        // ========== SECCIÓN 1: PARÁMETROS DE INVENTARIO C1G2 ==========
+        JPanel inventorySection = createAdvancedSection(
+            "1. Parámetros de Inventario RFID (C1G2)",
+            "Configura cómo el lector interroga las etiquetas RFID según el estándar EPC Class1 Gen2."
+        );
+        
+        JPanel invContent = new JPanel(new GridBagLayout());
+        invContent.setOpaque(false);
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(8, 10, 8, 10);
+        gbc.insets = new Insets(6, 8, 6, 8);
         gbc.anchor = GridBagConstraints.WEST;
         
-        int row = 0;
+        gbc.gridx = 0; gbc.gridy = 0;
+        JLabel sessionLabel = new JLabel("Sesión:");
+        sessionLabel.setFont(sessionLabel.getFont().deriveFont(Font.BOLD));
+        invContent.add(sessionLabel, gbc);
         
-        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
-        JLabel rssiTitle = new JLabel("Filtrado por RSSI");
-        rssiTitle.setFont(rssiTitle.getFont().deriveFont(Font.BOLD, 14f));
-        panel.add(rssiTitle, gbc);
-        
-        gbc.gridy = row; gbc.gridwidth = 1;
-        gbc.gridx = 0;
-        panel.add(rssiFilterCheck, gbc);
         gbc.gridx = 1;
-        panel.add(new JLabel("Umbral mínimo:"), gbc);
-        gbc.gridx = 2;
-        panel.add(rssiThresholdSpinner, gbc);
+        invContent.add(sessionCombo, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 2;
+        JLabel sessionDesc = new JLabel("<html><div style='width:400px; color:#888888;'>" +
+            "<b>S0:</b> Volátil - El tag responde siempre (ideal para pocos tags en movimiento)<br>" +
+            "<b>S1:</b> Persistente 0.5-5s - El tag espera antes de responder de nuevo<br>" +
+            "<b>S2/S3:</b> Persistente 2s+ - Para entornos con múltiples lectores simultáneos" +
+            "</div></html>");
+        invContent.add(sessionDesc, gbc);
+        
+        gbc.gridx = 2; gbc.gridy = 0; gbc.gridwidth = 1;
+        JLabel targetLabel = new JLabel("Target:");
+        targetLabel.setFont(targetLabel.getFont().deriveFont(Font.BOLD));
+        invContent.add(targetLabel, gbc);
+        
         gbc.gridx = 3;
-        panel.add(new JLabel("dBm"), gbc);
-        row++;
+        invContent.add(targetCombo, gbc);
         
-        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
-        panel.add(rssiStatsLabel, gbc);
+        gbc.gridx = 2; gbc.gridy = 1; gbc.gridwidth = 2;
+        JLabel targetDesc = new JLabel("<html><div style='width:300px; color:#888888;'>" +
+            "<b>A/B:</b> Lee solo tags en estado A o B<br>" +
+            "<b>A↔B:</b> Alterna entre ambos estados (máxima cobertura)" +
+            "</div></html>");
+        invContent.add(targetDesc, gbc);
         
-        gbc.gridy = row++; gbc.fill = GridBagConstraints.HORIZONTAL;
-        panel.add(new JSeparator(), gbc);
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1;
+        JLabel popLabel = new JLabel("Población estimada:");
+        popLabel.setFont(popLabel.getFont().deriveFont(Font.BOLD));
+        invContent.add(popLabel, gbc);
         
-        gbc.gridy = row++; gbc.fill = GridBagConstraints.NONE;
-        JLabel invTitle = new JLabel("Inventario C1G2");
-        invTitle.setFont(invTitle.getFont().deriveFont(Font.BOLD, 14f));
-        panel.add(invTitle, gbc);
-        
-        gbc.gridy = row; gbc.gridwidth = 1;
-        gbc.gridx = 0;
-        panel.add(new JLabel("Sesión:"), gbc);
         gbc.gridx = 1;
-        panel.add(sessionCombo, gbc);
+        invContent.add(tagPopulationSpinner, gbc);
+        
+        gbc.gridx = 2; gbc.gridwidth = 2;
+        JLabel popDesc = new JLabel("<html><div style='color:#888888;'>" +
+            "Cantidad aproximada de tags en el campo (optimiza tiempos de respuesta)" +
+            "</div></html>");
+        invContent.add(popDesc, gbc);
+        
+        inventorySection.add(invContent, BorderLayout.CENTER);
+        mainPanel.add(inventorySection);
+        mainPanel.add(Box.createVerticalStrut(15));
+        
+        // ========== SECCIÓN 2: MODO DENSE READER ==========
+        JPanel drmSection = createAdvancedSection(
+            "2. Modo Dense Reader (DRM)",
+            "Reduce interferencia electromagnética cuando hay múltiples lectores RFID operando en el mismo espacio."
+        );
+        
+        JPanel drmContent = new JPanel(new GridBagLayout());
+        drmContent.setOpaque(false);
+        gbc = new GridBagConstraints();
+        gbc.insets = new Insets(6, 8, 6, 8);
+        gbc.anchor = GridBagConstraints.WEST;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        invContent.add(denseReaderCheck, gbc);
+        drmContent.add(denseReaderCheck, gbc);
+        
+        gbc.gridx = 1;
+        JLabel rfLabel = new JLabel("Índice modo RF:");
+        rfLabel.setFont(rfLabel.getFont().deriveFont(Font.BOLD));
+        drmContent.add(rfLabel, gbc);
+        
         gbc.gridx = 2;
-        panel.add(new JLabel("Target:"), gbc);
+        drmContent.add(rfModeSpinner, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 4;
+        JLabel drmDesc = new JLabel("<html><div style='width:600px; color:#888888;'>" +
+            "<b>¿Cuándo activar?</b> Cuando hay 2 o más lectores en la misma área (almacén, línea de producción).<br>" +
+            "<b>Índice RF:</b> Cada lector debe usar un índice diferente para evitar colisiones de señal.<br>" +
+            "<b>Nota:</b> Activar DRM puede reducir ligeramente la velocidad de lectura." +
+            "</div></html>");
+        drmContent.add(drmDesc, gbc);
+        
+        drmSection.add(drmContent, BorderLayout.CENTER);
+        mainPanel.add(drmSection);
+        mainPanel.add(Box.createVerticalStrut(15));
+        
+        // ========== SECCIÓN 3: TRIGGER POR SENSOR GPI ==========
+        JPanel triggerSection = createAdvancedSection(
+            "3. Trigger Automático por Sensor (GPI)",
+            "Inicia o detiene la lectura automáticamente cuando un sensor externo detecta presencia."
+        );
+        
+        JPanel triggerContent = new JPanel(new GridBagLayout());
+        triggerContent.setOpaque(false);
+        gbc = new GridBagConstraints();
+        gbc.insets = new Insets(6, 8, 6, 8);
+        gbc.anchor = GridBagConstraints.WEST;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        triggerContent.add(gpiTriggerCheck, gbc);
+        
+        gbc.gridx = 1;
+        JLabel portLabel = new JLabel("Puerto GPI:");
+        portLabel.setFont(portLabel.getFont().deriveFont(Font.BOLD));
+        triggerContent.add(portLabel, gbc);
+        
+        gbc.gridx = 2;
+        triggerContent.add(gpiTriggerPortCombo, gbc);
+        
         gbc.gridx = 3;
-        panel.add(targetCombo, gbc);
-        row++;
+        JLabel stateLabel = new JLabel("Activar cuando:");
+        stateLabel.setFont(stateLabel.getFont().deriveFont(Font.BOLD));
+        triggerContent.add(stateLabel, gbc);
         
-        gbc.gridx = 0; gbc.gridy = row;
-        panel.add(new JLabel("Población tags:"), gbc);
+        gbc.gridx = 4;
+        triggerContent.add(gpiTriggerStateCombo, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 5;
+        JLabel triggerDesc = new JLabel("<html><div style='width:600px; color:#888888;'>" +
+            "<b>Uso típico:</b> Sensor de movimiento o barrera fotoeléctrica conectado a un puerto GPI.<br>" +
+            "<b>HIGH:</b> Activa lectura cuando el sensor detecta objeto (nivel alto).<br>" +
+            "<b>LOW:</b> Activa lectura cuando el sensor NO detecta objeto (nivel bajo).<br>" +
+            "<b>Ejemplo:</b> Un montacargas pasa frente al lector → sensor detecta → lectura automática." +
+            "</div></html>");
+        triggerContent.add(triggerDesc, gbc);
+        
+        triggerSection.add(triggerContent, BorderLayout.CENTER);
+        mainPanel.add(triggerSection);
+        mainPanel.add(Box.createVerticalStrut(15));
+        
+        // ========== SECCIÓN 4: FILTRADO RSSI GLOBAL ==========
+        JPanel rssiSection = createAdvancedSection(
+            "4. Filtrado Global por Intensidad de Señal (RSSI)",
+            "Filtra etiquetas por la fuerza de su señal. Tags con señal débil (lejanos) son ignorados."
+        );
+        
+        JPanel rssiContent = new JPanel(new GridBagLayout());
+        rssiContent.setOpaque(false);
+        gbc = new GridBagConstraints();
+        gbc.insets = new Insets(6, 8, 6, 8);
+        gbc.anchor = GridBagConstraints.WEST;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        rssiContent.add(rssiFilterCheck, gbc);
+        
         gbc.gridx = 1;
-        panel.add(tagPopulationSpinner, gbc);
-        row++;
+        JLabel threshLabel = new JLabel("Umbral mínimo:");
+        threshLabel.setFont(threshLabel.getFont().deriveFont(Font.BOLD));
+        rssiContent.add(threshLabel, gbc);
         
-        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
-        panel.add(new JSeparator(), gbc);
-        
-        gbc.gridy = row++;
-        JLabel drmTitle = new JLabel("Dense Reader Mode");
-        drmTitle.setFont(drmTitle.getFont().deriveFont(Font.BOLD, 14f));
-        panel.add(drmTitle, gbc);
-        
-        gbc.gridy = row; gbc.gridwidth = 1;
-        gbc.gridx = 0;
-        panel.add(denseReaderCheck, gbc);
-        gbc.gridx = 1;
-        panel.add(new JLabel("Índice modo RF:"), gbc);
         gbc.gridx = 2;
-        panel.add(rfModeSpinner, gbc);
-        row++;
+        rssiContent.add(rssiThresholdSpinner, gbc);
         
-        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
-        JLabel drmInfo = new JLabel("<html><i>DRM reduce interferencia cuando hay múltiples lectores cercanos.</i></html>");
-        panel.add(drmInfo, gbc);
-        
-        gbc.gridy = row++; gbc.fill = GridBagConstraints.HORIZONTAL;
-        panel.add(new JSeparator(), gbc);
-        
-        gbc.gridy = row++; gbc.fill = GridBagConstraints.NONE;
-        JLabel triggerTitle = new JLabel("Trigger por Sensor (GPI)");
-        triggerTitle.setFont(triggerTitle.getFont().deriveFont(Font.BOLD, 14f));
-        panel.add(triggerTitle, gbc);
-        
-        gbc.gridy = row; gbc.gridwidth = 1;
-        gbc.gridx = 0;
-        panel.add(gpiTriggerCheck, gbc);
-        gbc.gridx = 1;
-        panel.add(new JLabel("Puerto:"), gbc);
-        gbc.gridx = 2;
-        panel.add(gpiTriggerPortCombo, gbc);
         gbc.gridx = 3;
-        panel.add(gpiTriggerStateCombo, gbc);
-        row++;
+        rssiContent.add(new JLabel("dBm"), gbc);
         
-        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
-        JLabel triggerInfo = new JLabel("<html><i>Inicia/para lectura cuando el sensor detecta presencia.</i></html>");
-        panel.add(triggerInfo, gbc);
+        gbc.gridx = 4;
+        rssiContent.add(rssiStatsLabel, gbc);
         
-        gbc.gridy = row++; gbc.fill = GridBagConstraints.HORIZONTAL;
-        panel.add(new JSeparator(), gbc);
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 5;
+        JLabel rssiDesc = new JLabel("<html><div style='width:600px; color:#888888;'>" +
+            "<b>RSSI</b> = Received Signal Strength Indicator (Indicador de fuerza de señal recibida).<br>" +
+            "<b>Valores típicos:</b> -30 dBm (muy cerca) a -70 dBm (lejos). Valores menores = señal más débil.<br>" +
+            "<b>Ejemplo:</b> Umbral -50 dBm → Solo procesa tags con señal fuerte (cercanos al lector).<br>" +
+            "<b>Nota:</b> También puedes configurar filtros RSSI individuales por antena en la pestaña 'Antenas'." +
+            "</div></html>");
+        rssiContent.add(rssiDesc, gbc);
         
-        gbc.gridy = row++; gbc.fill = GridBagConstraints.NONE;
-        JLabel reportTitle = new JLabel("Reportes Avanzados");
-        reportTitle.setFont(reportTitle.getFont().deriveFont(Font.BOLD, 14f));
-        panel.add(reportTitle, gbc);
+        rssiSection.add(rssiContent, BorderLayout.CENTER);
+        mainPanel.add(rssiSection);
+        mainPanel.add(Box.createVerticalStrut(15));
         
-        gbc.gridy = row; gbc.gridwidth = 2;
-        gbc.gridx = 0;
-        panel.add(reportPhaseCheck, gbc);
-        gbc.gridx = 2;
-        panel.add(reportChannelCheck, gbc);
-        row++;
+        // ========== SECCIÓN 5: REPORTES ADICIONALES ==========
+        JPanel reportSection = createAdvancedSection(
+            "5. Datos Adicionales de Lectura",
+            "Información extra que el lector puede reportar para aplicaciones especializadas."
+        );
         
-        gbc.gridx = 0; gbc.gridy = row++; gbc.gridwidth = 4;
-        JLabel reportInfo = new JLabel("<html><i>Phase Angle es útil para localización de tags.</i></html>");
-        panel.add(reportInfo, gbc);
+        JPanel reportContent = new JPanel(new GridBagLayout());
+        reportContent.setOpaque(false);
+        gbc = new GridBagConstraints();
+        gbc.insets = new Insets(6, 8, 6, 8);
+        gbc.anchor = GridBagConstraints.WEST;
         
-        gbc.gridy = row; gbc.weighty = 1.0;
-        panel.add(new JLabel(), gbc);
+        gbc.gridx = 0; gbc.gridy = 0;
+        reportContent.add(reportPhaseCheck, gbc);
         
-        return panel;
+        gbc.gridx = 1;
+        JLabel phaseDesc = new JLabel("<html><div style='color:#888888;'>" +
+            "Ángulo de fase de la señal (usado para estimar distancia/posición del tag)" +
+            "</div></html>");
+        reportContent.add(phaseDesc, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1;
+        reportContent.add(reportChannelCheck, gbc);
+        
+        gbc.gridx = 1;
+        JLabel channelDesc = new JLabel("<html><div style='color:#888888;'>" +
+            "Frecuencia/canal RF usado para la lectura (útil para diagnóstico de interferencias)" +
+            "</div></html>");
+        reportContent.add(channelDesc, gbc);
+        
+        reportSection.add(reportContent, BorderLayout.CENTER);
+        mainPanel.add(reportSection);
+        
+        mainPanel.add(Box.createVerticalGlue());
+        
+        JScrollPane scrollPane = new JScrollPane(mainPanel);
+        scrollPane.setBorder(null);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.add(scrollPane, BorderLayout.CENTER);
+        
+        return wrapper;
+    }
+    
+    /**
+     * Crea una sección del panel avanzado con título y descripción.
+     * 
+     * @param title Título de la sección
+     * @param description Descripción de lo que hace esta sección
+     * @return Panel con estilo de sección
+     */
+    private JPanel createAdvancedSection(String title, String description) {
+        JPanel section = new JPanel(new BorderLayout(0, 8));
+        section.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(ModernUIStyle.BORDER_DEFAULT, 1),
+            BorderFactory.createEmptyBorder(12, 15, 12, 15)
+        ));
+        section.setBackground(ModernUIStyle.BG_CARD);
+        
+        JPanel header = new JPanel(new BorderLayout(0, 4));
+        header.setOpaque(false);
+        
+        JLabel titleLabel = new JLabel(title);
+        titleLabel.setFont(titleLabel.getFont().deriveFont(Font.BOLD, 14f));
+        titleLabel.setForeground(ModernUIStyle.ACCENT_PRIMARY);
+        header.add(titleLabel, BorderLayout.NORTH);
+        
+        JLabel descLabel = new JLabel("<html><div style='width:600px;'>" + description + "</div></html>");
+        descLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
+        descLabel.setFont(descLabel.getFont().deriveFont(Font.ITALIC, 11f));
+        header.add(descLabel, BorderLayout.CENTER);
+        
+        section.add(header, BorderLayout.NORTH);
+        
+        return section;
     }
     
     /**
