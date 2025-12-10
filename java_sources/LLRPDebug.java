@@ -294,7 +294,7 @@ public class LLRPDebug {
     private static void sendKeepaliveAck(DataOutputStream out, long messageId) throws IOException {
         // KEEPALIVE_ACK: Type 72
         byte[] msg = new byte[10];
-        int typeWord = (2 << 13) | 72; // Version 2 (LLRP 1.1), Type 72
+        int typeWord = (1 << 10) | 72; // Version 1 (LLRP 1.0.1), Type 72
         msg[0] = (byte)((typeWord >> 8) & 0xFF);
         msg[1] = (byte)(typeWord & 0xFF);
         // Length = 10
@@ -442,8 +442,9 @@ public class LLRPDebug {
     
     private static void sendMessage(DataOutputStream out, int type, int msgId, byte[] body) throws IOException {
         int length = 10 + body.length;
-        // Version 2 = LLRP 1.1 (bits 15-13 = 010)
-        int typeWord = (2 << 13) | (type & 0x3FF); // Version 2 + Type
+        // Header: Reserved (3 bits) + Version (3 bits) + Type (10 bits)
+        // Version 1 = LLRP 1.0.1 (bits 12-10 = 001)
+        int typeWord = (1 << 10) | (type & 0x3FF); // Version 1 + Type
         
         out.writeShort(typeWord);
         out.writeInt(length);
