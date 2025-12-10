@@ -114,9 +114,12 @@ public class ZebraSDKConnection implements RfidEventsListener {
     private void configureAntennas() {
         try {
             for (int ant = 1; ant <= 4; ant++) {
-                if (config.isAntennaEnabled(ant)) {
-                    int power = config.getAntennaPower(ant);
-                    int powerIndex = (power * maxPowerIndex) / 100;
+                AntennaConfig antConfig = config.getAntennaConfig(ant);
+                if (antConfig != null && antConfig.isEnabled()) {
+                    int powerIndex = antConfig.getPowerIndex();
+                    if (powerIndex > maxPowerIndex) {
+                        powerIndex = maxPowerIndex;
+                    }
                     
                     Antennas.AntennaRfConfig rfConfig = reader.Config.Antennas.getAntennaRfConfig(ant);
                     rfConfig.setTransmitPowerIndex(powerIndex);
@@ -124,14 +127,14 @@ public class ZebraSDKConnection implements RfidEventsListener {
                     rfConfig.setTari(0);
                     reader.Config.Antennas.setAntennaRfConfig(ant, rfConfig);
                     
-                    notifyStatus("Antena " + ant + " configurada: potencia " + power + "%");
+                    notifyStatus("Antena " + ant + " configurada: potencia índice " + powerIndex);
                 }
             }
             
             Antennas.SingulationControl singulation = reader.Config.Antennas.getSingulationControl(1);
             
             SESSION session = SESSION.SESSION_S0;
-            switch (config.getSession()) {
+            switch (config.getInventorySession()) {
                 case 0: session = SESSION.SESSION_S0; break;
                 case 1: session = SESSION.SESSION_S1; break;
                 case 2: session = SESSION.SESSION_S2; break;
@@ -143,7 +146,7 @@ public class ZebraSDKConnection implements RfidEventsListener {
             singulation.Action.setSLFlag(SL_FLAG.SL_ALL);
             reader.Config.Antennas.setSingulationControl(1, singulation);
             
-            notifyStatus("Singulación configurada: Sesión S" + config.getSession());
+            notifyStatus("Singulación configurada: Sesión S" + config.getInventorySession());
             
         } catch (Exception e) {
             notifyError("Error configurando antenas: " + e.getMessage());
@@ -264,7 +267,10 @@ public class ZebraSDKConnection implements RfidEventsListener {
             rfConfig.setTransmitPowerIndex(powerIndex);
             reader.Config.Antennas.setAntennaRfConfig(antenna, rfConfig);
             
-            config.setAntennaPower(antenna, powerPercent);
+            AntennaConfig antConfig = config.getAntennaConfig(antenna);
+            if (antConfig != null) {
+                antConfig.setTransmitPowerFromIndex(powerIndex);
+            }
             notifyStatus("Antena " + antenna + " potencia: " + powerPercent + "%");
             
         } catch (Exception e) {
@@ -278,7 +284,8 @@ public class ZebraSDKConnection implements RfidEventsListener {
         }
         
         try {
-            reader.Config.setGPOState(port, state);
+            GPO_PORT_STATE gpoState = state ? GPO_PORT_STATE.TRUE : GPO_PORT_STATE.FALSE;
+            reader.Config.GPO.setPortState(port, gpoState);
             return true;
         } catch (Exception e) {
             notifyError("Error GPO " + port + ": " + e.getMessage());
@@ -292,7 +299,8 @@ public class ZebraSDKConnection implements RfidEventsListener {
         }
         
         try {
-            return reader.Config.getGPIState(port);
+            GPI_PORT_STATE state = reader.Config.GPI.getPortState(port);
+            return state == GPI_PORT_STATE.GPI_PORT_STATE_HIGH;
         } catch (Exception e) {
             return false;
         }
@@ -309,11 +317,8 @@ public class ZebraSDKConnection implements RfidEventsListener {
                     short antenna = tag.getAntennaID();
                     short count = tag.getTagSeenCount();
                     
-                    TagData tagData = new TagData(epc);
-                    tagData.setRssi(rssi);
-                    tagData.setAntennaPort(antenna);
+                    TagData tagData = new TagData(epc, rssi, antenna, System.currentTimeMillis());
                     tagData.setReadCount(count);
-                    tagData.setLastSeen(System.currentTimeMillis());
                     
                     if (tagCallback != null) {
                         tagCallback.accept(tagData);

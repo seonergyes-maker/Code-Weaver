@@ -1398,7 +1398,7 @@ public class RFIDMainWindow extends JFrame {
         connectButton.setEnabled(true);
         disconnectButton.setEnabled(false);
         setStatus("Error de conexión: " + error);
-        statistics.recordConnectionError();
+        statistics.recordError("Connection error");
     }
     
     /**
@@ -1484,7 +1484,7 @@ public class RFIDMainWindow extends JFrame {
             }
         }
         
-        if (duplicateFilter.isEnabled() && duplicateFilter.isDuplicate(tag.getEpc())) {
+        if (duplicateFilter.isEnabled() && !duplicateFilter.shouldProcess(tag.getEpc())) {
             return;
         }
         
@@ -1501,10 +1501,10 @@ public class RFIDMainWindow extends JFrame {
             tagCache.put(epc, tag);
         }
         
-        statistics.recordTag(tag);
+        statistics.recordTagRead(tag);
         
         if (apiClient != null && apiClient.isRunning()) {
-            apiClient.sendTag(tag);
+            apiClient.enqueue(tag);
         }
         
         updateTagTable();
@@ -1580,7 +1580,7 @@ public class RFIDMainWindow extends JFrame {
      * Actualiza las estadísticas de la barra de estado.
      */
     private void updateStats() {
-        long total = statistics.getTotalTags();
+        long total = statistics.getTagsRead();
         int unique = tagCache.size();
         double tps = statistics.getTagsPerSecond();
         
@@ -1590,7 +1590,7 @@ public class RFIDMainWindow extends JFrame {
         statsLabel.setText(String.format("Tags: %d | Únicos: %d | TPS: %.1f", total, unique, tps));
         
         duplicateStatsLabel.setText(String.format("Filtrados: %d | Procesados: %d",
-            duplicateFilter.getFilteredCount(), duplicateFilter.getProcessedCount()));
+            duplicateFilter.getDuplicatesFiltered(), duplicateFilter.getUniqueTagsProcessed()));
         
         rssiStatsLabel.setText("Filtrados por RSSI: " + rssiFilteredCount);
     }
@@ -1640,7 +1640,7 @@ public class RFIDMainWindow extends JFrame {
     /**
      * Detiene el timer de actualización y libera recursos.
      */
-    private void shutdown() {
+    public void shutdown() {
         running = false;
         
         if (updateExecutor != null) {
@@ -1715,7 +1715,7 @@ public class RFIDMainWindow extends JFrame {
         
         if (!endpoint.isEmpty()) {
             apiClient = new APIClient(endpoint, key);
-            apiClient.setTrabajo(trabajo);
+            apiClient.setApiTrabajo(trabajo);
             apiClient.setDisplayHexMode(displayHexMode);
             apiClient.start();
             apiStatusLabel.setText("Cliente API iniciado");
