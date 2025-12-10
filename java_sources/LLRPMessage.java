@@ -547,16 +547,15 @@ public class LLRPMessage {
         ByteArrayOutputStream aiSpecBaos = new ByteArrayOutputStream();
         DataOutputStream aiSpecDos = new DataOutputStream(aiSpecBaos);
         
-        // AntennaIDs: usar 0 para "todas las antenas conectadas" (más compatible)
-        // Esto es según la especificación LLRP y ejemplos de Zebra
+        // AntennaIDs: usar antenna 1 específicamente
         aiSpecDos.writeShort(1);  // count = 1
-        aiSpecDos.writeShort(0);  // AntennaID = 0 significa "todas las antenas"
+        aiSpecDos.writeShort(1);  // AntennaID = 1
         
-        // AISpecStopTrigger (type 184) - Null trigger
+        // AISpecStopTrigger (type 184) - Duration trigger para forzar ciclos de inventario
         aiSpecDos.writeShort((PARAM_AISPEC_STOP_TRIGGER & 0x03FF));
         aiSpecDos.writeShort(9); // length = 4 header + 1 type + 4 duration
-        aiSpecDos.writeByte(0);  // AISpecStopTriggerType = 0 (Null)
-        aiSpecDos.writeInt(0);   // DurationTrigger = 0
+        aiSpecDos.writeByte(1);  // AISpecStopTriggerType = 1 (Duration)
+        aiSpecDos.writeInt(500); // DurationTrigger = 500ms (ciclo rápido)
         
         // InventoryParameterSpec (type 186)
         writeInventoryParameterSpecSimple(aiSpecDos, inventoryParamSpecId);
