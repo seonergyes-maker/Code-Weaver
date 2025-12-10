@@ -1,0 +1,133 @@
+C:\Users\enrique.aguilar\Downloads>java -jar Main.jar -d 192.168.1.117
+========================================
+  Zebra FX7500 RFID Manager
+  Versión 1.0.0
+========================================
+
+[Args] Modo debug LLRP habilitado
+[Args] IP del lector: 192.168.1.117
+[Config] Configuración cargada desde: rfid_config.json
+[Config] IP del lector establecida a: 192.168.1.117
+
+========================================
+  DEBUG LLRP - Análisis de tráfico
+========================================
+IP del lector: 192.168.1.117
+Duración: 30 segundos
+
+========================================
+  DEBUG LLRP - Análisis de tráfico
+========================================
+IP: 192.168.1.117
+Puerto: 5084
+Duración: 30 segundos
+
+[1] Conectando...
+    OK - Conectado a /192.168.1.117:5084
+[READER] Thread de lectura iniciado
+[EVENTO] READER_EVENT_NOTIFICATION ID:30
+[2] Enviando DELETE_ROSPEC(0)...
+[MSG] DELETE_ROSPEC_RESPONSE (Type:31) ID:1 -> OK
+[3] Enviando ADD_ROSPEC...
+[MSG] ADD_ROSPEC_RESPONSE (Type:30) ID:2 -> OK
+[EVENTO] READER_EVENT_NOTIFICATION ID:32
+[4] Enviando ENABLE_ROSPEC...
+[MSG] ENABLE_ROSPEC_RESPONSE (Type:34) ID:3 -> OK
+[EVENTO] READER_EVENT_NOTIFICATION ID:34
+[5] Enviando START_ROSPEC...
+[MSG] START_ROSPEC_RESPONSE (Type:32) ID:4 -> OK
+[EVENTO] READER_EVENT_NOTIFICATION ID:36
+
+========================================
+  MONITOREANDO TRÁFICO (30s)
+========================================
+
+[EVENTO] READER_EVENT_NOTIFICATION ID:38
+[  1s] Mensajes: 10 (+10) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:40
+[  2s] Mensajes: 11 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:42
+[  3s] Mensajes: 12 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:44
+[  4s] Mensajes: 13 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:46
+[  5s] Mensajes: 14 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:48
+[  6s] Mensajes: 15 (+1) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[EVENTO] READER_EVENT_NOTIFICATION ID:50
+[  7s] Mensajes: 16 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:52
+[EVENTO] READER_EVENT_NOTIFICATION ID:54
+[  8s] Mensajes: 18 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:56
+[  9s] Mensajes: 19 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:58
+[ 10s] Mensajes: 20 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:60
+[ 11s] Mensajes: 21 (+1) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[EVENTO] READER_EVENT_NOTIFICATION ID:62
+[ 12s] Mensajes: 22 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:64
+[ 13s] Mensajes: 23 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:66
+[ 14s] Mensajes: 24 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:68
+[ 15s] Mensajes: 25 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:70
+[ 16s] Mensajes: 26 (+1) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[EVENTO] READER_EVENT_NOTIFICATION ID:72
+[ 17s] Mensajes: 27 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:74
+[EVENTO] READER_EVENT_NOTIFICATION ID:76
+[ 18s] Mensajes: 29 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:78
+[EVENTO] READER_EVENT_NOTIFICATION ID:80
+[ 19s] Mensajes: 31 (+2) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:82
+[ 20s] Mensajes: 32 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:84
+[ 21s] Mensajes: 33 (+1) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[EVENTO] READER_EVENT_NOTIFICATION ID:86
+[EVENTO] READER_EVENT_NOTIFICATION ID:88
+[ 22s] Mensajes: 35 (+2) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:90
+[ 23s] Mensajes: 36 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:92
+[ 24s] Mensajes: 37 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:94
+[EVENTO] READER_EVENT_NOTIFICATION ID:96
+[ 25s] Mensajes: 39 (+2) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:98
+[ 26s] Mensajes: 40 (+1) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[EVENTO] READER_EVENT_NOTIFICATION ID:100
+[ 27s] Mensajes: 41 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:102
+[ 28s] Mensajes: 42 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:104
+[ 29s] Mensajes: 43 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[EVENTO] READER_EVENT_NOTIFICATION ID:106
+[EVENTO] READER_EVENT_NOTIFICATION ID:108
+[ 30s] Mensajes: 45 (+1) | RO_ACCESS_REPORT: 0 (+0)
+
+[6] Deteniendo ROSpec...
+[MSG] STOP_ROSPEC_RESPONSE (Type:33) ID:5 -> OK
+[READER] Thread de lectura terminado
+[7] Cerrando conexión...
+
+========================================
+  RESULTADOS
+========================================
+Total mensajes recibidos: 46
+Total RO_ACCESS_REPORT: 0
+
+DIAGNÓSTICO: No se recibieron RO_ACCESS_REPORT
+Posibles causas:
+  1. El ROSpec no se inició correctamente
+  2. No hay tags en el rango de la antena
+  3. Problema de configuración del lector
+  4. El lector no está enviando reportes por esta conexión

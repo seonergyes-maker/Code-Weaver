@@ -194,6 +194,11 @@ public class LLRPDebug {
             sendDeleteRoSpec(out, 0, 1);
             Thread.sleep(500);
             
+            // Configurar antena
+            System.out.println("[2.5] Enviando SET_READER_CONFIG (Antena)...");
+            sendSetReaderConfig(out, 10);
+            Thread.sleep(500);
+            
             // Enviar ADD_ROSPEC
             System.out.println("[3] Enviando ADD_ROSPEC...");
             sendAddRoSpec(out, 2);
@@ -631,6 +636,54 @@ public class LLRPDebug {
     private static void sendGetReport(DataOutputStream out, int msgId) throws IOException {
         // GET_REPORT: Type 60
         sendMessage(out, 60, msgId, new byte[0]);
+    }
+    
+    private static void sendSetReaderConfig(DataOutputStream out, int msgId) throws IOException {
+        // SET_READER_CONFIG: Type 3
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        
+        // ResetToFactoryDefault = false (solo modificar lo que especificamos)
+        dos.writeByte(0);
+        
+        // AntennaConfiguration (Type 222) - para antena 1
+        ByteArrayOutputStream antBaos = new ByteArrayOutputStream();
+        DataOutputStream antDos = new DataOutputStream(antBaos);
+        antDos.writeShort(1); // AntennaID = 1
+        
+        // RFReceiver (Type 223) - sensibilidad
+        ByteArrayOutputStream rxBaos = new ByteArrayOutputStream();
+        DataOutputStream rxDos = new DataOutputStream(rxBaos);
+        rxDos.writeShort(1); // ReceiverSensitivity = index 1 (máxima sensibilidad)
+        writeParameter(antDos, 223, rxBaos.toByteArray());
+        
+        // RFTransmitter (Type 224) - potencia
+        ByteArrayOutputStream txBaos = new ByteArrayOutputStream();
+        DataOutputStream txDos = new DataOutputStream(txBaos);
+        txDos.writeShort(1);   // HopTableID
+        txDos.writeShort(0);   // ChannelIndex (0 = usar hopping)
+        txDos.writeShort(300); // TransmitPower = index 300 (alto, ajustar según capabilities)
+        writeParameter(antDos, 224, txBaos.toByteArray());
+        
+        writeParameter(dos, 222, antBaos.toByteArray());
+        
+        // ROReportSpec global (Type 237) - configurar reportes inmediatos
+        ByteArrayOutputStream reportBaos = new ByteArrayOutputStream();
+        DataOutputStream reportDos = new DataOutputStream(reportBaos);
+        reportDos.writeByte(1);  // ROReportTrigger = Upon_N_Tags (1)
+        reportDos.writeShort(1); // N = 1 (cada tag)
+        
+        // TagReportContentSelector (Type 238)
+        ByteArrayOutputStream tagBaos = new ByteArrayOutputStream();
+        DataOutputStream tagDos = new DataOutputStream(tagBaos);
+        // Habilitar todos los campos importantes
+        short enableMask = (short)0b1111011110_000000; // ROSpecID, SpecIndex, InvParamSpecID, AntennaID, PeakRSSI, FirstSeen, LastSeen, TagSeenCount
+        tagDos.writeShort(enableMask);
+        writeParameter(reportDos, 238, tagBaos.toByteArray());
+        
+        writeParameter(dos, 237, reportBaos.toByteArray());
+        
+        sendMessage(out, 3, msgId, baos.toByteArray());
     }
     
     private static void writeParameter(DataOutputStream out, int type, byte[] data) throws IOException {
