@@ -145,7 +145,14 @@ public class TestLLRP4J {
             LlrpMessage startResp = client.transact(startRospec);
             if (startResp instanceof START_ROSPEC_RESPONSE) {
                 START_ROSPEC_RESPONSE resp = (START_ROSPEC_RESPONSE) startResp;
-                System.out.println("    Respuesta: " + resp.llrpStatus().statusCode());
+                StatusCode startStatus = resp.llrpStatus().statusCode();
+                System.out.println("    Respuesta: " + startStatus);
+                if (startStatus != StatusCode.M_Success) {
+                    String errorDesc = resp.llrpStatus().errorDescription();
+                    System.out.println("    ERROR: " + errorDesc);
+                    // Intentar obtener más detalles del error
+                    System.out.println("    Detalles: " + resp.llrpStatus());
+                }
             }
             System.out.println("    OK - Lectura iniciada!");
             
@@ -306,11 +313,11 @@ public class TestLLRP4J {
         rospec.priority(0);
         rospec.currentState(ROSpecState.Disabled);
         
-        // ROBoundarySpec - Trigger inmediato
+        // ROBoundarySpec - Trigger Null (se inicia con START_ROSPEC)
         ROBoundarySpec boundarySpec = new ROBoundarySpec();
         
         ROSpecStartTrigger startTrigger = new ROSpecStartTrigger();
-        startTrigger.roSpecStartTriggerType(ROSpecStartTriggerType.Immediate);
+        startTrigger.roSpecStartTriggerType(ROSpecStartTriggerType.Null);
         boundarySpec.roSpecStartTrigger(startTrigger);
         
         ROSpecStopTrigger stopTrigger = new ROSpecStopTrigger();
@@ -320,9 +327,9 @@ public class TestLLRP4J {
         
         rospec.roBoundarySpec(boundarySpec);
         
-        // AISpec - todas las antenas
+        // AISpec - antena 0 = todas las antenas disponibles
         AISpec aiSpec = new AISpec();
-        aiSpec.antennaIDs(new int[]{1, 2, 3, 4}); // Antenas específicas
+        aiSpec.antennaIDs(new int[]{0}); // 0 = todas las antenas
         
         AISpecStopTrigger aiStopTrigger = new AISpecStopTrigger();
         aiStopTrigger.aiSpecStopTriggerType(AISpecStopTriggerType.Null);
@@ -341,10 +348,10 @@ public class TestLLRP4J {
         specParams.add(aiSpec);
         rospec.specParameter(specParams);
         
-        // ROReportSpec - Reporte inmediato por cada tag
+        // ROReportSpec - Reporte por cada N tags
         ROReportSpec reportSpec = new ROReportSpec();
-        reportSpec.roReportTrigger(ROReportTriggerType.Upon_N_Tags_Or_End_Of_ROSpec);
-        reportSpec.n(1);  // Reportar cada tag individualmente
+        reportSpec.roReportTrigger(ROReportTriggerType.Upon_N_Tags_Or_End_Of_AISpec);
+        reportSpec.n(1);  // Reportar cada tag
         
         TagReportContentSelector contentSelector = new TagReportContentSelector();
         contentSelector.enableROSpecID(true);

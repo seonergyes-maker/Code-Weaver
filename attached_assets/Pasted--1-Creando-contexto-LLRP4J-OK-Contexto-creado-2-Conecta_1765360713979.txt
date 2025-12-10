@@ -1,0 +1,71 @@
+[1] Creando contexto LLRP4J...
+    OK - Contexto creado
+[2] Conectando a 192.168.1.117:5084...
+[main] INFO net.enilink.llrp4j.net.IoHandler - LLRP reader reported successfull connection attempt (ConnectionAttemptEvent.Status = Success)
+    OK - Conectado!
+[2.5] Configurando Reader Events...
+    OK - Eventos configurados
+[3] Eliminando ROSpecs existentes...
+    OK - ROSpecs eliminados
+[4] Creando ROSpec...
+    OK - ROSpec creado
+[5] Habilitando ROSpec...
+    Respuesta: M_Success
+    OK - ROSpec habilitado
+[6] Iniciando lectura...
+    Respuesta: M_FieldError
+    OK - Lectura iniciada!
+
+========================================
+  ESPERANDO TAGS (30 segundos)...
+========================================
+
+[  1s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[  2s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[  3s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[  4s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[  5s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[  6s] Tags: 0 (+0) | Mensajes: 0 (+0)
+    [Solicitando reporte...]
+[  7s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[  8s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[  9s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 10s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 11s] Tags: 0 (+0) | Mensajes: 0 (+0)
+    [Solicitando reporte...]
+[ 12s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 13s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 14s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 15s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 16s] Tags: 0 (+0) | Mensajes: 0 (+0)
+    [Solicitando reporte...]
+[ 17s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 18s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 19s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 20s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 21s] Tags: 0 (+0) | Mensajes: 0 (+0)
+    [Solicitando reporte...]
+[ 22s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 23s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 24s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 25s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 26s] Tags: 0 (+0) | Mensajes: 0 (+0)
+    [Solicitando reporte...]
+[ 27s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 28s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 29s] Tags: 0 (+0) | Mensajes: 0 (+0)
+[ 30s] Tags: 0 (+0) | Mensajes: 0 (+0)
+
+[7] Deteniendo lectura...
+    OK - Lectura detenida
+[8] Cerrando conexión...
+    OK - Desconectado
+
+========================================
+  RESULTADOS
+========================================
+Total de tags leídos: 0
+Total de mensajes recibidos: 0
+Promedio: 0,0 tags/segundo
+
+C:\Users\enrique.aguilar\Downloads>
