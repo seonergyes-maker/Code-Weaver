@@ -1,0 +1,40 @@
+[LLRP] Paso 4: Habilitando ROSpec...
+[LLRP-RX] Mensaje recibido: tipo=ENABLE_ROSPEC_RESPONSE (34), id=10, payload=8 bytes
+[LLRP] ROSpec habilitado OK
+[LLRP] Paso 5: Iniciando ROSpec...
+[LLRP-RX] Mensaje recibido: tipo=START_ROSPEC_RESPONSE (32), id=12, payload=8 bytes
+[LLRP] ROSpec iniciado OK - Lectura activa!
+[RFID] Lectura iniciada correctamente
+[LLRP-RX] Mensaje recibido: tipo=KEEPALIVE (62), id=214, payload=0 bytes
+[LLRP-RX] Mensaje recibido: tipo=KEEPALIVE (62), id=215, payload=0 bytes
+[LLRP-RX] Mensaje recibido: tipo=KEEPALIVE (62), id=216, payload=0 bytes
+[Config] Formato EPC cambiado a: Decimal
+[LLRP-RX] Mensaje recibido: tipo=STOP_ROSPEC_RESPONSE (33), id=20, payload=8 bytes
+[LLRP-RX] Mensaje recibido: tipo=DELETE_ROSPEC_RESPONSE (31), id=22, payload=8 bytes
+[RFID] Lectura detenida
+[LLRP] Iniciando lectura - ROSpec ID: 1
+[LLRP] Antenas habilitadas: [1, 2]
+[LLRP] Paso 1: Eliminando ROSpecs existentes...
+[LLRP-RX] Mensaje recibido: tipo=DELETE_ROSPEC_RESPONSE (31), id=24, payload=8 bytes
+[LLRP] ROSpecs eliminados OK
+[LLRP] Paso 2: Configurando antenas...
+[LLRP-RX] Mensaje recibido: tipo=SET_READER_CONFIG_RESPONSE (13), id=26, payload=280 bytes
+[LLRP] Advertencia: No se pudo configurar antenas, usando configuración por defecto
+[LLRP] Paso 3: Agregando ROSpec...
+[LLRP] Enviando ADD_ROSPEC, tamaño payload: 72 bytes
+[LLRP] ADD_ROSPEC payload HEX: 00B1004800000001000000B2001200B300050100B60009000000000000B7001A00020001000200B80009000000000000BA000700010100ED001201000100EE000B03FF015C0005C0
+[LLRP-RX] Mensaje recibido: tipo=ADD_ROSPEC_RESPONSE (30), id=28, payload=8 bytes
+[LLRP] ADD_ROSPEC respuesta - código: 0, descripción: Success
+[LLRP] Payload respuesta: 011F000800000000
+[LLRP] ROSpec agregado OK
+[LLRP] Paso 4: Habilitando ROSpec...
+[LLRP-RX] Mensaje recibido: tipo=ENABLE_ROSPEC_RESPONSE (34), id=30, payload=8 bytes
+[LLRP] ROSpec habilitado OK
+[LLRP] Paso 5: Iniciando ROSpec...
+[LLRP-RX] Mensaje recibido: tipo=START_ROSPEC_RESPONSE (32), id=32, payload=8 bytes
+[LLRP] ROSpec iniciado OK - Lectura activa!
+[RFID] Lectura iniciada correctamente
+[LLRP-RX] Mensaje recibido: tipo=KEEPALIVE (62), id=217, payload=0 bytes
+[LLRP-RX] Mensaje recibido: tipo=STOP_ROSPEC_RESPONSE (33), id=36, payload=8 bytes
+[LLRP-RX] Mensaje recibido: tipo=DELETE_ROSPEC_RESPONSE (31), id=38, payload=8 bytes
+[RFID] Lectura detenida

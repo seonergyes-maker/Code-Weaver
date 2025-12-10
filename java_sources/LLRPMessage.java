@@ -547,11 +547,10 @@ public class LLRPMessage {
         ByteArrayOutputStream aiSpecBaos = new ByteArrayOutputStream();
         DataOutputStream aiSpecDos = new DataOutputStream(aiSpecBaos);
         
-        // AntennaIDs (count + list of antenna IDs)
-        aiSpecDos.writeShort(antennaPorts.length);
-        for (int port : antennaPorts) {
-            aiSpecDos.writeShort(port);
-        }
+        // AntennaIDs: usar 0 para "todas las antenas conectadas" (más compatible)
+        // Esto es según la especificación LLRP y ejemplos de Zebra
+        aiSpecDos.writeShort(1);  // count = 1
+        aiSpecDos.writeShort(0);  // AntennaID = 0 significa "todas las antenas"
         
         // AISpecStopTrigger (type 184) - Null trigger
         aiSpecDos.writeShort((PARAM_AISPEC_STOP_TRIGGER & 0x03FF));
