@@ -93,15 +93,9 @@ public class LLRPDebug {
                         // Mostrar mensaje recibido
                         if (messageType == 61) { // RO_ACCESS_REPORT
                             roAccessReportCount[0]++;
-                            System.out.println("[>>> RO_ACCESS_REPORT] ID:" + messageId + " Len:" + messageLength + " Body:" + bodyLength + " bytes");
-                            // Mostrar primeros bytes del body para debug
-                            if (bodyLength > 0) {
-                                StringBuilder hex = new StringBuilder();
-                                for (int i = 0; i < Math.min(50, bodyLength); i++) {
-                                    hex.append(String.format("%02X ", body[i]));
-                                }
-                                System.out.println("    Data: " + hex.toString() + (bodyLength > 50 ? "..." : ""));
-                            }
+                            System.out.println("[>>> RO_ACCESS_REPORT] ID:" + messageId);
+                            // Parsear TagReportData parameters
+                            parseTagReportData(body);
                         } else if (messageType == 100) { // ERROR_MESSAGE
                             System.out.println("[!!! ERROR_MESSAGE] ID:" + messageId + " Len:" + messageLength);
                             // Parsear LLRPStatus del error
@@ -309,6 +303,138 @@ public class LLRPDebug {
             case 200: return "A_Invalid";
             case 201: return "A_OutOfRange";
             default: return "Unknown(" + code + ")";
+        }
+    }
+    
+    private static void parseTagReportData(byte[] data) {
+        if (data == null || data.length == 0) {
+            System.out.println("    (sin datos)");
+            return;
+        }
+        
+        int offset = 0;
+        int tagCount = 0;
+        
+        while (offset + 4 <= data.length) {
+            // Leer TLV header: Type (2 bytes) + Length (2 bytes)
+            int paramType = ((data[offset] & 0x3F) << 8) | (data[offset + 1] & 0xFF);
+            int paramLen = ((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF);
+            
+            if (paramLen < 4 || offset + paramLen > data.length) {
+                break;
+            }
+            
+            // TagReportData = Type 240
+            if (paramType == 240) {
+                tagCount++;
+                parseOneTag(data, offset + 4, paramLen - 4, tagCount);
+            }
+            
+            offset += paramLen;
+        }
+        
+        if (tagCount == 0) {
+            System.out.println("    (reporte vacío - sin tags)");
+            // Mostrar bytes crudos para debug
+            StringBuilder hex = new StringBuilder();
+            for (int i = 0; i < Math.min(60, data.length); i++) {
+                hex.append(String.format("%02X ", data[i]));
+            }
+            System.out.println("    Raw: " + hex.toString() + (data.length > 60 ? "..." : ""));
+        }
+    }
+    
+    private static void parseOneTag(byte[] data, int start, int len, int tagNum) {
+        String epc = "";
+        int rssi = 0;
+        int antennaId = 0;
+        
+        int offset = start;
+        int end = start + len;
+        
+        while (offset + 2 <= end) {
+            int b0 = data[offset] & 0xFF;
+            
+            // Verificar si es TV parameter (bit 7 set) o TLV
+            if ((b0 & 0x80) != 0) {
+                // TV Parameter (1-byte type, variable length)
+                int tvType = b0 & 0x7F;
+                
+                if (tvType == 1) { // AntennaID (TV)
+                    if (offset + 3 <= end) {
+                        antennaId = ((data[offset + 1] & 0xFF) << 8) | (data[offset + 2] & 0xFF);
+                        offset += 3;
+                    } else {
+                        offset++;
+                    }
+                } else if (tvType == 6) { // PeakRSSI (TV)
+                    if (offset + 2 <= end) {
+                        rssi = data[offset + 1]; // signed byte
+                        offset += 2;
+                    } else {
+                        offset++;
+                    }
+                } else {
+                    // Otro TV, saltar según tipo conocido
+                    offset += getTVLength(tvType);
+                    if (offset > end) offset = end;
+                }
+            } else {
+                // TLV Parameter
+                if (offset + 4 > end) break;
+                
+                int paramType = ((b0 & 0x3F) << 8) | (data[offset + 1] & 0xFF);
+                int paramLen = ((data[offset + 2] & 0xFF) << 8) | (data[offset + 3] & 0xFF);
+                
+                if (paramLen < 4 || offset + paramLen > end) {
+                    offset += 4;
+                    continue;
+                }
+                
+                // EPCData = Type 241, EPC-96 = Type 13
+                if (paramType == 241) {
+                    // EPCData: NumBits (2 bytes) + EPC bytes
+                    if (paramLen > 6) {
+                        int numBits = ((data[offset + 4] & 0xFF) << 8) | (data[offset + 5] & 0xFF);
+                        int numBytes = (numBits + 7) / 8;
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = 0; i < numBytes && offset + 6 + i < end; i++) {
+                            sb.append(String.format("%02X", data[offset + 6 + i] & 0xFF));
+                        }
+                        epc = sb.toString();
+                    }
+                } else if (paramType == 13) {
+                    // EPC-96: 96 bits = 12 bytes
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 4; i < paramLen && offset + i < end; i++) {
+                        sb.append(String.format("%02X", data[offset + i] & 0xFF));
+                    }
+                    epc = sb.toString();
+                }
+                
+                offset += paramLen;
+            }
+        }
+        
+        System.out.printf("    TAG #%d: EPC=%s RSSI=%ddBm Ant=%d%n", 
+            tagNum, epc.isEmpty() ? "(no EPC)" : epc, rssi, antennaId);
+    }
+    
+    private static int getTVLength(int tvType) {
+        // Longitudes conocidas de TV parameters
+        switch (tvType) {
+            case 1: return 3;  // AntennaID
+            case 2: return 3;  // ChannelIndex  
+            case 3: return 9;  // FirstSeenTimestampUTC
+            case 4: return 9;  // FirstSeenTimestampUptime
+            case 5: return 9;  // LastSeenTimestampUTC
+            case 6: return 2;  // PeakRSSI
+            case 7: return 3;  // TagSeenCount
+            case 8: return 3;  // ROSpecID (short)
+            case 9: return 3;  // SpecIndex
+            case 10: return 3; // InventoryParameterSpecID
+            case 14: return 5; // ROSpecID (int)
+            default: return 2; // Mínimo
         }
     }
     
