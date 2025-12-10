@@ -420,7 +420,7 @@ public class LLRPMessage {
     private static void writeTLVParameter(DataOutputStream dos, int type, byte[] value) 
             throws IOException {
         int length = 4 + value.length;
-        dos.writeShort((type & 0x03FF) | 0x0400);
+        dos.writeShort(type & 0x03FF);  // Solo el tipo, sin bits adicionales
         dos.writeShort(length);
         dos.write(value);
     }
@@ -464,14 +464,14 @@ public class LLRPMessage {
         rfTxDos.flush();
         
         byte[] rfTxData = rfTxBaos.toByteArray();
-        paramDos.writeShort((PARAM_RF_TRANSMITTER & 0x03FF) | 0x0400);
+        paramDos.writeShort((PARAM_RF_TRANSMITTER & 0x03FF));
         paramDos.writeShort(4 + rfTxData.length);
         paramDos.write(rfTxData);
         
         paramDos.flush();
         
         byte[] paramData = paramBaos.toByteArray();
-        dos.writeShort((PARAM_ANTENNA_CONFIGURATION & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_ANTENNA_CONFIGURATION & 0x03FF));
         dos.writeShort(4 + paramData.length);
         dos.write(paramData);
     }
@@ -505,7 +505,7 @@ public class LLRPMessage {
         byte[] roSpecData = roSpecBaos.toByteArray();
         
         // TLV header for ROSpec (type 177)
-        dos.writeShort((PARAM_ROSPEC & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_ROSPEC & 0x03FF));
         dos.writeShort(4 + roSpecData.length);
         dos.write(roSpecData);
     }
@@ -520,12 +520,12 @@ public class LLRPMessage {
         DataOutputStream boundaryDos = new DataOutputStream(boundaryBaos);
         
         // ROSpecStartTrigger (type 179) - Immediate trigger (start when enabled)
-        boundaryDos.writeShort((PARAM_ROSPEC_START_TRIGGER & 0x03FF) | 0x0400);
+        boundaryDos.writeShort((PARAM_ROSPEC_START_TRIGGER & 0x03FF));
         boundaryDos.writeShort(5); // length = 4 header + 1 byte trigger type
         boundaryDos.writeByte(1);  // ROSpecStartTriggerType = 1 (Immediate) <-- CAMBIADO DE 0 A 1
         
         // ROSpecStopTrigger (type 182) - Null trigger (run forever)
-        boundaryDos.writeShort((PARAM_ROSPEC_STOP_TRIGGER & 0x03FF) | 0x0400);
+        boundaryDos.writeShort((PARAM_ROSPEC_STOP_TRIGGER & 0x03FF));
         boundaryDos.writeShort(9); // length = 4 header + 1 byte type + 4 bytes duration
         boundaryDos.writeByte(0);  // ROSpecStopTriggerType = 0 (Null)
         boundaryDos.writeInt(0);   // DurationTriggerValue = 0
@@ -534,7 +534,7 @@ public class LLRPMessage {
         byte[] boundaryData = boundaryBaos.toByteArray();
         
         // ROBoundarySpec (type 178)
-        dos.writeShort((PARAM_RO_BOUNDARY_SPEC & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_RO_BOUNDARY_SPEC & 0x03FF));
         dos.writeShort(4 + boundaryData.length);
         dos.write(boundaryData);
     }
@@ -554,7 +554,7 @@ public class LLRPMessage {
         }
         
         // AISpecStopTrigger (type 184) - Null trigger
-        aiSpecDos.writeShort((PARAM_AISPEC_STOP_TRIGGER & 0x03FF) | 0x0400);
+        aiSpecDos.writeShort((PARAM_AISPEC_STOP_TRIGGER & 0x03FF));
         aiSpecDos.writeShort(9); // length = 4 header + 1 type + 4 duration
         aiSpecDos.writeByte(0);  // AISpecStopTriggerType = 0 (Null)
         aiSpecDos.writeInt(0);   // DurationTrigger = 0
@@ -566,7 +566,7 @@ public class LLRPMessage {
         byte[] aiSpecData = aiSpecBaos.toByteArray();
         
         // AISpec (type 183)
-        dos.writeShort((PARAM_AISPEC & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_AISPEC & 0x03FF));
         dos.writeShort(4 + aiSpecData.length);
         dos.write(aiSpecData);
     }
@@ -588,7 +588,7 @@ public class LLRPMessage {
         byte[] invData = invBaos.toByteArray();
         
         // InventoryParameterSpec (type 186)
-        dos.writeShort((PARAM_INVENTORY_PARAMETER_SPEC & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_INVENTORY_PARAMETER_SPEC & 0x03FF));
         dos.writeShort(4 + invData.length);
         dos.write(invData);
     }
@@ -617,14 +617,14 @@ public class LLRPMessage {
         selectorDos.writeShort(0x03FF);
         
         // C1G2EPCMemorySelector (type 348)
-        selectorDos.writeShort((348 & 0x03FF) | 0x0400);
+        selectorDos.writeShort((348 & 0x03FF));
         selectorDos.writeShort(5); // 4 header + 1 byte
         selectorDos.writeByte(0xC0); // EnableCRC=1, EnablePCBits=1
         
         selectorDos.flush();
         byte[] selectorData = selectorBaos.toByteArray();
         
-        reportDos.writeShort((PARAM_TAG_REPORT_CONTENT_SELECTOR & 0x03FF) | 0x0400);
+        reportDos.writeShort((PARAM_TAG_REPORT_CONTENT_SELECTOR & 0x03FF));
         reportDos.writeShort(4 + selectorData.length);
         reportDos.write(selectorData);
         
@@ -632,7 +632,7 @@ public class LLRPMessage {
         byte[] reportData = reportBaos.toByteArray();
         
         // ROReportSpec (type 237)
-        dos.writeShort((PARAM_RO_REPORT_SPEC & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_RO_REPORT_SPEC & 0x03FF));
         dos.writeShort(4 + reportData.length);
         dos.write(reportData);
     }
@@ -650,7 +650,7 @@ public class LLRPMessage {
         startTriggerDos.flush();
         byte[] startTriggerData = startTriggerBaos.toByteArray();
         
-        boundaryDos.writeShort((PARAM_ROSPEC_START_TRIGGER & 0x03FF) | 0x0400);
+        boundaryDos.writeShort((PARAM_ROSPEC_START_TRIGGER & 0x03FF));
         boundaryDos.writeShort(4 + startTriggerData.length);
         boundaryDos.write(startTriggerData);
         
@@ -661,14 +661,14 @@ public class LLRPMessage {
         stopTriggerDos.flush();
         byte[] stopTriggerData = stopTriggerBaos.toByteArray();
         
-        boundaryDos.writeShort((PARAM_ROSPEC_STOP_TRIGGER & 0x03FF) | 0x0400);
+        boundaryDos.writeShort((PARAM_ROSPEC_STOP_TRIGGER & 0x03FF));
         boundaryDos.writeShort(4 + stopTriggerData.length);
         boundaryDos.write(stopTriggerData);
         
         boundaryDos.flush();
         byte[] boundaryData = boundaryBaos.toByteArray();
         
-        dos.writeShort((PARAM_RO_BOUNDARY_SPEC & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_RO_BOUNDARY_SPEC & 0x03FF));
         dos.writeShort(4 + boundaryData.length);
         dos.write(boundaryData);
     }
@@ -693,7 +693,7 @@ public class LLRPMessage {
         stopTriggerDos.flush();
         byte[] stopTriggerData = stopTriggerBaos.toByteArray();
         
-        aiSpecDos.writeShort((PARAM_AISPEC_STOP_TRIGGER & 0x03FF) | 0x0400);
+        aiSpecDos.writeShort((PARAM_AISPEC_STOP_TRIGGER & 0x03FF));
         aiSpecDos.writeShort(4 + stopTriggerData.length);
         aiSpecDos.write(stopTriggerData);
         
@@ -702,7 +702,7 @@ public class LLRPMessage {
         aiSpecDos.flush();
         byte[] aiSpecData = aiSpecBaos.toByteArray();
         
-        dos.writeShort((PARAM_AISPEC & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_AISPEC & 0x03FF));
         dos.writeShort(4 + aiSpecData.length);
         dos.write(aiSpecData);
     }
@@ -726,7 +726,7 @@ public class LLRPMessage {
         invDos.flush();
         byte[] invData = invBaos.toByteArray();
         
-        dos.writeShort((PARAM_INVENTORY_PARAMETER_SPEC & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_INVENTORY_PARAMETER_SPEC & 0x03FF));
         dos.writeShort(4 + invData.length);
         dos.write(invData);
     }
@@ -748,7 +748,7 @@ public class LLRPMessage {
         rfCtrlDos.flush();
         byte[] rfCtrlData = rfCtrlBaos.toByteArray();
         
-        cmdDos.writeShort((PARAM_C1G2_RF_CONTROL & 0x03FF) | 0x0400);
+        cmdDos.writeShort((PARAM_C1G2_RF_CONTROL & 0x03FF));
         cmdDos.writeShort(4 + rfCtrlData.length);
         cmdDos.write(rfCtrlData);
         
@@ -760,14 +760,14 @@ public class LLRPMessage {
         singDos.flush();
         byte[] singData = singBaos.toByteArray();
         
-        cmdDos.writeShort((PARAM_C1G2_SINGULATION_CONTROL & 0x03FF) | 0x0400);
+        cmdDos.writeShort((PARAM_C1G2_SINGULATION_CONTROL & 0x03FF));
         cmdDos.writeShort(4 + singData.length);
         cmdDos.write(singData);
         
         cmdDos.flush();
         byte[] cmdData = cmdBaos.toByteArray();
         
-        dos.writeShort((PARAM_C1G2_INVENTORY_COMMAND & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_C1G2_INVENTORY_COMMAND & 0x03FF));
         dos.writeShort(4 + cmdData.length);
         dos.write(cmdData);
     }
@@ -787,7 +787,7 @@ public class LLRPMessage {
         reportDos.flush();
         byte[] reportData = reportBaos.toByteArray();
         
-        dos.writeShort((PARAM_RO_REPORT_SPEC & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_RO_REPORT_SPEC & 0x03FF));
         dos.writeShort(4 + reportData.length);
         dos.write(reportData);
     }
@@ -812,7 +812,7 @@ public class LLRPMessage {
         selectorDos.flush();
         byte[] selectorData = selectorBaos.toByteArray();
         
-        dos.writeShort((PARAM_TAG_REPORT_CONTENT_SELECTOR & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_TAG_REPORT_CONTENT_SELECTOR & 0x03FF));
         dos.writeShort(4 + selectorData.length);
         dos.write(selectorData);
     }
@@ -840,7 +840,7 @@ public class LLRPMessage {
         customDos.flush();
         byte[] customData = customBaos.toByteArray();
         
-        dos.writeShort((PARAM_CUSTOM & 0x03FF) | 0x0400);
+        dos.writeShort((PARAM_CUSTOM & 0x03FF));
         dos.writeShort(4 + customData.length);
         dos.write(customData);
     }
