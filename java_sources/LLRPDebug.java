@@ -164,6 +164,14 @@ public class LLRPDebug {
                             }
                         } else {
                             System.out.println("[MSG] " + msgName + " (Type:" + messageType + ") ID:" + messageId + " Len:" + messageLength);
+                            // Mostrar primeros bytes para debug
+                            if (bodyLength > 0) {
+                                StringBuilder hex = new StringBuilder();
+                                for (int i = 0; i < Math.min(40, bodyLength); i++) {
+                                    hex.append(String.format("%02X ", body[i]));
+                                }
+                                System.out.println("    Raw: " + hex.toString());
+                            }
                         }
                         
                     } catch (SocketTimeoutException e) {
@@ -181,29 +189,24 @@ public class LLRPDebug {
             // Esperar un momento para recibir READER_EVENT_NOTIFICATION inicial
             Thread.sleep(1000);
             
-            // Enviar SET_READER_CONFIG para configurar eventos
-            System.out.println("[2] Enviando SET_READER_CONFIG...");
-            sendSetReaderConfig(out, 1);
-            Thread.sleep(500);
-            
             // Enviar DELETE_ROSPEC(0) para limpiar
-            System.out.println("[3] Enviando DELETE_ROSPEC(0)...");
-            sendDeleteRoSpec(out, 0, 2);
+            System.out.println("[2] Enviando DELETE_ROSPEC(0)...");
+            sendDeleteRoSpec(out, 0, 1);
             Thread.sleep(500);
             
             // Enviar ADD_ROSPEC
-            System.out.println("[4] Enviando ADD_ROSPEC...");
-            sendAddRoSpec(out, 3);
+            System.out.println("[3] Enviando ADD_ROSPEC...");
+            sendAddRoSpec(out, 2);
             Thread.sleep(500);
             
             // Enviar ENABLE_ROSPEC
-            System.out.println("[5] Enviando ENABLE_ROSPEC...");
-            sendEnableRoSpec(out, 4);
+            System.out.println("[4] Enviando ENABLE_ROSPEC...");
+            sendEnableRoSpec(out, 3);
             Thread.sleep(500);
             
             // Enviar START_ROSPEC
-            System.out.println("[6] Enviando START_ROSPEC...");
-            sendStartRoSpec(out, 5);
+            System.out.println("[5] Enviando START_ROSPEC...");
+            sendStartRoSpec(out, 4);
             Thread.sleep(500);
             
             System.out.println();
@@ -240,15 +243,15 @@ public class LLRPDebug {
             
             // Detener ROSpec
             System.out.println();
-            System.out.println("[7] Deteniendo ROSpec...");
-            sendStopRoSpec(out, 6);
+            System.out.println("[6] Deteniendo ROSpec...");
+            sendStopRoSpec(out, 5);
             Thread.sleep(300);
             
-            sendDeleteRoSpec(out, 1, 7);
+            sendDeleteRoSpec(out, 1, 6);
             Thread.sleep(300);
             
             // Cerrar
-            System.out.println("[8] Cerrando conexión...");
+            System.out.println("[7] Cerrando conexión...");
             executor.shutdownNow();
             
             System.out.println();
