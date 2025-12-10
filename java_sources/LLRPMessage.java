@@ -1051,6 +1051,41 @@ public class LLRPMessage {
         return getStatusCode(message) == 0;
     }
     
+    /**
+     * Obtiene la descripción del código de estado LLRP.
+     * 
+     * @param message Mensaje de respuesta
+     * @return Descripción del estado
+     */
+    public static String getStatusDescription(LLRPMessage message) {
+        int code = getStatusCode(message);
+        switch (code) {
+            case 0: return "Success";
+            case 100: return "M_FieldError - Field error in message";
+            case 101: return "M_UnexpectedParameter - Unexpected parameter";
+            case 102: return "M_MissingParameter - Missing parameter";
+            case 103: return "M_DuplicateParameter - Duplicate parameter";
+            case 104: return "M_OverflowParameter - Overflow parameter";
+            case 105: return "M_OverflowField - Overflow field";
+            case 106: return "M_UnknownParameter - Unknown parameter";
+            case 107: return "M_UnknownField - Unknown field";
+            case 108: return "M_UnsupportedMessage - Unsupported message";
+            case 109: return "M_UnsupportedVersion - Unsupported version";
+            case 110: return "M_UnsupportedParameter - Unsupported parameter";
+            case 200: return "P_FieldError - Parameter field error";
+            case 201: return "P_UnexpectedParameter - Unexpected sub-parameter";
+            case 202: return "P_MissingParameter - Missing sub-parameter";
+            case 203: return "P_DuplicateParameter - Duplicate sub-parameter";
+            case 204: return "P_OverflowParameter - Overflow sub-parameter";
+            case 205: return "P_OverflowField - Overflow field in parameter";
+            case 206: return "P_UnknownParameter - Unknown sub-parameter";
+            case 207: return "P_UnknownField - Unknown field in parameter";
+            case 208: return "P_UnsupportedParameter - Unsupported sub-parameter";
+            case -1: return "No LLRPStatus found in response";
+            default: return "Unknown error code: " + code;
+        }
+    }
+    
     // ==================== Utilidades ====================
     
     /**
