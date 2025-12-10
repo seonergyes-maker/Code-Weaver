@@ -570,33 +570,12 @@ public class LLRPDebug {
         aiStopDos.writeInt(0);  // Duration (ignored for Null)
         writeParameter(aispecDos, 184, aiStopBaos.toByteArray());
         
-        // InventoryParameterSpec (Type 186) con C1G2InventoryCommand
+        // InventoryParameterSpec (Type 186) - MINIMO sin C1G2InventoryCommand
         ByteArrayOutputStream invBaos = new ByteArrayOutputStream();
         DataOutputStream invDos = new DataOutputStream(invBaos);
         invDos.writeShort(1);  // InventoryParameterSpecID
         invDos.writeByte(1);   // ProtocolID = EPCGlobalClass1Gen2 (1)
-        
-        // C1G2InventoryCommand (Type 330)
-        ByteArrayOutputStream c1g2Baos = new ByteArrayOutputStream();
-        DataOutputStream c1g2Dos = new DataOutputStream(c1g2Baos);
-        c1g2Dos.writeByte(0);  // TagInventoryStateAware = false
-        
-        // C1G2RFControl (Type 335)
-        ByteArrayOutputStream rfBaos = new ByteArrayOutputStream();
-        DataOutputStream rfDos = new DataOutputStream(rfBaos);
-        rfDos.writeShort(1);   // ModeIndex = 1 (modo estándar)
-        rfDos.writeShort(0);   // Tari = 0 (usar default del modo)
-        writeParameter(c1g2Dos, 335, rfBaos.toByteArray());
-        
-        // C1G2SingulationControl (Type 336) - Session S0
-        ByteArrayOutputStream singBaos = new ByteArrayOutputStream();
-        DataOutputStream singDos = new DataOutputStream(singBaos);
-        singDos.writeByte(0);  // Session = S0 (bits 7-6)
-        singDos.writeShort(0); // TagPopulation = 0 (auto)
-        singDos.writeInt(0);   // TagTransitTime = 0 (auto)
-        writeParameter(c1g2Dos, 336, singBaos.toByteArray());
-        
-        writeParameter(invDos, 330, c1g2Baos.toByteArray());
+        // Sin subparámetros - el lector usará defaults
         writeParameter(aispecDos, 186, invBaos.toByteArray());
         
         writeParameter(rospecDos, 183, aispecBaos.toByteArray());
