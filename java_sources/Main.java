@@ -695,7 +695,7 @@ public class Main {
     private static void stopReading() {
         if (connection != null) {
             try {
-                connection.stopReading(config);
+                connection.stopReading(config.getRoSpecId());
             } catch (Exception e) {
                 System.err.println("Error al detener lectura: " + e.getMessage());
             }
