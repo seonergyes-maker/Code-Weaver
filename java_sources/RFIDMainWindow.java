@@ -44,8 +44,11 @@ public class RFIDMainWindow extends JFrame {
     private JSpinner portSpinner;
     private JButton connectButton;
     private JButton disconnectButton;
+    private JButton startReadingButton;
+    private JButton stopReadingButton;
     private JLabel connectionStatusLabel;
     private JPanel connectionIndicator;
+    private volatile boolean isReading = false;
     
     // ==================== Componentes de antenas ====================
     private JSlider[] powerSliders = new JSlider[4];
@@ -379,6 +382,16 @@ public class RFIDMainWindow extends JFrame {
         ModernUIStyle.styleDangerButton(disconnectButton);
         disconnectButton.setEnabled(false);
         
+        startReadingButton = new JButton("\u25B6 Iniciar Lectura");  // ▶
+        ModernUIStyle.stylePrimaryButton(startReadingButton);
+        startReadingButton.setEnabled(false);
+        startReadingButton.setToolTipText("Iniciar la lectura de etiquetas RFID");
+        
+        stopReadingButton = new JButton("\u25A0 Detener Lectura");  // ■
+        ModernUIStyle.styleDangerButton(stopReadingButton);
+        stopReadingButton.setEnabled(false);
+        stopReadingButton.setToolTipText("Detener la lectura de etiquetas RFID");
+        
         connectionStatusLabel = new JLabel("Desconectado");
         connectionStatusLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
         connectionStatusLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -634,12 +647,15 @@ public class RFIDMainWindow extends JFrame {
         gbc.gridx = 3;
         panel.add(portSpinner, gbc);
         
-        // Botones
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
+        // Botones de conexión
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 4;
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         buttonPanel.setBackground(ModernUIStyle.BG_DARK);
         buttonPanel.add(connectButton);
         buttonPanel.add(disconnectButton);
+        buttonPanel.add(new JLabel("   ")); // Separador
+        buttonPanel.add(startReadingButton);
+        buttonPanel.add(stopReadingButton);
         panel.add(buttonPanel, gbc);
         
         // Estado
@@ -1127,6 +1143,12 @@ public class RFIDMainWindow extends JFrame {
         // Botón desconectar
         disconnectButton.addActionListener(e -> disconnect());
         
+        // Botón iniciar lectura
+        startReadingButton.addActionListener(e -> startReading());
+        
+        // Botón detener lectura
+        stopReadingButton.addActionListener(e -> stopReading());
+        
         // Auto-conexión
         autoConnectCheck.addActionListener(e -> {
             config.setAutoConnectEnabled(autoConnectCheck.isSelected());
@@ -1340,6 +1362,15 @@ public class RFIDMainWindow extends JFrame {
      * Desconecta del lector RFID.
      */
     private void disconnect() {
+        // Detener lectura primero si está activa
+        if (isReading && connection != null) {
+            try {
+                connection.stopReading(config.getRoSpecId());
+            } catch (Exception e) {
+                // Ignorar errores al detener
+            }
+        }
+        
         if (connection != null) {
             try {
                 connection.disconnect();
@@ -1351,6 +1382,163 @@ public class RFIDMainWindow extends JFrame {
     }
     
     /**
+     * Inicia la lectura de etiquetas RFID.
+     * Configura y activa el ROSpec en el lector.
+     */
+    private void startReading() {
+        if (connection == null || !connection.isConnected()) {
+            JOptionPane.showMessageDialog(this,
+                "No hay conexión con el lector",
+                "Error",
+                JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        
+        saveUIToConfig();
+        setStatus("Iniciando lectura de etiquetas...");
+        activityIndicator.setIndeterminate(true);
+        startReadingButton.setEnabled(false);
+        
+        new SwingWorker<Boolean, Void>() {
+            private String errorMessage = "";
+            
+            @Override
+            protected Boolean doInBackground() {
+                try {
+                    // Configurar el handler para recibir tags
+                    connection.setAsyncMessageHandler(message -> {
+                        if (message != null && message.getType() == LLRPMessageType.RO_ACCESS_REPORT) {
+                            processTagReport(message);
+                        }
+                    });
+                    
+                    return connection.startReading(config);
+                } catch (Exception e) {
+                    errorMessage = e.getMessage();
+                    return false;
+                }
+            }
+            
+            @Override
+            protected void done() {
+                activityIndicator.setIndeterminate(false);
+                try {
+                    if (get()) {
+                        isReading = true;
+                        startReadingButton.setEnabled(false);
+                        stopReadingButton.setEnabled(true);
+                        connectionStatusLabel.setText("Leyendo");
+                        connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
+                        setStatus("Lectura activa - Esperando etiquetas RFID...");
+                        System.out.println("[RFID] Lectura iniciada correctamente");
+                    } else {
+                        startReadingButton.setEnabled(true);
+                        String msg = errorMessage.isEmpty() ? "No se pudo iniciar la lectura" : errorMessage;
+                        setStatus("Error: " + msg);
+                        JOptionPane.showMessageDialog(RFIDMainWindow.this,
+                            "Error al iniciar lectura: " + msg,
+                            "Error de Lectura",
+                            JOptionPane.ERROR_MESSAGE);
+                    }
+                } catch (Exception e) {
+                    startReadingButton.setEnabled(true);
+                    setStatus("Error: " + e.getMessage());
+                }
+            }
+        }.execute();
+    }
+    
+    /**
+     * Detiene la lectura de etiquetas RFID.
+     */
+    private void stopReading() {
+        if (connection == null || !connection.isConnected()) {
+            return;
+        }
+        
+        setStatus("Deteniendo lectura...");
+        stopReadingButton.setEnabled(false);
+        
+        new SwingWorker<Boolean, Void>() {
+            @Override
+            protected Boolean doInBackground() {
+                try {
+                    return connection.stopReading(config.getRoSpecId());
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+            
+            @Override
+            protected void done() {
+                isReading = false;
+                startReadingButton.setEnabled(true);
+                stopReadingButton.setEnabled(false);
+                connectionStatusLabel.setText("Conectado");
+                setStatus("Lectura detenida - Conectado a " + config.getReaderIP());
+                System.out.println("[RFID] Lectura detenida");
+            }
+        }.execute();
+    }
+    
+    /**
+     * Procesa un reporte de tags recibido del lector.
+     * 
+     * @param message Mensaje RO_ACCESS_REPORT
+     */
+    private void processTagReport(LLRPMessage message) {
+        // Los datos del tag vienen en el payload del mensaje
+        byte[] payload = message.getPayload();
+        if (payload == null || payload.length < 10) {
+            return;
+        }
+        
+        // Parsear los datos del tag del mensaje LLRP
+        // El formato puede variar, pero típicamente incluye:
+        // - EPC (variable length)
+        // - RSSI (2 bytes)
+        // - Antenna ID (2 bytes)
+        
+        try {
+            // Extraer EPC (simplificado - asume formato estándar)
+            int epcLength = Math.min(24, payload.length - 4); // Max 24 bytes EPC
+            byte[] epcBytes = new byte[epcLength];
+            System.arraycopy(payload, 0, epcBytes, 0, epcLength);
+            
+            StringBuilder epcHex = new StringBuilder();
+            for (byte b : epcBytes) {
+                epcHex.append(String.format("%02X", b));
+            }
+            String epc = epcHex.toString();
+            
+            // RSSI y antena (simplificado)
+            int rssi = -50; // Valor por defecto
+            int antenna = 1;
+            
+            if (payload.length > epcLength + 2) {
+                rssi = (payload[epcLength] & 0xFF) - 128;
+                antenna = (payload[epcLength + 1] & 0x0F) + 1;
+            }
+            
+            // Crear objeto TagData y procesar
+            TagData tag = new TagData(epc, rssi, antenna, System.currentTimeMillis());
+            handleTagRead(tag);
+            
+        } catch (Exception e) {
+            System.err.println("[RFID] Error procesando tag: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Maneja la lectura de un tag (delega a addTag).
+     * 
+     * @param tag Datos del tag leído
+     */
+    private void handleTagRead(TagData tag) {
+        addTag(tag);
+    }
+    
+    /**
      * Llamado cuando la conexión es exitosa.
      */
     private void onConnected() {
@@ -1359,7 +1547,9 @@ public class RFIDMainWindow extends JFrame {
         connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
         connectButton.setEnabled(false);
         disconnectButton.setEnabled(true);
-        setStatus("Conectado a " + config.getReaderIP());
+        startReadingButton.setEnabled(true);
+        stopReadingButton.setEnabled(false);
+        setStatus("Conectado a " + config.getReaderIP() + " - Presione 'Iniciar Lectura' para leer etiquetas");
         statistics.recordConnection();
         
         // Guardar la última IP conectada exitosamente para auto-conexión
@@ -1405,6 +1595,9 @@ public class RFIDMainWindow extends JFrame {
         connectionStatusLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
         connectButton.setEnabled(true);
         disconnectButton.setEnabled(false);
+        startReadingButton.setEnabled(false);
+        stopReadingButton.setEnabled(false);
+        isReading = false;
         setStatus("Desconectado");
         statistics.recordDisconnection();
         
