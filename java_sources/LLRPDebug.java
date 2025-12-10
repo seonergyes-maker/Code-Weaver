@@ -195,6 +195,11 @@ public class LLRPDebug {
             sendStartRoSpec(out, 4);
             Thread.sleep(500);
             
+            // Enviar GET_REPORT inmediatamente para forzar envío de tags pendientes
+            System.out.println("[5b] Enviando GET_REPORT para forzar reporte...");
+            sendGetReport(out, 10);
+            Thread.sleep(500);
+            
             System.out.println();
             System.out.println("========================================");
             System.out.println("  MONITOREANDO TRÁFICO (" + testDuration + "s)");
@@ -403,8 +408,9 @@ public class LLRPDebug {
         // ROReportSpec (Type 237)
         ByteArrayOutputStream reportBaos = new ByteArrayOutputStream();
         DataOutputStream reportDos = new DataOutputStream(reportBaos);
-        reportDos.writeByte(1); // ROReportTrigger = Upon_N_Tags_Or_End_Of_ROSpec
-        reportDos.writeShort(1); // N = 1
+        // ROReportTrigger: 0=None, 1=Upon_N_Tags_Or_End_Of_AISpec, 2=Upon_N_Tags_Or_End_Of_ROSpec
+        reportDos.writeByte(2); // ROReportTrigger = Upon_N_Tags_Or_End_Of_ROSpec
+        reportDos.writeShort(1); // N = 1 (report after each tag)
         
         // TagReportContentSelector (Type 238)
         ByteArrayOutputStream tagContentBaos = new ByteArrayOutputStream();
