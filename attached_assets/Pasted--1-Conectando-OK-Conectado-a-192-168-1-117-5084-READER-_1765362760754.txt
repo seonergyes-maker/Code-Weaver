@@ -1,0 +1,70 @@
+[1] Conectando...
+    OK - Conectado a /192.168.1.117:5084
+[READER] Thread de lectura iniciado
+[EVENTO] READER_EVENT_NOTIFICATION ID:327
+[!!! ERROR_MESSAGE] ID:328 Len:274
+    StatusCode: 110 (M_UnsupportedVersion)
+    ErrorDescription: unsupported version
+    Raw: 01 1F 01 08 00 6E 01 00 75 6E 73 75 70 70 6F 72 74 65 64 20 76 65 72 73 69 6F 6E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[2] Enviando DELETE_ROSPEC(0)...
+[!!! ERROR_MESSAGE] ID:1 Len:274
+    StatusCode: 110 (M_UnsupportedVersion)
+    ErrorDescription: unsupported version
+    Raw: 01 1F 01 08 00 6E 01 00 75 6E 73 75 70 70 6F 72 74 65 64 20 76 65 72 73 69 6F 6E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[3] Enviando ADD_ROSPEC...
+[!!! ERROR_MESSAGE] ID:2 Len:274
+    StatusCode: 110 (M_UnsupportedVersion)
+    ErrorDescription: unsupported version
+    Raw: 01 1F 01 08 00 6E 01 00 75 6E 73 75 70 70 6F 72 74 65 64 20 76 65 72 73 69 6F 6E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[4] Enviando ENABLE_ROSPEC...
+[!!! ERROR_MESSAGE] ID:3 Len:274
+    StatusCode: 110 (M_UnsupportedVersion)
+    ErrorDescription: unsupported version
+    Raw: 01 1F 01 08 00 6E 01 00 75 6E 73 75 70 70 6F 72 74 65 64 20 76 65 72 73 69 6F 6E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[5] Enviando START_ROSPEC...
+[!!! ERROR_MESSAGE] ID:4 Len:274
+    StatusCode: 110 (M_UnsupportedVersion)
+    ErrorDescription: unsupported version
+    Raw: 01 1F 01 08 00 6E 01 00 75 6E 73 75 70 70 6F 72 74 65 64 20 76 65 72 73 69 6F 6E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+========================================
+  MONITOREANDO TRÁFICO (30s)
+========================================
+
+[  1s] Mensajes: 7 (+7) | RO_ACCESS_REPORT: 0 (+0)
+[  2s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  3s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  4s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  5s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  6s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[!!! ERROR_MESSAGE] ID:105 Len:274
+    StatusCode: 110 (M_UnsupportedVersion)
+    ErrorDescription: unsupported version
+    Raw: 01 1F 01 08 00 6E 01 00 75 6E 73 75 70 70 6F 72 74 65 64 20 76 65 72 73 69 6F 6E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  7s] Mensajes: 8 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[  8s] Mensajes: 8 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  9s] Mensajes: 8 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 10s] Mensajes: 8 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 11s] Mensajes: 8 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[!!! ERROR_MESSAGE] ID:110 Len:274
+    StatusCode: 110 (M_UnsupportedVersion)
+    ErrorDescription: unsupported version
+    Raw: 01 1F 01 08 00 6E 01 00 75 6E 73 75 70 70 6F 72 74 65 64 20 76 65 72 73 69 6F 6E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[ 12s] Mensajes: 9 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[ 13s] Mensajes: 9 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[!!! ERROR_MESSAGE] ID:329 Len:274
+    StatusCode: 110 (M_UnsupportedVersion)
+    ErrorDescription: unsupported version
+    Raw: 01 1F 01 08 00 6E 01 00 75 6E 73 75 70 70 6F 72 74 65 64 20 76 65 72 73 69 6F 6E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[ 14s] Mensajes: 11 (+2) | RO_ACCESS_REPORT: 0 (+0)
+[ 15s] Mensajes: 11 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 16s] Mensajes: 11 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[!!! ERROR_MESSAGE] ID:115 Len:274
+    StatusCode: 110 (M_UnsupportedVersion)
+    ErrorDescription: unsupported version
+    Raw: 01 1F 01 08 00 6E 01 00 75 6E 73 75 70 70 6F 72 74 65 64 20 76 65 72 73 69 6F 6E 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[ 17s] Mensajes: 12 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[ 18s] Mensajes: 12 (+0) | RO_ACCESS_REPORT: 0 (+0)
