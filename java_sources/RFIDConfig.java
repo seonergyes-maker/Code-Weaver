@@ -160,6 +160,11 @@ public class RFIDConfig implements Serializable {
         this.antennaConfigs = new AntennaConfig[MAX_ANTENNA_PORTS];
         for (int i = 0; i < MAX_ANTENNA_PORTS; i++) {
             this.antennaConfigs[i] = new AntennaConfig(i + 1);
+            // Por defecto solo habilitar antenas 1 y 2 (las más comunes)
+            // Las antenas no conectadas físicamente causan que el ROSpec falle
+            if (i >= 2) {
+                this.antennaConfigs[i].setEnabled(false);
+            }
         }
         
         this.gpoSettings = new boolean[4];
