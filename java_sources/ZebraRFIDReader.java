@@ -112,17 +112,19 @@ public class ZebraRFIDReader implements RfidEventsListener {
     
     @Override
     public void eventReadNotify(RfidReadEvents e) {
-        com.mot.rfid.api3.TagData[] tags = reader.Actions.getReadTags(100);
-        if (tags != null) {
-            for (com.mot.rfid.api3.TagData tag : tags) {
-                String epc = tag.getTagID();
-                short rssi = tag.getPeakRSSI();
-                short antenna = tag.getAntennaID();
-                short count = tag.getTagSeenCount();
+        try {
+            TagData tagData = e.getReadEventData().tagData;
+            if (tagData != null) {
+                String epc = tagData.getTagID();
+                short rssi = tagData.getPeakRSSI();
+                short antenna = tagData.getAntennaID();
+                short count = tagData.getTagSeenCount();
                 
                 System.out.printf("[TAG] EPC: %s | RSSI: %d dBm | Antena: %d | Lecturas: %d%n",
                     epc, rssi, antenna, count);
             }
+        } catch (Exception ex) {
+            ex.printStackTrace();
         }
     }
     
