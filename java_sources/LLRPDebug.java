@@ -607,24 +607,16 @@ public class LLRPDebug {
         reportDos.writeByte(1);  // ROReportTrigger = Upon_N_Tags_Or_End_Of_AISpec
         reportDos.writeShort(1); // N = 1 (cada tag)
         
-        // TagReportContentSelector (Type 238)
+        // TagReportContentSelector (Type 238) - SIMPLIFICADO
         ByteArrayOutputStream tagContentBaos = new ByteArrayOutputStream();
         DataOutputStream tagContentDos = new DataOutputStream(tagContentBaos);
-        // Bits (MSB first): EnableROSpecID, EnableSpecIndex, EnableInvParamSpecID, 
-        // EnableAntennaID, EnableChannelIndex, EnablePeakRSSI, EnableFirstSeenTimestamp,
-        // EnableLastSeenTimestamp, EnableTagSeenCount, EnableAccessSpecID, C1G2EPCSelectorPresent
-        // Enable: AntennaID, PeakRSSI, FirstSeen, LastSeen, TagSeenCount + C1G2EPC
-        short enableMask = (short)0b0001011111_100000;  // AntennaID, PeakRSSI, FirstSeen, LastSeen, TagSeenCount, C1G2EPC
+        // EnableROSpecID(1), EnableSpecIndex(1), EnableInvParamSpecID(1), EnableAntennaID(1),
+        // EnableChannelIndex(0), EnablePeakRSSI(1), EnableFirstSeenTimestamp(1), 
+        // EnableLastSeenTimestamp(1), EnableTagSeenCount(1), EnableAccessSpecID(0), Reserved(6)
+        short enableMask = (short)0x8000; // Solo habilitar lo básico - el EPC siempre viene
         tagContentDos.writeShort(enableMask);
-        
-        // C1G2EPCMemorySelector (Type 348) - Para obtener EPC
-        ByteArrayOutputStream epcSelBaos = new ByteArrayOutputStream();
-        DataOutputStream epcSelDos = new DataOutputStream(epcSelBaos);
-        // Bits: EnableCRC (1), EnablePCBits (1), EnableEPCMemory (1), Reserved (5)
-        epcSelDos.writeByte(0b11100000);  // Enable CRC, PC, EPC
-        writeParameter(tagContentDos, 348, epcSelBaos.toByteArray());
-        
         writeParameter(reportDos, 238, tagContentBaos.toByteArray());
+        
         writeParameter(rospecDos, 237, reportBaos.toByteArray());
         
         writeParameter(dos, 177, rospecBaos.toByteArray());
