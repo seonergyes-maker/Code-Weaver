@@ -1,7 +1,7 @@
 import com.mot.rfid.api3.*;
 
 /**
- * Lector RFID simple usando SDK oficial de Zebra (Symbol/Motorola)
+ * Lector RFID usando SDK oficial de Zebra (Symbol/Motorola)
  * Para FX7500/FX9600
  */
 public class ZebraRFIDReader implements RfidEventsListener {
@@ -41,13 +41,14 @@ public class ZebraRFIDReader implements RfidEventsListener {
             
             System.out.println("[3] Configurando eventos...");
             reader.Events.addEventsListener(this);
-            reader.Events.setHandheldEvent(true);
+            reader.Events.setInventoryStartEvent(true);
+            reader.Events.setInventoryStopEvent(true);
             reader.Events.setTagReadEvent(true);
-            reader.Events.setAttachTagDataWithReadEvent(true);
+            reader.Events.setAttachTagDataWithReadEvent(false);
             
             System.out.println("[4] Configurando antena...");
             int maxPower = caps.getTransmitPowerLevelValues().length - 1;
-            System.out.println("    Potencia máxima disponible: " + maxPower);
+            System.out.println("    Potencia máxima: índice " + maxPower);
             
             Antennas.AntennaRfConfig rfConfig = reader.Config.Antennas.getAntennaRfConfig(1);
             rfConfig.setTransmitPowerIndex(maxPower);
@@ -62,7 +63,7 @@ public class ZebraRFIDReader implements RfidEventsListener {
             singulation.Action.setSLFlag(SL_FLAG.SL_ALL);
             reader.Config.Antennas.setSingulationControl(1, singulation);
             
-            System.out.println("[5] Iniciando lectura continua de tags...");
+            System.out.println("[5] Iniciando inventario...");
             System.out.println();
             System.out.println("===========================================");
             System.out.println("  LEYENDO TAGS (Ctrl+C para detener)");
@@ -74,14 +75,10 @@ public class ZebraRFIDReader implements RfidEventsListener {
                 stop();
             }));
             
-            TriggerInfo triggerInfo = new TriggerInfo();
-            triggerInfo.StartTrigger.setTriggerType(START_TRIGGER_TYPE.START_TRIGGER_TYPE_IMMEDIATE);
-            triggerInfo.StopTrigger.setTriggerType(STOP_TRIGGER_TYPE.STOP_TRIGGER_TYPE_IMMEDIATE);
-            
-            reader.Actions.Inventory.perform(null, triggerInfo, null);
+            reader.Actions.Inventory.perform();
             
             while (running) {
-                Thread.sleep(100);
+                Thread.sleep(500);
             }
             
         } catch (InvalidUsageException e) {
@@ -113,18 +110,20 @@ public class ZebraRFIDReader implements RfidEventsListener {
     @Override
     public void eventReadNotify(RfidReadEvents e) {
         try {
-            TagData tagData = e.getReadEventData().tagData;
-            if (tagData != null) {
-                String epc = tagData.getTagID();
-                short rssi = tagData.getPeakRSSI();
-                short antenna = tagData.getAntennaID();
-                short count = tagData.getTagSeenCount();
-                
-                System.out.printf("[TAG] EPC: %s | RSSI: %d dBm | Antena: %d | Lecturas: %d%n",
-                    epc, rssi, antenna, count);
+            TagData[] tags = reader.Actions.getReadTags(100);
+            if (tags != null && tags.length > 0) {
+                for (TagData tag : tags) {
+                    String epc = tag.getTagID();
+                    short rssi = tag.getPeakRSSI();
+                    short antenna = tag.getAntennaID();
+                    short count = tag.getTagSeenCount();
+                    
+                    System.out.printf("[TAG] EPC: %s | RSSI: %d dBm | Antena: %d | Lecturas: %d%n",
+                        epc, rssi, antenna, count);
+                }
             }
         } catch (Exception ex) {
-            ex.printStackTrace();
+            System.err.println("Error leyendo tags: " + ex.getMessage());
         }
     }
     
@@ -133,9 +132,9 @@ public class ZebraRFIDReader implements RfidEventsListener {
         STATUS_EVENT_TYPE eventType = e.StatusEventData.getStatusEventType();
         
         if (eventType == STATUS_EVENT_TYPE.INVENTORY_START_EVENT) {
-            System.out.println("[EVENTO] Inventario iniciado");
+            System.out.println("[EVENTO] Inventario INICIADO");
         } else if (eventType == STATUS_EVENT_TYPE.INVENTORY_STOP_EVENT) {
-            System.out.println("[EVENTO] Inventario detenido");
+            System.out.println("[EVENTO] Inventario DETENIDO");
         }
     }
 }
