@@ -714,6 +714,12 @@ if code_changed:
     st.session_state.code = code
     st.session_state.files[st.session_state.current_file] = code
     
+    if st.session_state.current_project_name and st.session_state.current_project_name != "Proyecto Sin Guardar":
+        try:
+            save_project(st.session_state.current_project_name, st.session_state.files, [])
+        except Exception:
+            pass
+    
     if st.session_state.run_on_save:
         dep_result = install_detected_dependencies(st.session_state.files)
         dep_msg = ""
