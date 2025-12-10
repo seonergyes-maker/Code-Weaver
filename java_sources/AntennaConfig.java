@@ -42,6 +42,12 @@ public class AntennaConfig implements Serializable {
     /** Ganancia de antena en dBi (típicamente 6.0 para antenas Zebra) */
     private double antennaGain;
     
+    /** Umbral RSSI mínimo en dBm (-80 a 0). Tags con RSSI menor se ignoran. */
+    private int rssiThreshold;
+    
+    /** Habilitar filtrado por RSSI para esta antena */
+    private boolean rssiFilterEnabled;
+    
     /**
      * Constructor por defecto. Crea una configuración con valores predeterminados.
      */
@@ -52,6 +58,8 @@ public class AntennaConfig implements Serializable {
         this.enabled = true;
         this.cableLoss = 0.0;
         this.antennaGain = 6.0;
+        this.rssiThreshold = -70;
+        this.rssiFilterEnabled = false;
     }
     
     /**
@@ -214,6 +222,44 @@ public class AntennaConfig implements Serializable {
     }
     
     /**
+     * Obtiene el umbral RSSI mínimo para esta antena.
+     * 
+     * @return Umbral RSSI en dBm (-80 a 0)
+     */
+    public int getRssiThreshold() {
+        return rssiThreshold;
+    }
+    
+    /**
+     * Establece el umbral RSSI mínimo. Tags con RSSI menor serán ignorados.
+     * 
+     * @param rssiThreshold Umbral RSSI en dBm (-80 a 0)
+     */
+    public void setRssiThreshold(int rssiThreshold) {
+        if (rssiThreshold < -80) rssiThreshold = -80;
+        if (rssiThreshold > 0) rssiThreshold = 0;
+        this.rssiThreshold = rssiThreshold;
+    }
+    
+    /**
+     * Verifica si el filtrado RSSI está habilitado para esta antena.
+     * 
+     * @return true si el filtrado RSSI está activo
+     */
+    public boolean isRssiFilterEnabled() {
+        return rssiFilterEnabled;
+    }
+    
+    /**
+     * Habilita o deshabilita el filtrado RSSI para esta antena.
+     * 
+     * @param enabled true para habilitar filtrado RSSI
+     */
+    public void setRssiFilterEnabled(boolean enabled) {
+        this.rssiFilterEnabled = enabled;
+    }
+    
+    /**
      * Calcula el EIRP (Equivalent Isotropically Radiated Power) efectivo.
      * EIRP = Potencia TX - Pérdida cable + Ganancia antena
      * 
@@ -308,6 +354,8 @@ public class AntennaConfig implements Serializable {
         copy.enabled = this.enabled;
         copy.cableLoss = this.cableLoss;
         copy.antennaGain = this.antennaGain;
+        copy.rssiThreshold = this.rssiThreshold;
+        copy.rssiFilterEnabled = this.rssiFilterEnabled;
         return copy;
     }
     

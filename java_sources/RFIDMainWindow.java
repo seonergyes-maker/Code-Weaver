@@ -54,6 +54,10 @@ public class RFIDMainWindow extends JFrame {
     private JSlider[] powerSliders = new JSlider[4];
     private JCheckBox[] antennaEnableChecks = new JCheckBox[4];
     private JLabel[] powerLabels = new JLabel[4];
+    private JSlider[] rssiSliders = new JSlider[4];
+    private JCheckBox[] rssiFilterChecks = new JCheckBox[4];
+    private JLabel[] rssiLabels = new JLabel[4];
+    private JSpinner[] cableLossSpinners = new JSpinner[4];
     
     // ==================== Componentes de monitoreo ====================
     private JTable tagTable;
@@ -385,19 +389,38 @@ public class RFIDMainWindow extends JFrame {
         ModernUIStyle.styleCheckBox(autoConnectCheck);
         
         for (int i = 0; i < 4; i++) {
-            powerSliders[i] = new JSlider(10, 30, (int) config.getAntennaConfig(i + 1).getTransmitPower());
+            AntennaConfig ac = config.getAntennaConfig(i + 1);
+            
+            powerSliders[i] = new JSlider(10, 30, (int) ac.getTransmitPower());
             powerSliders[i].setMajorTickSpacing(5);
             powerSliders[i].setMinorTickSpacing(1);
             powerSliders[i].setPaintTicks(true);
             powerSliders[i].setPaintLabels(true);
             ModernUIStyle.styleSlider(powerSliders[i]);
             
-            antennaEnableChecks[i] = new JCheckBox("Habilitada", config.getAntennaConfig(i + 1).isEnabled());
+            antennaEnableChecks[i] = new JCheckBox("Habilitada", ac.isEnabled());
             ModernUIStyle.styleCheckBox(antennaEnableChecks[i]);
             
             powerLabels[i] = new JLabel(powerSliders[i].getValue() + " dBm");
             powerLabels[i].setForeground(ModernUIStyle.ACCENT_PRIMARY);
             powerLabels[i].setFont(new Font("Consolas", Font.BOLD, 14));
+            
+            rssiSliders[i] = new JSlider(-80, 0, ac.getRssiThreshold());
+            rssiSliders[i].setMajorTickSpacing(20);
+            rssiSliders[i].setMinorTickSpacing(5);
+            rssiSliders[i].setPaintTicks(true);
+            rssiSliders[i].setPaintLabels(true);
+            ModernUIStyle.styleSlider(rssiSliders[i]);
+            
+            rssiFilterChecks[i] = new JCheckBox("Filtrar RSSI", ac.isRssiFilterEnabled());
+            ModernUIStyle.styleCheckBox(rssiFilterChecks[i]);
+            
+            rssiLabels[i] = new JLabel(rssiSliders[i].getValue() + " dBm");
+            rssiLabels[i].setForeground(ModernUIStyle.ACCENT_WARNING);
+            rssiLabels[i].setFont(new Font("Consolas", Font.BOLD, 12));
+            
+            cableLossSpinners[i] = new JSpinner(new SpinnerNumberModel(ac.getCableLoss(), 0.0, 20.0, 0.5));
+            ModernUIStyle.styleSpinner(cableLossSpinners[i]);
         }
         
         String[] columnNames = {"EPC", "RSSI (dBm)", "Antena", "Lecturas", "Última Lectura"};
@@ -656,26 +679,68 @@ public class RFIDMainWindow extends JFrame {
      * @return Subpanel de antena
      */
     private JPanel createAntennaSubPanel(int antennaIndex) {
-        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createTitledBorder(
                 BorderFactory.createLineBorder(ModernUIStyle.BORDER_DEFAULT),
                 "Antena " + (antennaIndex + 1)
             ),
-            BorderFactory.createEmptyBorder(10, 10, 10, 10)
+            BorderFactory.createEmptyBorder(8, 8, 8, 8)
         ));
         
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        topPanel.add(antennaEnableChecks[antennaIndex]);
-        topPanel.add(powerLabels[antennaIndex]);
-        panel.add(topPanel, BorderLayout.NORTH);
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(2, 4, 2, 4);
+        gbc.anchor = GridBagConstraints.WEST;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
         
-        panel.add(powerSliders[antennaIndex], BorderLayout.CENTER);
+        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2;
+        panel.add(antennaEnableChecks[antennaIndex], gbc);
+        
+        gbc.gridy = 1; gbc.gridwidth = 1;
+        JLabel pwrLabel = new JLabel("Potencia TX:");
+        pwrLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        panel.add(pwrLabel, gbc);
+        
+        gbc.gridx = 1;
+        panel.add(powerLabels[antennaIndex], gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2; gbc.weightx = 1.0;
+        panel.add(powerSliders[antennaIndex], gbc);
+        
+        gbc.gridy = 3; gbc.gridwidth = 1; gbc.weightx = 0;
+        JLabel cableLabel = new JLabel("Pérdida cable (dB):");
+        cableLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        panel.add(cableLabel, gbc);
+        
+        gbc.gridx = 1;
+        panel.add(cableLossSpinners[antennaIndex], gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
+        panel.add(rssiFilterChecks[antennaIndex], gbc);
+        
+        gbc.gridy = 5; gbc.gridwidth = 1;
+        JLabel rssiLabel = new JLabel("Umbral RSSI:");
+        rssiLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
+        panel.add(rssiLabel, gbc);
+        
+        gbc.gridx = 1;
+        panel.add(rssiLabels[antennaIndex], gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 6; gbc.gridwidth = 2; gbc.weightx = 1.0;
+        panel.add(rssiSliders[antennaIndex], gbc);
         
         final int idx = antennaIndex;
         powerSliders[antennaIndex].addChangeListener(e -> {
             powerLabels[idx].setText(powerSliders[idx].getValue() + " dBm");
         });
+        rssiSliders[antennaIndex].addChangeListener(e -> {
+            rssiLabels[idx].setText(rssiSliders[idx].getValue() + " dBm");
+        });
+        
+        rssiFilterChecks[antennaIndex].addActionListener(e -> {
+            rssiSliders[idx].setEnabled(rssiFilterChecks[idx].isSelected());
+        });
+        rssiSliders[antennaIndex].setEnabled(rssiFilterChecks[antennaIndex].isSelected());
         
         return panel;
     }
@@ -1146,6 +1211,10 @@ public class RFIDMainWindow extends JFrame {
             AntennaConfig ac = config.getAntennaConfig(i + 1);
             powerSliders[i].setValue((int) ac.getTransmitPower());
             antennaEnableChecks[i].setSelected(ac.isEnabled());
+            rssiSliders[i].setValue(ac.getRssiThreshold());
+            rssiFilterChecks[i].setSelected(ac.isRssiFilterEnabled());
+            cableLossSpinners[i].setValue(ac.getCableLoss());
+            rssiSliders[i].setEnabled(ac.isRssiFilterEnabled());
         }
         
         if (config.getApiEndpoint() != null) {
@@ -1174,6 +1243,9 @@ public class RFIDMainWindow extends JFrame {
             AntennaConfig ac = config.getAntennaConfig(i + 1);
             ac.setTransmitPower(powerSliders[i].getValue());
             ac.setEnabled(antennaEnableChecks[i].isSelected());
+            ac.setRssiThreshold(rssiSliders[i].getValue());
+            ac.setRssiFilterEnabled(rssiFilterChecks[i].isSelected());
+            ac.setCableLoss((Double) cableLossSpinners[i].getValue());
         }
         
         config.setApiEndpoint(apiEndpointField.getText().trim());
