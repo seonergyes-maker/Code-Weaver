@@ -495,6 +495,11 @@ public class LLRPConnection implements AutoCloseable {
     private void handleReceivedMessage(LLRPMessage message) {
         if (message == null) return;
         
+        // Debug: mostrar TODOS los mensajes recibidos
+        System.out.println("[LLRP-RX] Mensaje recibido: tipo=" + message.getMessageType() + 
+            " (" + message.getMessageType().getTypeId() + "), id=" + message.getMessageId() +
+            ", payload=" + (message.getPayload() != null ? message.getPayload().length : 0) + " bytes");
+        
         if (message.getMessageType() == LLRPMessageType.KEEPALIVE) {
             try {
                 send(LLRPMessage.createKeepaliveAck());
