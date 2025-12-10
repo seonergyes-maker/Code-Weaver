@@ -102,6 +102,34 @@ public class LLRPDebug {
                                 }
                                 System.out.println("    Data: " + hex.toString() + (bodyLength > 50 ? "..." : ""));
                             }
+                        } else if (messageType == 100) { // ERROR_MESSAGE
+                            System.out.println("[!!! ERROR_MESSAGE] ID:" + messageId + " Len:" + messageLength);
+                            // Parsear LLRPStatus del error
+                            if (bodyLength >= 6) {
+                                // LLRPStatus parameter: Type (2 bytes) + Length (2 bytes) + StatusCode (2 bytes) + ErrorDescription
+                                int paramType = ((body[0] & 0xFF) << 8) | (body[1] & 0xFF);
+                                int paramLen = ((body[2] & 0xFF) << 8) | (body[3] & 0xFF);
+                                int statusCode = ((body[4] & 0xFF) << 8) | (body[5] & 0xFF);
+                                
+                                String statusName = getStatusCodeName(statusCode);
+                                System.out.println("    StatusCode: " + statusCode + " (" + statusName + ")");
+                                
+                                // Leer ErrorDescription si existe
+                                if (paramLen > 6 && bodyLength > 6) {
+                                    // ErrorDescriptionByteCount (2 bytes)
+                                    int descLen = ((body[6] & 0xFF) << 8) | (body[7] & 0xFF);
+                                    if (descLen > 0 && bodyLength >= 8 + descLen) {
+                                        String errorDesc = new String(body, 8, descLen, "UTF-8");
+                                        System.out.println("    ErrorDescription: " + errorDesc);
+                                    }
+                                }
+                            }
+                            // Mostrar bytes crudos
+                            StringBuilder hex = new StringBuilder();
+                            for (int i = 0; i < Math.min(100, bodyLength); i++) {
+                                hex.append(String.format("%02X ", body[i]));
+                            }
+                            System.out.println("    Raw: " + hex.toString());
                         } else if (messageType == 62) { // KEEPALIVE
                             // Responder KEEPALIVE_ACK silenciosamente
                             sendKeepaliveAck(out, messageId);
@@ -237,7 +265,29 @@ public class LLRPDebug {
             case 62: return "KEEPALIVE";
             case 63: return "READER_EVENT_NOTIFICATION";
             case 72: return "KEEPALIVE_ACK";
+            case 100: return "ERROR_MESSAGE";
             default: return "UNKNOWN(" + type + ")";
+        }
+    }
+    
+    private static String getStatusCodeName(int code) {
+        switch (code) {
+            case 0: return "M_Success";
+            case 100: return "M_ParameterError";
+            case 101: return "M_FieldError";
+            case 102: return "M_UnexpectedParameter";
+            case 103: return "M_MissingParameter";
+            case 104: return "M_DuplicateParameter";
+            case 105: return "M_OverflowParameter";
+            case 106: return "M_OverflowField";
+            case 107: return "M_UnknownParameter";
+            case 108: return "M_UnknownField";
+            case 109: return "M_UnsupportedMessage";
+            case 110: return "M_UnsupportedVersion";
+            case 111: return "M_UnsupportedParameter";
+            case 200: return "A_Invalid";
+            case 201: return "A_OutOfRange";
+            default: return "Unknown(" + code + ")";
         }
     }
     

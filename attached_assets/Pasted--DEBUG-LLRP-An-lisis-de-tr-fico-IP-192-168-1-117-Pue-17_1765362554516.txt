@@ -1,0 +1,83 @@
+  DEBUG LLRP - Análisis de tráfico
+========================================
+IP: 192.168.1.117
+Puerto: 5084
+Duración: 30 segundos
+
+[1] Conectando...
+    OK - Conectado a /192.168.1.117:5084
+[READER] Thread de lectura iniciado
+[EVENTO] READER_EVENT_NOTIFICATION ID:322
+[MSG] UNKNOWN(100) (Type:100) ID:323 Len:274
+[2] Enviando DELETE_ROSPEC(0)...
+[MSG] UNKNOWN(100) (Type:100) ID:1 Len:274
+[3] Enviando ADD_ROSPEC...
+[MSG] UNKNOWN(100) (Type:100) ID:2 Len:274
+[4] Enviando ENABLE_ROSPEC...
+[MSG] UNKNOWN(100) (Type:100) ID:3 Len:274
+[5] Enviando START_ROSPEC...
+[MSG] UNKNOWN(100) (Type:100) ID:4 Len:274
+
+========================================
+  MONITOREANDO TRÁFICO (30s)
+========================================
+
+[  1s] Mensajes: 7 (+7) | RO_ACCESS_REPORT: 0 (+0)
+[  2s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  3s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  4s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  5s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  6s] Mensajes: 7 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[MSG] UNKNOWN(100) (Type:100) ID:105 Len:274
+[  7s] Mensajes: 8 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[  8s] Mensajes: 8 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[  9s] Mensajes: 8 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 10s] Mensajes: 8 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 11s] Mensajes: 8 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[MSG] UNKNOWN(100) (Type:100) ID:110 Len:274
+[ 12s] Mensajes: 9 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[ 13s] Mensajes: 9 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[MSG] UNKNOWN(100) (Type:100) ID:324 Len:274
+[ 14s] Mensajes: 11 (+2) | RO_ACCESS_REPORT: 0 (+0)
+[ 15s] Mensajes: 11 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 16s] Mensajes: 11 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[MSG] UNKNOWN(100) (Type:100) ID:115 Len:274
+[ 17s] Mensajes: 12 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[ 18s] Mensajes: 12 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 19s] Mensajes: 12 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 20s] Mensajes: 12 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 21s] Mensajes: 12 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[MSG] UNKNOWN(100) (Type:100) ID:120 Len:274
+[ 22s] Mensajes: 13 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[ 23s] Mensajes: 13 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 24s] Mensajes: 13 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 25s] Mensajes: 13 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 26s] Mensajes: 13 (+0) | RO_ACCESS_REPORT: 0 (+0)
+    [Enviando GET_REPORT...]
+[MSG] UNKNOWN(100) (Type:100) ID:125 Len:274
+[ 27s] Mensajes: 14 (+1) | RO_ACCESS_REPORT: 0 (+0)
+[ 28s] Mensajes: 14 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 29s] Mensajes: 14 (+0) | RO_ACCESS_REPORT: 0 (+0)
+[ 30s] Mensajes: 14 (+0) | RO_ACCESS_REPORT: 0 (+0)
+
+[6] Deteniendo ROSpec...
+[MSG] UNKNOWN(100) (Type:100) ID:5 Len:274
+[READER] Thread de lectura terminado
+[7] Cerrando conexión...
+
+========================================
+  RESULTADOS
+========================================
+Total mensajes recibidos: 15
+Total RO_ACCESS_REPORT: 0
+
+DIAGNÓSTICO: No se recibieron RO_ACCESS_REPORT
+Posibles causas:
+  1. El ROSpec no se inició correctamente
+  2. No hay tags en el rango de la antena
+  3. Problema de configuración del lector
+  4. El lector no está enviando reportes por esta conexión
