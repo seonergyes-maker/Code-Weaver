@@ -512,15 +512,17 @@ public class LLRPMessage {
     
     /**
      * Escribe ROBoundarySpec simplificado.
+     * StartTrigger = Immediate (1) para que inicie al habilitar
+     * StopTrigger = Null (0) para que corra indefinidamente
      */
     private static void writeROBoundarySpecSimple(DataOutputStream dos) throws IOException {
         ByteArrayOutputStream boundaryBaos = new ByteArrayOutputStream();
         DataOutputStream boundaryDos = new DataOutputStream(boundaryBaos);
         
-        // ROSpecStartTrigger (type 179) - Null trigger (start immediately when enabled)
+        // ROSpecStartTrigger (type 179) - Immediate trigger (start when enabled)
         boundaryDos.writeShort((PARAM_ROSPEC_START_TRIGGER & 0x03FF) | 0x0400);
         boundaryDos.writeShort(5); // length = 4 header + 1 byte trigger type
-        boundaryDos.writeByte(0);  // ROSpecStartTriggerType = 0 (Null)
+        boundaryDos.writeByte(1);  // ROSpecStartTriggerType = 1 (Immediate) <-- CAMBIADO DE 0 A 1
         
         // ROSpecStopTrigger (type 182) - Null trigger (run forever)
         boundaryDos.writeShort((PARAM_ROSPEC_STOP_TRIGGER & 0x03FF) | 0x0400);

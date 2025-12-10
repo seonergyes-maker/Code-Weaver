@@ -1,0 +1,128 @@
+Soportar los mensajes ROSpec estándar de LLRP.
+
+Añadir una extensión llamada MotoDefaultSpec que incluye una ROSpec pre-configurada para el modo Auto. 
+Zebra Technologies
++1
+
+Te resumo las dos cosas.
+
+1. Mensajes ROSpec que entiende el FX7500 (LLRP estándar)
+
+El FX7500 soporta la misma secuencia de mensajes que cualquier lector LLRP:
+
+ADD_ROSPEC
+
+ENABLE_ROSPEC
+
+START_ROSPEC
+
+STOP_ROSPEC
+
+DISABLE_ROSPEC
+
+DELETE_ROSPEC
+
+GET_ROSPECS / GET_ROSPECS_RESPONSE 
+Wikipedia
++1
+
+El flujo típico es:
+
+DELETE_ROSPEC con ROSpecID = 0 (borra todas las ROSpec existentes).
+
+ADD_ROSPEC con tu estructura ROSpec.
+
+ENABLE_ROSPEC (mismo ROSpecID).
+
+START_ROSPEC para empezar a leer.
+
+Opcionalmente STOP_ROSPEC, DISABLE_ROSPEC, DELETE_ROSPEC cuando termines.
+
+2. Estructura de una ROSpec para el FX7500
+
+A nivel LLRP, una ROSpec tiene (simplificando):
+
+ROSpecID (uint32)
+
+Priority
+
+CurrentState (normalmente Disabled al crearla)
+
+ROBoundarySpec
+
+ROSpecStartTrigger (por ejemplo Immediate, Null, etc.)
+
+ROSpecStopTrigger (por ejemplo Null o por duración)
+
+Una o más “Specs” internas (para inventario, surveys, etc.)
+
+En el FX7500 lo habitual es AISpec:
+
+AntennaIDs (lista de antenas que usas, ej. [1,2])
+
+AISpecStopTrigger
+
+InventoryParameterSpec
+
+InventoryParameterSpecID
+
+ProtocolID (para UHF casi siempre EPCGlobalClass1Gen2)
+
+Config RF y singulation (RFMode, Session, TagPopulation…)
+
+ROReportSpec
+
+ROReportTrigger (cuándo se envía el reporte)
+
+N (si aplicable)
+
+TagReportContentSelector (qué campos quieres en el reporte)
+
+3. Ejemplo de ROSpec (estilo JSON, típico con llrpjs) para un FX7500
+
+Este ejemplo define un inventario continuo en las antenas 1 y 2, leyendo C1G2 y generando un reporte por cada tag:
+
+{
+  "type": "ADD_ROSPEC",
+  "data": {
+    "ROSpec": {
+      "ROSpecID": 1,
+      "Priority": 1,
+      "CurrentState": "Disabled",
+      "ROBoundarySpec": {
+        "ROSpecStartTrigger": {
+          "ROSpecStartTriggerType": "Immediate"
+        },
+        "ROSpecStopTrigger": {
+          "ROSpecStopTriggerType": "Null",
+          "DurationTriggerValue": 0
+        }
+      },
+      "AISpec": {
+        "AntennaIDs": [1, 2],
+        "AISpecStopTrigger": {
+          "AISpecStopTriggerType": "Null",
+          "DurationTrigger": 0
+        },
+        "InventoryParameterSpec": {
+          "InventoryParameterSpecID": 1,
+          "ProtocolID": "EPCGlobalClass1Gen2"
+        }
+      },
+      "ROReportSpec": {
+        "ROReportTrigger": "Upon_N_Tags_Or_End_Of_ROSpec",
+        "N": 1,
+        "TagReportContentSelector": {
+          "EnableROSpecID": true,
+          "EnableAntennaID": true,
+          "EnableFirstSeenTimestamp": true,
+          "EnableLastSeenTimestamp": true,
+          "EnableTagSeenCount": true
+        }
+      }
+    }
+  }
+}
+
+
+Importante para el FX7500: en AntennaIDs pon solo las antenas realmente conectadas; si declaras más de las que tienes, la ROSpec puede fallar por completo.
