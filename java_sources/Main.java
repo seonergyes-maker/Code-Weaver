@@ -51,6 +51,12 @@ public class Main {
     /** Flag para auto-conectar */
     private static boolean autoStart = false;
     
+    /** Flag para modo prueba LLRP4J */
+    private static boolean llrp4jTest = false;
+    
+    /** Duración de la prueba LLRP4J en segundos */
+    private static int llrp4jTestDuration = 30;
+    
     /** Ruta del archivo de configuración */
     private static String configPath = DEFAULT_CONFIG_PATH;
     
@@ -90,7 +96,9 @@ public class Main {
         }
         
         // Iniciar en modo apropiado
-        if (noGui) {
+        if (llrp4jTest) {
+            runLLRP4JTest();
+        } else if (noGui) {
             runConsoleMode();
         } else {
             runGuiMode();
@@ -159,6 +167,29 @@ public class Main {
                     System.out.println(APP_NAME + " versión " + VERSION);
                     return false;
                     
+                case "--llrp4j-test":
+                case "--llrp4j":
+                case "--test-reader":
+                case "-t":
+                    llrp4jTest = true;
+                    noGui = true;  // La prueba LLRP4J es sin GUI
+                    System.out.println("[Args] Modo prueba LLRP4J habilitado");
+                    // Verificar si hay argumentos adicionales (IP y duración)
+                    if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+                        readerIp = args[++i];
+                        System.out.println("[Args] IP del lector: " + readerIp);
+                    }
+                    if (i + 1 < args.length && !args[i + 1].startsWith("-")) {
+                        try {
+                            llrp4jTestDuration = Integer.parseInt(args[++i]);
+                            System.out.println("[Args] Duración: " + llrp4jTestDuration + " segundos");
+                        } catch (NumberFormatException e) {
+                            // No es un número, ignorar
+                            i--;
+                        }
+                    }
+                    break;
+                    
                 default:
                     if (arg.startsWith("-")) {
                         System.err.println("Argumento desconocido: " + args[i]);
@@ -177,20 +208,24 @@ public class Main {
      */
     private static void printHelp() {
         System.out.println();
-        System.out.println("Uso: java Main [opciones]");
+        System.out.println("Uso: java -jar Main.jar [opciones]");
         System.out.println();
         System.out.println("Opciones:");
-        System.out.println("  --nogui, --headless  Ejecutar en modo consola sin GUI (para servicios)");
-        System.out.println("  --config, -c FILE    Cargar configuración desde archivo JSON");
-        System.out.println("  --ip ADDRESS         Establecer IP del lector (override)");
-        System.out.println("  --autostart, -a      Conectar automáticamente al iniciar");
-        System.out.println("  --help, -h           Mostrar esta ayuda");
-        System.out.println("  --version, -v        Mostrar versión");
+        System.out.println("  --nogui, --headless     Ejecutar en modo consola sin GUI (para servicios)");
+        System.out.println("  --config, -c FILE       Cargar configuración desde archivo JSON");
+        System.out.println("  --ip ADDRESS            Establecer IP del lector (override)");
+        System.out.println("  --autostart, -a         Conectar automáticamente al iniciar");
+        System.out.println("  --llrp4j-test [IP] [S]  Ejecutar prueba de conexión LLRP4J");
+        System.out.println("                          IP: dirección del lector (opcional)");
+        System.out.println("                          S: duración en segundos (opcional, def: 30)");
+        System.out.println("  --help, -h              Mostrar esta ayuda");
+        System.out.println("  --version, -v           Mostrar versión");
         System.out.println();
         System.out.println("Ejemplos:");
-        System.out.println("  java Main                              # Iniciar GUI");
-        System.out.println("  java Main --nogui --ip 192.168.1.100   # Modo consola con IP");
-        System.out.println("  java Main --config mi_config.json -a   # Cargar config y auto-conectar");
+        System.out.println("  java -jar Main.jar                              # Iniciar GUI");
+        System.out.println("  java -jar Main.jar --nogui --ip 192.168.1.100   # Modo consola");
+        System.out.println("  java -jar Main.jar --llrp4j-test 192.168.1.117  # Probar conexión");
+        System.out.println("  java -jar Main.jar --llrp4j-test 192.168.1.117 60  # Prueba 60 seg");
         System.out.println();
     }
     
@@ -214,6 +249,34 @@ public class Main {
         }
         
         statistics = new ReaderStatistics();
+    }
+    
+    /**
+     * Ejecuta la prueba de conexión LLRP4J.
+     * Esta prueba conecta al lector FX7500 usando la librería LLRP4J,
+     * configura un ROSpec y muestra los tags leídos durante la duración especificada.
+     */
+    private static void runLLRP4JTest() {
+        String testIp = (readerIp != null && !readerIp.isEmpty()) ? readerIp : config.getReaderIP();
+        
+        System.out.println();
+        System.out.println("========================================");
+        System.out.println("  PRUEBA LLRP4J - Zebra FX7500");
+        System.out.println("========================================");
+        System.out.println("IP del lector: " + testIp);
+        System.out.println("Duración: " + llrp4jTestDuration + " segundos");
+        System.out.println();
+        
+        // Ejecutar TestLLRP4J con los argumentos
+        String[] testArgs = new String[] { testIp, String.valueOf(llrp4jTestDuration) };
+        
+        try {
+            // Invocar el método main de TestLLRP4J
+            TestLLRP4J.main(testArgs);
+        } catch (Exception e) {
+            System.err.println("Error en prueba LLRP4J: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
     
     /**
