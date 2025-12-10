@@ -46,8 +46,11 @@ public class ZebraRFIDReader implements RfidEventsListener {
             reader.Events.setAttachTagDataWithReadEvent(true);
             
             System.out.println("[4] Configurando antena...");
+            int maxPower = caps.getTransmitPowerLevelValues().length - 1;
+            System.out.println("    Potencia máxima disponible: " + maxPower);
+            
             Antennas.AntennaRfConfig rfConfig = reader.Config.Antennas.getAntennaRfConfig(1);
-            rfConfig.setTransmitPowerIndex(270);
+            rfConfig.setTransmitPowerIndex(maxPower);
             rfConfig.setrfModeTableIndex(0);
             rfConfig.setTari(0);
             reader.Config.Antennas.setAntennaRfConfig(1, rfConfig);
