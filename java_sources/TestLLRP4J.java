@@ -16,15 +16,21 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
- * Prueba simple de conexión LLRP4J al lector FX7500.
+ * Prueba de conexión LLRP4J al lector FX7500.
+ * Usa un modelo de cola para procesar mensajes asíncronos.
  */
 public class TestLLRP4J {
     
     private static AtomicInteger tagCount = new AtomicInteger(0);
+    private static AtomicInteger messageCount = new AtomicInteger(0);
     private static LlrpClient client;
     private static volatile boolean running = true;
+    private static BlockingQueue<LlrpMessage> messageQueue = new LinkedBlockingQueue<>();
     
     public static void main(String[] args) {
         String readerIP = args.length > 0 ? args[0] : "192.168.1.117";
@@ -43,16 +49,23 @@ public class TestLLRP4J {
             LlrpContext context = LlrpContext.create(new LlrpModule());
             System.out.println("    OK - Contexto creado");
             
-            // Crear endpoint para recibir mensajes
+            // Crear endpoint para recibir mensajes - encola todo
             LlrpEndpoint endpoint = new LlrpEndpoint() {
                 @Override
                 public void messageReceived(LlrpMessage message) {
-                    handleMessage(message);
+                    messageCount.incrementAndGet();
+                    messageQueue.offer(message);
+                    
+                    // Debug: mostrar tipo de mensaje recibido
+                    String msgType = message.getClass().getSimpleName();
+                    if (!(message instanceof KEEPALIVE)) {
+                        System.out.println("[DEBUG] Mensaje recibido: " + msgType);
+                    }
                 }
                 
                 @Override
                 public void errorOccured(String msg, Throwable cause) {
-                    System.err.println("[ERROR] " + msg);
+                    System.err.println("[ERROR ENDPOINT] " + msg);
                     if (cause != null) {
                         cause.printStackTrace();
                     }
@@ -62,14 +75,40 @@ public class TestLLRP4J {
             // Conectar al lector
             System.out.println("[2] Conectando a " + readerIP + ":5084...");
             client = LlrpClient.create(context, readerIP, 5084).endpoint(endpoint);
-            Thread.sleep(1000);
+            Thread.sleep(2000);  // Esperar más para conexión completa
             System.out.println("    OK - Conectado!");
+            
+            // Configurar el lector para enviar eventos
+            System.out.println("[2.5] Configurando Reader Events...");
+            SET_READER_CONFIG setConfig = new SET_READER_CONFIG();
+            setConfig.resetToFactoryDefault(false);
+            
+            ReaderEventNotificationSpec eventSpec = new ReaderEventNotificationSpec();
+            List<EventNotificationState> eventStates = new ArrayList<>();
+            
+            // Habilitar notificaciones de ROSpec
+            EventNotificationState roSpecEvent = new EventNotificationState();
+            roSpecEvent.eventType(NotificationEventType.ROSpec_Event);
+            roSpecEvent.notificationState(true);
+            eventStates.add(roSpecEvent);
+            
+            // Habilitar notificaciones de reporte
+            EventNotificationState reportEvent = new EventNotificationState();
+            reportEvent.eventType(NotificationEventType.Report_Buffer_Fill_Warning);
+            reportEvent.notificationState(true);
+            eventStates.add(reportEvent);
+            
+            eventSpec.eventNotificationState(eventStates);
+            setConfig.readerEventNotificationSpec(eventSpec);
+            
+            LlrpMessage configResp = client.transact(setConfig);
+            System.out.println("    OK - Eventos configurados");
             
             // Eliminar ROSpecs existentes
             System.out.println("[3] Eliminando ROSpecs existentes...");
             DELETE_ROSPEC deleteRospec = new DELETE_ROSPEC();
             deleteRospec.roSpecID(0);
-            LlrpMessage deleteResp = client.transact(deleteRospec);
+            client.transact(deleteRospec);
             System.out.println("    OK - ROSpecs eliminados");
             
             // Crear y agregar ROSpec
@@ -92,14 +131,22 @@ public class TestLLRP4J {
             System.out.println("[5] Habilitando ROSpec...");
             ENABLE_ROSPEC enableRospec = new ENABLE_ROSPEC();
             enableRospec.roSpecID(1);
-            client.transact(enableRospec);
+            LlrpMessage enableResp = client.transact(enableRospec);
+            if (enableResp instanceof ENABLE_ROSPEC_RESPONSE) {
+                ENABLE_ROSPEC_RESPONSE resp = (ENABLE_ROSPEC_RESPONSE) enableResp;
+                System.out.println("    Respuesta: " + resp.llrpStatus().statusCode());
+            }
             System.out.println("    OK - ROSpec habilitado");
             
             // Iniciar ROSpec
             System.out.println("[6] Iniciando lectura...");
             START_ROSPEC startRospec = new START_ROSPEC();
             startRospec.roSpecID(1);
-            client.transact(startRospec);
+            LlrpMessage startResp = client.transact(startRospec);
+            if (startResp instanceof START_ROSPEC_RESPONSE) {
+                START_ROSPEC_RESPONSE resp = (START_ROSPEC_RESPONSE) startResp;
+                System.out.println("    Respuesta: " + resp.llrpStatus().statusCode());
+            }
             System.out.println("    OK - Lectura iniciada!");
             
             System.out.println();
@@ -108,21 +155,51 @@ public class TestLLRP4J {
             System.out.println("========================================");
             System.out.println();
             
-            // Esperar y monitorear
+            // Thread para procesar mensajes de la cola
+            Thread processorThread = new Thread(() -> {
+                while (running) {
+                    try {
+                        LlrpMessage msg = messageQueue.poll(100, TimeUnit.MILLISECONDS);
+                        if (msg != null) {
+                            processMessage(msg);
+                        }
+                    } catch (InterruptedException e) {
+                        break;
+                    }
+                }
+            });
+            processorThread.start();
+            
+            // Monitorear por la duración especificada
             long startTime = System.currentTimeMillis();
             int lastCount = 0;
+            int lastMsgCount = 0;
             
             for (int i = 0; i < testDuration && running; i++) {
                 Thread.sleep(1000);
                 int currentCount = tagCount.get();
+                int currentMsgCount = messageCount.get();
                 int newTags = currentCount - lastCount;
+                int newMsgs = currentMsgCount - lastMsgCount;
                 long elapsed = (System.currentTimeMillis() - startTime) / 1000;
                 
-                System.out.printf("[%3ds] Tags totales: %d (+%d en último segundo)\n", 
-                    elapsed, currentCount, newTags);
+                System.out.printf("[%3ds] Tags: %d (+%d) | Mensajes: %d (+%d)\n", 
+                    elapsed, currentCount, newTags, currentMsgCount, newMsgs);
                 
                 lastCount = currentCount;
+                lastMsgCount = currentMsgCount;
+                
+                // Cada 5 segundos, solicitar reporte manualmente
+                if (i > 0 && i % 5 == 0) {
+                    System.out.println("    [Solicitando reporte...]");
+                    GET_REPORT getReport = new GET_REPORT();
+                    client.send(getReport);
+                }
             }
+            
+            running = false;
+            processorThread.interrupt();
+            processorThread.join(1000);
             
             // Detener lectura
             System.out.println();
@@ -146,7 +223,9 @@ public class TestLLRP4J {
             System.out.println("  RESULTADOS");
             System.out.println("========================================");
             System.out.println("Total de tags leídos: " + tagCount.get());
-            System.out.println("Promedio: " + (tagCount.get() / testDuration) + " tags/segundo");
+            System.out.println("Total de mensajes recibidos: " + messageCount.get());
+            double tagsPerSec = testDuration > 0 ? (double) tagCount.get() / testDuration : 0;
+            System.out.printf("Promedio: %.1f tags/segundo\n", tagsPerSec);
             
         } catch (Exception e) {
             System.err.println("ERROR: " + e.getMessage());
@@ -154,7 +233,7 @@ public class TestLLRP4J {
         }
     }
     
-    private static void handleMessage(LlrpMessage message) {
+    private static void processMessage(LlrpMessage message) {
         if (message instanceof RO_ACCESS_REPORT) {
             RO_ACCESS_REPORT report = (RO_ACCESS_REPORT) message;
             List<TagReportData> tags = report.tagReportData();
@@ -201,20 +280,21 @@ public class TestLLRP4J {
                         rssi = peakRSSI.peakRSSI();
                     }
                     
-                    System.out.println(">>> TAG: " + epc + " | Antena: " + antenna + " | RSSI: " + rssi + " dBm");
+                    System.out.println(">>> TAG: " + epc + " | Ant: " + antenna + " | RSSI: " + rssi);
                 }
             }
         } else if (message instanceof KEEPALIVE) {
-            // Responder keepalive
+            // Responder keepalive silenciosamente
             if (client != null) {
                 try {
                     client.send(new KEEPALIVE_ACK());
                 } catch (Exception e) {
-                    // Ignorar errores de keepalive
+                    // Ignorar
                 }
             }
         } else if (message instanceof READER_EVENT_NOTIFICATION) {
-            System.out.println("[EVENTO] Notificación del lector recibida");
+            READER_EVENT_NOTIFICATION notification = (READER_EVENT_NOTIFICATION) message;
+            System.out.println("[EVENTO] Notificación del lector");
         }
     }
     
@@ -226,11 +306,11 @@ public class TestLLRP4J {
         rospec.priority(0);
         rospec.currentState(ROSpecState.Disabled);
         
-        // ROBoundarySpec
+        // ROBoundarySpec - Trigger inmediato
         ROBoundarySpec boundarySpec = new ROBoundarySpec();
         
         ROSpecStartTrigger startTrigger = new ROSpecStartTrigger();
-        startTrigger.roSpecStartTriggerType(ROSpecStartTriggerType.Null);
+        startTrigger.roSpecStartTriggerType(ROSpecStartTriggerType.Immediate);
         boundarySpec.roSpecStartTrigger(startTrigger);
         
         ROSpecStopTrigger stopTrigger = new ROSpecStopTrigger();
@@ -240,9 +320,9 @@ public class TestLLRP4J {
         
         rospec.roBoundarySpec(boundarySpec);
         
-        // AISpec
+        // AISpec - todas las antenas
         AISpec aiSpec = new AISpec();
-        aiSpec.antennaIDs(new int[]{0}); // 0 = todas las antenas
+        aiSpec.antennaIDs(new int[]{1, 2, 3, 4}); // Antenas específicas
         
         AISpecStopTrigger aiStopTrigger = new AISpecStopTrigger();
         aiStopTrigger.aiSpecStopTriggerType(AISpecStopTriggerType.Null);
@@ -261,10 +341,10 @@ public class TestLLRP4J {
         specParams.add(aiSpec);
         rospec.specParameter(specParams);
         
-        // ROReportSpec
+        // ROReportSpec - Reporte inmediato por cada tag
         ROReportSpec reportSpec = new ROReportSpec();
-        reportSpec.roReportTrigger(ROReportTriggerType.Upon_N_Tags_Or_End_Of_AISpec_Or_End_Of_RFSurveySpec);
-        reportSpec.n(1);
+        reportSpec.roReportTrigger(ROReportTriggerType.Upon_N_Tags_Or_End_Of_ROSpec);
+        reportSpec.n(1);  // Reportar cada tag individualmente
         
         TagReportContentSelector contentSelector = new TagReportContentSelector();
         contentSelector.enableROSpecID(true);
@@ -276,11 +356,11 @@ public class TestLLRP4J {
         contentSelector.enableFirstSeenTimestamp(true);
         contentSelector.enableLastSeenTimestamp(true);
         contentSelector.enableTagSeenCount(true);
-        contentSelector.enableAccessSpecID(true);
+        contentSelector.enableAccessSpecID(false);
         
         C1G2EPCMemorySelector epcSelector = new C1G2EPCMemorySelector();
-        epcSelector.enableCRC(true);
-        epcSelector.enablePCBits(true);
+        epcSelector.enableCRC(false);
+        epcSelector.enablePCBits(false);
         
         List<AirProtocolEPCMemorySelector> epcSelectors = new ArrayList<>();
         epcSelectors.add(epcSelector);
