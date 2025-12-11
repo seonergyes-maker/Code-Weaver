@@ -22,6 +22,9 @@ public class DuplicateFilter {
     /** Indica si el filtro está habilitado */
     private boolean enabled;
     
+    /** Modo sin expiración (estilo VZEBRA) - tags bloqueados hasta reset manual */
+    private boolean noExpiration;
+    
     /** Contador de duplicados filtrados */
     private long duplicatesFiltered;
     
@@ -34,6 +37,7 @@ public class DuplicateFilter {
     public DuplicateFilter() {
         this.expirationMs = DEFAULT_EXPIRATION_MS;
         this.enabled = true;
+        this.noExpiration = false;
         this.duplicatesFiltered = 0;
         this.uniqueTagsProcessed = 0;
     }
@@ -62,6 +66,20 @@ public class DuplicateFilter {
         long now = System.currentTimeMillis();
         Long lastSeen = seenTags.get(epc);
         
+        // Modo sin expiración (estilo VZEBRA)
+        if (noExpiration) {
+            if (lastSeen != null) {
+                // Tag ya fue visto, es duplicado permanente
+                duplicatesFiltered++;
+                return false;
+            }
+            // Tag nuevo, agregarlo al set
+            seenTags.put(epc, now);
+            uniqueTagsProcessed++;
+            return true;
+        }
+        
+        // Modo con tiempo de expiración
         if (lastSeen != null && (now - lastSeen) < expirationMs) {
             duplicatesFiltered++;
             return false;
@@ -145,10 +163,27 @@ public class DuplicateFilter {
         return seenTags.size();
     }
     
+    /**
+     * Verifica si está en modo sin expiración.
+     */
+    public boolean isNoExpiration() {
+        return noExpiration;
+    }
+    
+    /**
+     * Establece el modo sin expiración (estilo VZEBRA).
+     * Cuando está activo, los tags se bloquean permanentemente hasta llamar a clear().
+     * 
+     * @param noExpiration true para bloquear tags permanentemente
+     */
+    public void setNoExpiration(boolean noExpiration) {
+        this.noExpiration = noExpiration;
+    }
+    
     @Override
     public String toString() {
         return String.format(
-            "DuplicateFilter[enabled=%b, expiration=%dms, cached=%d, filtered=%d, processed=%d]",
-            enabled, expirationMs, seenTags.size(), duplicatesFiltered, uniqueTagsProcessed);
+            "DuplicateFilter[enabled=%b, noExpiration=%b, expiration=%dms, cached=%d, filtered=%d, processed=%d]",
+            enabled, noExpiration, expirationMs, seenTags.size(), duplicatesFiltered, uniqueTagsProcessed);
     }
 }

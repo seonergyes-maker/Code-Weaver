@@ -86,6 +86,19 @@ public class RFIDConfig implements Serializable {
     /** Tiempo de expiración del filtro de duplicados en segundos */
     private int duplicateFilterExpiration;
     
+    /** Modo sin expiración para el filtro de duplicados (estilo VZEBRA) */
+    private boolean duplicateFilterNoExpiration;
+    
+    /** Control de inicio por API habilitado */
+    private boolean apiStartControlEnabled;
+    private boolean retryFailedEnabled = true;
+    private int retryIntervalSeconds = 60;
+    private boolean apiPollingEnabled = false;
+    private int apiPollingIntervalSeconds = 5;
+    
+    /** Envío automático de tags a API habilitado */
+    private boolean apiEnabled = false;
+    
     // ==================== Configuración Avanzada Zebra ====================
     
     /** Umbral RSSI mínimo en dBm (-80 a 0). Tags con RSSI menor se ignoran. */
@@ -172,6 +185,8 @@ public class RFIDConfig implements Serializable {
         
         this.duplicateFilterEnabled = true;
         this.duplicateFilterExpiration = 5;
+        this.duplicateFilterNoExpiration = false;
+        this.apiStartControlEnabled = false;
         
         // Configuración avanzada Zebra - valores por defecto
         this.rssiThreshold = -70;           // -70 dBm es un buen umbral por defecto
@@ -382,6 +397,62 @@ public class RFIDConfig implements Serializable {
     public void setDuplicateFilterExpiration(int seconds) {
         if (seconds < 1) seconds = 1;
         this.duplicateFilterExpiration = seconds;
+    }
+
+    public boolean isDuplicateFilterNoExpiration() {
+        return duplicateFilterNoExpiration;
+    }
+
+    public void setDuplicateFilterNoExpiration(boolean noExpiration) {
+        this.duplicateFilterNoExpiration = noExpiration;
+    }
+
+    public boolean isApiStartControlEnabled() {
+        return apiStartControlEnabled;
+    }
+
+    public void setApiStartControlEnabled(boolean enabled) {
+        this.apiStartControlEnabled = enabled;
+    }
+    
+    public boolean isRetryFailedEnabled() {
+        return retryFailedEnabled;
+    }
+    
+    public void setRetryFailedEnabled(boolean enabled) {
+        this.retryFailedEnabled = enabled;
+    }
+    
+    public int getRetryIntervalSeconds() {
+        return retryIntervalSeconds;
+    }
+    
+    public void setRetryIntervalSeconds(int seconds) {
+        this.retryIntervalSeconds = seconds > 0 ? seconds : 60;
+    }
+    
+    public boolean isApiPollingEnabled() {
+        return apiPollingEnabled;
+    }
+    
+    public void setApiPollingEnabled(boolean enabled) {
+        this.apiPollingEnabled = enabled;
+    }
+    
+    public int getApiPollingIntervalSeconds() {
+        return apiPollingIntervalSeconds;
+    }
+    
+    public void setApiPollingIntervalSeconds(int seconds) {
+        this.apiPollingIntervalSeconds = seconds > 0 ? seconds : 5;
+    }
+    
+    public boolean isApiEnabled() {
+        return apiEnabled;
+    }
+    
+    public void setApiEnabled(boolean apiEnabled) {
+        this.apiEnabled = apiEnabled;
     }
     
     // ==================== Getters/Setters Configuración Avanzada ====================
@@ -699,6 +770,13 @@ public class RFIDConfig implements Serializable {
         // Configuración avanzada
         sb.append("  \"duplicateFilterEnabled\": ").append(duplicateFilterEnabled).append(",\n");
         sb.append("  \"duplicateFilterExpiration\": ").append(duplicateFilterExpiration).append(",\n");
+        sb.append("  \"duplicateFilterNoExpiration\": ").append(duplicateFilterNoExpiration).append(",\n");
+        sb.append("  \"apiStartControlEnabled\": ").append(apiStartControlEnabled).append(",\n");
+        sb.append("  \"retryFailedEnabled\": ").append(retryFailedEnabled).append(",\n");
+        sb.append("  \"retryIntervalSeconds\": ").append(retryIntervalSeconds).append(",\n");
+        sb.append("  \"apiPollingEnabled\": ").append(apiPollingEnabled).append(",\n");
+        sb.append("  \"apiPollingIntervalSeconds\": ").append(apiPollingIntervalSeconds).append(",\n");
+        sb.append("  \"apiEnabled\": ").append(apiEnabled).append(",\n");
         sb.append("  \"rssiThreshold\": ").append(rssiThreshold).append(",\n");
         sb.append("  \"rssiFilterEnabled\": ").append(rssiFilterEnabled).append(",\n");
         sb.append("  \"inventorySession\": ").append(inventorySession).append(",\n");
@@ -792,6 +870,13 @@ public class RFIDConfig implements Serializable {
         // Configuración avanzada
         config.duplicateFilterEnabled = extractBooleanValue(json, "duplicateFilterEnabled", config.duplicateFilterEnabled);
         config.duplicateFilterExpiration = extractIntValue(json, "duplicateFilterExpiration", config.duplicateFilterExpiration);
+        config.duplicateFilterNoExpiration = extractBooleanValue(json, "duplicateFilterNoExpiration", config.duplicateFilterNoExpiration);
+        config.apiStartControlEnabled = extractBooleanValue(json, "apiStartControlEnabled", config.apiStartControlEnabled);
+        config.retryFailedEnabled = extractBooleanValue(json, "retryFailedEnabled", config.retryFailedEnabled);
+        config.retryIntervalSeconds = extractIntValue(json, "retryIntervalSeconds", config.retryIntervalSeconds);
+        config.apiPollingEnabled = extractBooleanValue(json, "apiPollingEnabled", config.apiPollingEnabled);
+        config.apiPollingIntervalSeconds = extractIntValue(json, "apiPollingIntervalSeconds", config.apiPollingIntervalSeconds);
+        config.apiEnabled = extractBooleanValue(json, "apiEnabled", config.apiEnabled);
         config.rssiThreshold = extractIntValue(json, "rssiThreshold", config.rssiThreshold);
         config.rssiFilterEnabled = extractBooleanValue(json, "rssiFilterEnabled", config.rssiFilterEnabled);
         config.inventorySession = extractIntValue(json, "inventorySession", config.inventorySession);

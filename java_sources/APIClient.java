@@ -102,6 +102,8 @@ public class APIClient implements AutoCloseable {
     
     /** Callback para errores */
     private Consumer<Exception> errorHandler;
+    private FailedTagStorage failedTagStorage;
+    private LogManager logger = LogManager.getInstance();
     
     /** Modo de visualización del EPC: true = hex, false = decimal */
     private volatile boolean displayHexMode = true;
@@ -130,6 +132,39 @@ public class APIClient implements AutoCloseable {
             this.responseTimeMs = responseTimeMs;
         }
     }
+
+    /**
+     * Respuesta de la API de inicio de lectura.
+     * Contiene la autorización para iniciar la lectura y parámetros de configuración.
+     */
+    public static class InicioResponse {
+        /** Indica si se puede iniciar la lectura */
+        public final boolean resultado;
+        /** Mensaje de la API (error o información) */
+        public final String mensaje;
+        /** Fecha de inicio del servidor (epoch seconds) */
+        public final long fechaInicio;
+        /** Milisegundos de pausa entre lecturas */
+        public final int milisegundosParada;
+        
+        public InicioResponse(boolean resultado, String mensaje, long fechaInicio, int milisegundosParada) {
+            this.resultado = resultado;
+            this.mensaje = mensaje;
+            this.fechaInicio = fechaInicio;
+            this.milisegundosParada = milisegundosParada;
+        }
+        
+        public static InicioResponse error(String mensaje) {
+            return new InicioResponse(false, mensaje, 0, 100);
+        }
+        
+        @Override
+        public String toString() {
+            return String.format("InicioResponse[resultado=%s, mensaje=%s, fechaInicio=%d, parada=%dms]",
+                resultado, mensaje, fechaInicio, milisegundosParada);
+        }
+    }
+
     
     /**
      * Constructor por defecto.
@@ -267,6 +302,10 @@ public class APIClient implements AutoCloseable {
     
     public void setErrorHandler(Consumer<Exception> handler) {
         this.errorHandler = handler;
+    }
+    
+    public void setFailedTagStorage(FailedTagStorage storage) {
+        this.failedTagStorage = storage;
     }
     
     /**
@@ -528,6 +567,253 @@ public class APIClient implements AutoCloseable {
      * 
      * @return true si la conexión es exitosa
      */
+
+    /**
+     * Consulta a la API si se puede iniciar la lectura RFID.
+     * Llama al endpoint /rfid_lecturas/inicia con la IP del lector.
+     * 
+     * @return InicioResponse con el resultado de la consulta
+     */
+    public InicioResponse consultarAPIInicio() {
+        System.out.println("[APIClient] Consultando API inicio...");
+        
+        if (endpointUrl == null || endpointUrl.isEmpty()) {
+            System.out.println("[APIClient] Error: URL no configurada");
+            return InicioResponse.error("URL de API no configurada");
+        }
+        
+        // Construir URL de inicia: reemplazar /alta por /inicia en la URL base
+        String urlInicia = endpointUrl;
+        
+        // Si contiene /rfid_lecturas/alta, reemplazar por /inicia
+        if (urlInicia.contains("/rfid_lecturas/alta")) {
+            urlInicia = urlInicia.substring(0, urlInicia.indexOf("/rfid_lecturas/alta")) + "/rfid_lecturas/inicia";
+        } else {
+            // Asumir URL base, agregar /rfid_lecturas/inicia
+            if (!urlInicia.endsWith("/")) urlInicia += "/";
+            urlInicia += "rfid_lecturas/inicia";
+        }
+        
+        System.out.println("[APIClient] URL inicia: " + urlInicia);
+        
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(urlInicia);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setConnectTimeout(connectTimeout);
+            connection.setReadTimeout(readTimeout);
+            connection.setRequestProperty("Accept", "application/json");
+            // Enviar api-key e ip como headers HTTP
+            if (apiKey != null && !apiKey.isEmpty()) {
+                connection.setRequestProperty("api-key", apiKey);
+            }
+            if (readerIP != null && !readerIP.isEmpty()) {
+                connection.setRequestProperty("ip", readerIP);
+            }
+            
+            System.out.println("[APIClient] Headers: api-key=" + (apiKey != null ? apiKey.substring(0, Math.min(8, apiKey.length())) + "..." : "null") + ", ip=" + readerIP);
+            
+            int responseCode = connection.getResponseCode();
+            
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                StringBuilder response = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        response.append(line);
+                    }
+                }
+                
+                // Parsear JSON manualmente (sin dependencias externas)
+                String jsonStr = response.toString();
+                boolean resultado = parseJsonBoolean(jsonStr, "resultado");
+                String mensaje = parseJsonString(jsonStr, "mensaje");
+                long fechaInicio = parseJsonLong(jsonStr, "fecha_inicio");
+                int milisParada = parseJsonInt(jsonStr, "milisegundos_parada", 100);
+                
+                System.out.println("[APIClient] Respuesta de inicio: resultado=" + resultado + 
+                                 ", mensaje=" + mensaje + ", fecha=" + fechaInicio);
+                
+                return new InicioResponse(resultado, mensaje, fechaInicio, milisParada);
+                
+            } else {
+                String errorMsg = "Error HTTP " + responseCode;
+                System.err.println("[APIClient] " + errorMsg);
+                return InicioResponse.error(errorMsg);
+            }
+            
+        } catch (Exception e) {
+            String errorMsg = "Error al consultar API de inicio: " + e.getMessage();
+            System.err.println("[APIClient] " + errorMsg);
+            return InicioResponse.error(errorMsg);
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+    
+    /**
+     * Parsea un valor booleano de un JSON simple.
+     */
+    
+    /**
+     * Parsea un valor String de un JSON simple.
+     */
+    
+    /**
+     * Parsea un valor long de un JSON simple.
+     */
+    
+    /**
+     * Parsea un valor int de un JSON simple con valor por defecto.
+     */
+
+    /**
+     * Parsea un valor booleano de un JSON simple.
+     */
+    private boolean parseJsonBoolean(String json, String key) {
+        try {
+            String pattern = "\"" + key + "\"\\s*:\\s*(true|false)";
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile(pattern);
+            java.util.regex.Matcher m = p.matcher(json);
+            if (m.find()) {
+                return Boolean.parseBoolean(m.group(1));
+            }
+        } catch (Exception e) {
+            System.err.println("[APIClient] Error parseando boolean: " + e.getMessage());
+        }
+        return false;
+    }
+    
+    /**
+     * Parsea un valor String de un JSON simple.
+     */
+    private String parseJsonString(String json, String key) {
+        try {
+            String pattern = "\"" + key + "\"\\s*:\\s*\"([^\"]*)\"";
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile(pattern);
+            java.util.regex.Matcher m = p.matcher(json);
+            if (m.find()) {
+                return m.group(1);
+            }
+        } catch (Exception e) {
+            System.err.println("[APIClient] Error parseando string: " + e.getMessage());
+        }
+        return "";
+    }
+    
+    /**
+     * Parsea un valor long de un JSON simple.
+     */
+    private long parseJsonLong(String json, String key) {
+        try {
+            String pattern = "\"" + key + "\"\\s*:\\s*(-?\\d+)";
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile(pattern);
+            java.util.regex.Matcher m = p.matcher(json);
+            if (m.find()) {
+                return Long.parseLong(m.group(1));
+            }
+        } catch (Exception e) {
+            System.err.println("[APIClient] Error parseando long: " + e.getMessage());
+        }
+        return 0;
+    }
+    
+    /**
+     * Parsea un valor int de un JSON simple con valor por defecto.
+     */
+    private int parseJsonInt(String json, String key, int defaultValue) {
+        try {
+            String pattern = "\"" + key + "\"\\s*:\\s*(-?\\d+)";
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile(pattern);
+            java.util.regex.Matcher m = p.matcher(json);
+            if (m.find()) {
+                return Integer.parseInt(m.group(1));
+            }
+        } catch (Exception e) {
+            System.err.println("[APIClient] Error parseando int: " + e.getMessage());
+        }
+        return defaultValue;
+    }
+
+
+
+
+    /**
+     * Envía un tag individual a la API usando el formato de VZEBRA.
+     * URL: {endpoint}/rfid_lecturas/alta/{token}/{ip}/{trabajo}/{tag}
+     * 
+     * @param tag EPC del tag leído
+     * @param antena Número de antena
+     * @param rssi Nivel de señal
+     * @return true si el envío fue exitoso (HTTP 200)
+     */
+    public boolean enviarTagAPI(String tag, int antena, int rssi) {
+        if (endpointUrl == null || endpointUrl.isEmpty()) {
+            System.err.println("[APIClient] URL no configurada");
+            return false;
+        }
+        
+        try {
+            // Construir URL estilo VZEBRA: {URL}/rfid_lecturas/alta/{token}/{ip}/{trabajo}/{tag}
+            String baseUrl = endpointUrl.endsWith("/") ? endpointUrl : endpointUrl + "/";
+            String urlAlta = baseUrl + "rfid_lecturas/alta/" + 
+                           apiKey + "/" + 
+                           readerIP + "/" + 
+                           apiTrabajo + "/" + 
+                           tag;
+            
+            System.out.println("[APIClient] Enviando tag: " + urlAlta);
+            logger.debug("APIClient", "Enviando tag: " + tag);
+            
+            URL url = new URL(urlAlta);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setConnectTimeout(connectTimeout);
+            conn.setReadTimeout(readTimeout);
+            
+            int responseCode = conn.getResponseCode();
+            
+            if (responseCode == 200) {
+                logger.logTag(tag, antena, rssi, true);
+                return true;
+            } else {
+                logger.warn("APIClient", "Error enviando tag. HTTP " + responseCode + " - " + tag);
+                lastError = "HTTP " + responseCode;
+                // Almacenar lectura fallida para reintento
+                if (failedTagStorage != null) {
+                    failedTagStorage.almacenarLecturaFallida(readerIP, antena, rssi, tag);
+                }
+                return false;
+            }
+            
+        } catch (Exception e) {
+            logger.error("APIClient", "Error enviando tag: " + tag, e);
+            lastError = e.getMessage();
+            // Almacenar lectura fallida para reintento
+            if (failedTagStorage != null) {
+                failedTagStorage.almacenarLecturaFallida(readerIP, antena, rssi, tag);
+            }
+            if (errorHandler != null) {
+                errorHandler.accept(e);
+            }
+            return false;
+        }
+    }
+    
+    /**
+     * Envía un tag a la API de forma asíncrona (no bloquea el hilo principal).
+     */
+    public void enviarTagAPIAsync(String tag, int antena, int rssi) {
+        new Thread(() -> {
+            enviarTagAPI(tag, antena, rssi);
+        }).start();
+    }
+
     public boolean testConnection() {
         if (!isConfigured()) {
             return false;
@@ -619,7 +905,9 @@ public class APIClient implements AutoCloseable {
      * @throws IOException si hay error de conexión
      */
     private int doSendSingleTag(TagData tag) throws IOException {
-        String epc = displayHexMode ? tag.getEpc() : convertEpcToDecimal(tag.getEpc());
+        // EPC se envía tal cual (el filtro HEX/DECIMAL ya se aplicó antes)
+        String epc = tag.getEpc();
+        System.out.println("[APIClient] Enviando tag: " + epc);
         
         String token = (apiKey != null) ? URLEncoder.encode(apiKey, StandardCharsets.UTF_8.toString()) : "";
         String ip = (readerIP != null) ? URLEncoder.encode(readerIP, StandardCharsets.UTF_8.toString()) : "";

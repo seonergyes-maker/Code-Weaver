@@ -22,7 +22,7 @@ public class Main {
     public static final String VERSION = "2.0.0";
     
     /** Nombre de la aplicación */
-    public static final String APP_NAME = "Zebra FX7500 RFID Manager";
+    public static final String APP_NAME = "Zebra FX7500 RFID Manager by Daemon4";
     
     /** Ruta por defecto del archivo de configuración */
     public static final String DEFAULT_CONFIG_PATH = "rfid_config.json";

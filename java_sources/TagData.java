@@ -51,6 +51,9 @@ public class TagData implements Serializable, Comparable<TagData> {
     /** Marca de tiempo de la última lectura */
     private long lastSeen;
     
+    /** Estado del envío a la API: "", "Enviando", "OK", "Error" */
+    private String apiStatus = "";
+    
     /** Formateador de fecha para visualización */
     private static final DateTimeFormatter DATE_FORMATTER = 
         DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
@@ -320,6 +323,14 @@ public class TagData implements Serializable, Comparable<TagData> {
      */
     public long getLastSeen() {
         return lastSeen;
+    }
+    
+    public String getApiStatus() {
+        return apiStatus;
+    }
+    
+    public void setApiStatus(String apiStatus) {
+        this.apiStatus = apiStatus;
     }
     
     /**

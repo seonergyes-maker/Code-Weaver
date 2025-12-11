@@ -19,28 +19,28 @@ import java.awt.*;
  */
 public class ModernUIStyle {
     
-    // Colores principales
-    public static final Color BG_DARK = new Color(30, 32, 40);          // #1E2028
-    public static final Color BG_PANEL = new Color(37, 42, 52);         // #252A34
-    public static final Color BG_CARD = new Color(45, 50, 62);          // #2D323E
-    public static final Color BG_INPUT = new Color(55, 60, 75);         // #373C4B
-    public static final Color BG_HOVER = new Color(65, 70, 85);         // #414655
-    
-    // Acentos
-    public static final Color ACCENT_PRIMARY = new Color(0, 184, 217);  // #00B8D9 cyan
-    public static final Color ACCENT_SUCCESS = new Color(54, 179, 126); // #36B37E verde
-    public static final Color ACCENT_WARNING = new Color(255, 171, 0);  // #FFAB00 ámbar
-    public static final Color ACCENT_ERROR = new Color(255, 86, 48);    // #FF5630 rojo
-    public static final Color ACCENT_INFO = new Color(101, 84, 192);    // #6554C0 púrpura
-    
-    // Texto
-    public static final Color TEXT_PRIMARY = new Color(255, 255, 255);  // #FFFFFF
-    public static final Color TEXT_SECONDARY = new Color(165, 173, 186);// #A5ADBA
-    public static final Color TEXT_MUTED = new Color(107, 119, 140);    // #6B778C
-    
-    // Bordes
-    public static final Color BORDER_DEFAULT = new Color(60, 65, 80);   // #3C4150
-    public static final Color BORDER_FOCUS = ACCENT_PRIMARY;
+ // Colores principales (tema claro)
+ public static final Color BG_DARK   = new Color(244, 245, 247);  // #F4F5F7 fondo general
+ public static final Color BG_PANEL  = new Color(255, 255, 255);  // #FFFFFF paneles
+ public static final Color BG_CARD   = new Color(250, 251, 252);  // #FAFBFC tarjetas
+ public static final Color BG_INPUT  = new Color(235, 236, 240);  // #EBECF0 campos de texto
+ public static final Color BG_HOVER  = new Color(223, 225, 230);  // #DFE1E6 hover
+
+ // Acentos (los mismos, funcionan bien sobre fondos claros)
+ public static final Color ACCENT_PRIMARY = new Color(0, 184, 217);   // #00B8D9 cyan
+ public static final Color ACCENT_SUCCESS = new Color(54, 179, 126);  // #36B37E verde
+ public static final Color ACCENT_WARNING = new Color(255, 171, 0);   // #FFAB00 ámbar
+ public static final Color ACCENT_ERROR   = new Color(255, 86, 48);   // #FF5630 rojo
+ public static final Color ACCENT_INFO    = new Color(101, 84, 192);  // #6554C0 púrpura
+
+ // Texto (letras negras / oscuras)
+ public static final Color TEXT_PRIMARY   = new Color(0, 0, 0);       // #000000 texto principal
+ public static final Color TEXT_SECONDARY = new Color(11, 11, 11);    // #444B58 gris oscuro
+ public static final Color TEXT_MUTED     = new Color(44, 44, 44); // #6B778C gris medio
+
+ // Bordes
+ public static final Color BORDER_DEFAULT = new Color(223, 225, 230); // #DFE1E6
+ public static final Color BORDER_FOCUS   = ACCENT_PRIMARY;
     
     /**
      * Aplica el tema oscuro moderno a toda la aplicación.
@@ -142,7 +142,7 @@ public class ModernUIStyle {
      */
     public static void stylePrimaryButton(JButton button) {
         button.setBackground(ACCENT_PRIMARY);
-        button.setForeground(BG_DARK);
+        button.setForeground(TEXT_PRIMARY);
         button.setFont(new Font("Segoe UI", Font.BOLD, 12));
         button.setFocusPainted(false);
         button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
@@ -189,7 +189,7 @@ public class ModernUIStyle {
      */
     public static void styleSuccessButton(JButton button) {
         button.setBackground(ACCENT_SUCCESS);
-        button.setForeground(Color.WHITE);
+        button.setForeground(TEXT_PRIMARY);
         button.setFont(new Font("Segoe UI", Font.BOLD, 12));
         button.setFocusPainted(false);
         button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
@@ -202,7 +202,7 @@ public class ModernUIStyle {
      */
     public static void styleDangerButton(JButton button) {
         button.setBackground(ACCENT_ERROR);
-        button.setForeground(Color.WHITE);
+        button.setForeground(TEXT_PRIMARY);
         button.setFont(new Font("Segoe UI", Font.BOLD, 12));
         button.setFocusPainted(false);
         button.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
@@ -328,7 +328,7 @@ public class ModernUIStyle {
             }
         };
         chip.setOpaque(false);
-        chip.setForeground(Color.WHITE);
+        chip.setForeground(TEXT_PRIMARY);
         chip.setFont(new Font("Segoe UI", Font.BOLD, 11));
         chip.setHorizontalAlignment(SwingConstants.CENTER);
         chip.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
@@ -341,7 +341,7 @@ public class ModernUIStyle {
     public static JProgressBar createModernProgressBar() {
         JProgressBar progressBar = new JProgressBar();
         progressBar.setBackground(BG_CARD);
-        progressBar.setForeground(ACCENT_PRIMARY);
+        progressBar.setForeground(TEXT_PRIMARY);
         progressBar.setBorderPainted(false);
         progressBar.setStringPainted(false);
         return progressBar;

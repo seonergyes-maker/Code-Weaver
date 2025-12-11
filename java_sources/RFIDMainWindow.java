@@ -77,6 +77,9 @@ public class RFIDMainWindow extends JFrame {
     private JButton testApiButton;
     private JLabel apiStatusLabel;
     private JCheckBox apiEnabledCheck;
+    private JCheckBox apiStartControlCheck;
+    private JCheckBox apiPollingCheck;
+    private JSpinner apiPollingIntervalSpinner;
     
     // ==================== Componentes de GPIO ====================
     private JToggleButton[] gpoButtons = new JToggleButton[4];
@@ -91,6 +94,7 @@ public class RFIDMainWindow extends JFrame {
     // ==================== Componentes de Herramientas ====================
     private JCheckBox duplicateFilterCheck;
     private JSpinner duplicateExpirationSpinner;
+    private JCheckBox noExpirationCheck;
     private JButton generateWindowsServiceButton;
     private JButton generateUbuntuServiceButton;
     private JButton saveConfigButton;
@@ -123,6 +127,22 @@ public class RFIDMainWindow extends JFrame {
     private ZebraSDKConnection connection;
     private APIClient apiClient;
     private ReaderStatistics statistics;
+    private LogManager logger = LogManager.getInstance();
+    
+    // Control de fecha de inicio API (estilo VZEBRA)
+    private volatile long ultimaFechaInicioAPI = 0;
+    private volatile int milisegundosParada = 100;
+    
+    // Almacenamiento de lecturas fallidas
+    private FailedTagStorage failedTagStorage;
+    
+    // Throttling para envío a API (usa milisegundosParada de la respuesta)
+    private volatile long ultimoEnvioAPI = 0;
+    
+    // Polling periódico a la API de inicio (estilo VZEBRA)
+    private ScheduledExecutorService apiPollingExecutor;
+    private volatile boolean apiPollingEnabled = false;
+    private int apiPollingIntervalSeconds = 5;
     
     // ==================== Executor para actualizaciones ====================
     private ScheduledExecutorService updateExecutor;
@@ -180,6 +200,10 @@ public class RFIDMainWindow extends JFrame {
         this.statistics = new ReaderStatistics();
         this.duplicateFilter = new DuplicateFilter(this.config.getDuplicateFilterExpiration() * 1000L);
         this.duplicateFilter.setEnabled(this.config.isDuplicateFilterEnabled());
+        this.duplicateFilter.setNoExpiration(this.config.isDuplicateFilterNoExpiration());
+        
+        // Inicializar almacenamiento de lecturas fallidas
+        this.failedTagStorage = new FailedTagStorage(logger);
         
         initializeLookAndFeel();
         initializeComponents();
@@ -423,7 +447,7 @@ public class RFIDMainWindow extends JFrame {
             ModernUIStyle.styleSpinner(cableLossSpinners[i]);
         }
         
-        String[] columnNames = {"EPC", "RSSI (dBm)", "Antena", "Lecturas", "Última Lectura"};
+        String[] columnNames = {"EPC", "RSSI (dBm)", "Antena", "Lecturas", "Última Lectura", "API"};
         tagTableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -484,8 +508,19 @@ public class RFIDMainWindow extends JFrame {
         apiStatusLabel = new JLabel("No configurado");
         apiStatusLabel.setForeground(ModernUIStyle.TEXT_MUTED);
         
-        apiEnabledCheck = new JCheckBox("Envío automático habilitado", false);
+        apiEnabledCheck = new JCheckBox("Envío automático habilitado", config.isApiEnabled());
         ModernUIStyle.styleCheckBox(apiEnabledCheck);
+        
+        apiStartControlCheck = new JCheckBox("Consultar API antes de iniciar lectura", config.isApiStartControlEnabled());
+        ModernUIStyle.styleCheckBox(apiStartControlCheck);
+        
+        apiPollingCheck = new JCheckBox("Polling automático (control por API)", config.isApiPollingEnabled());
+        ModernUIStyle.styleCheckBox(apiPollingCheck);
+        apiPollingCheck.setToolTipText("Consulta la API periódicamente e inicia/detiene lectura automáticamente");
+        
+        apiPollingIntervalSpinner = new JSpinner(new SpinnerNumberModel(
+            config.getApiPollingIntervalSeconds(), 1, 60, 1));
+        apiPollingIntervalSpinner.setPreferredSize(new Dimension(60, 25));
         
         for (int i = 0; i < 4; i++) {
             gpoButtons[i] = new JToggleButton("GPO " + (i + 1));
@@ -522,6 +557,9 @@ public class RFIDMainWindow extends JFrame {
         duplicateExpirationSpinner = new JSpinner(new SpinnerNumberModel(
             config.getDuplicateFilterExpiration(), 1, 300, 1));
         ModernUIStyle.styleSpinner(duplicateExpirationSpinner);
+        
+        noExpirationCheck = new JCheckBox("Sin expiración (estilo VZEBRA)", config.isDuplicateFilterNoExpiration());
+        ModernUIStyle.styleCheckBox(noExpirationCheck);
         
         generateWindowsServiceButton = new JButton("\u229E Generar Instalador Windows");
         ModernUIStyle.stylePrimaryButton(generateWindowsServiceButton);
@@ -593,8 +631,8 @@ public class RFIDMainWindow extends JFrame {
         ModernUIStyle.styleTabbedPane(tabbedPane);
         
         tabbedPane.addTab("Conexión", createConnectionPanel());
-        tabbedPane.addTab("Antenas", createAntennasPanel());
         tabbedPane.addTab("Monitoreo", createMonitorPanel());
+        tabbedPane.addTab("Antenas", createAntennasPanel());
         tabbedPane.addTab("API", createApiPanel());
         tabbedPane.addTab("GPIO", createGpioPanel());
         tabbedPane.addTab("Avanzado", createAdvancedPanel());
@@ -718,7 +756,7 @@ public class RFIDMainWindow extends JFrame {
         gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 2;
         panel.add(rssiFilterChecks[antennaIndex], gbc);
         
-        gbc.gridy = 5; gbc.gridwidth = 1;
+        gbc.gridy = 6; gbc.gridwidth = 1;
         JLabel rssiLabel = new JLabel("Umbral RSSI:");
         rssiLabel.setFont(new Font("Segoe UI", Font.PLAIN, 11));
         panel.add(rssiLabel, gbc);
@@ -779,44 +817,118 @@ public class RFIDMainWindow extends JFrame {
      * @return Panel de API
      */
     private JPanel createApiPanel() {
-        JPanel panel = new JPanel(new GridBagLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        
+        // ========== SECCIÓN 1: CONFIGURACIÓN DEL SERVIDOR ==========
+        JPanel serverSection = new JPanel(new BorderLayout(0, 8));
+        serverSection.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(ModernUIStyle.BORDER_DEFAULT, 1),
+            BorderFactory.createEmptyBorder(12, 15, 12, 15)
+        ));
+        serverSection.setBackground(ModernUIStyle.BG_CARD);
+        
+        JLabel serverTitle = new JLabel("Configuración del Servidor API");
+        serverTitle.setFont(serverTitle.getFont().deriveFont(Font.BOLD, 14f));
+        serverTitle.setForeground(ModernUIStyle.ACCENT_PRIMARY);
+        serverSection.add(serverTitle, BorderLayout.NORTH);
+        
+        JPanel serverContent = new JPanel(new GridBagLayout());
+        serverContent.setOpaque(false);
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.insets = new Insets(5, 5, 5, 10);
         gbc.anchor = GridBagConstraints.WEST;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
         
         gbc.gridx = 0; gbc.gridy = 0;
-        panel.add(new JLabel("Endpoint:"), gbc);
+        serverContent.add(new JLabel("Endpoint:"), gbc);
+        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
+        serverContent.add(apiEndpointField, gbc);
         
-        gbc.gridx = 1; gbc.gridwidth = 2;
-        panel.add(apiEndpointField, gbc);
+        gbc.gridx = 0; gbc.gridy = 1; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0;
+        serverContent.add(new JLabel("API Key:"), gbc);
+        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
+        serverContent.add(apiKeyField, gbc);
         
-        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 1;
-        panel.add(new JLabel("API Key:"), gbc);
+        gbc.gridx = 0; gbc.gridy = 2; gbc.fill = GridBagConstraints.NONE; gbc.weightx = 0;
+        serverContent.add(new JLabel("ID Trabajo:"), gbc);
+        gbc.gridx = 1; gbc.fill = GridBagConstraints.HORIZONTAL; gbc.weightx = 1.0;
+        serverContent.add(apiTrabajoField, gbc);
         
-        gbc.gridx = 1; gbc.gridwidth = 2;
-        panel.add(apiKeyField, gbc);
-        
-        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 1;
-        panel.add(new JLabel("ID Trabajo:"), gbc);
-        
-        gbc.gridx = 1; gbc.gridwidth = 2;
-        panel.add(apiTrabajoField, gbc);
-        
-        gbc.gridx = 0; gbc.gridy = 3;
-        panel.add(testApiButton, gbc);
-        
+        gbc.gridx = 0; gbc.gridy = 3; gbc.fill = GridBagConstraints.NONE;
+        serverContent.add(testApiButton, gbc);
         gbc.gridx = 1;
-        panel.add(apiStatusLabel, gbc);
+        serverContent.add(apiStatusLabel, gbc);
         
-        gbc.gridx = 0; gbc.gridy = 4; gbc.gridwidth = 3;
-        panel.add(apiEnabledCheck, gbc);
+        serverSection.add(serverContent, BorderLayout.CENTER);
+        mainPanel.add(serverSection);
+        mainPanel.add(Box.createVerticalStrut(12));
         
-        gbc.gridy = 5; gbc.weighty = 1.0;
-        panel.add(new JLabel(), gbc);
+        // ========== SECCIÓN 2: OPCIONES DE ENVÍO ==========
+        JPanel optionsSection = new JPanel(new BorderLayout(0, 8));
+        optionsSection.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(ModernUIStyle.BORDER_DEFAULT, 1),
+            BorderFactory.createEmptyBorder(12, 15, 12, 15)
+        ));
+        optionsSection.setBackground(ModernUIStyle.BG_CARD);
         
-        return panel;
+        JLabel optionsTitle = new JLabel("Opciones de Envío");
+        optionsTitle.setFont(optionsTitle.getFont().deriveFont(Font.BOLD, 14f));
+        optionsTitle.setForeground(ModernUIStyle.ACCENT_PRIMARY);
+        optionsSection.add(optionsTitle, BorderLayout.NORTH);
+        
+        JPanel optionsContent = new JPanel();
+        optionsContent.setLayout(new BoxLayout(optionsContent, BoxLayout.Y_AXIS));
+        optionsContent.setOpaque(false);
+        
+        optionsContent.add(apiEnabledCheck);
+        optionsContent.add(Box.createVerticalStrut(5));
+        
+        optionsSection.add(optionsContent, BorderLayout.CENTER);
+        mainPanel.add(optionsSection);
+        mainPanel.add(Box.createVerticalStrut(12));
+        
+        // ========== SECCIÓN 3: CONTROL AUTOMÁTICO ==========
+        JPanel controlSection = new JPanel(new BorderLayout(0, 8));
+        controlSection.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(ModernUIStyle.BORDER_DEFAULT, 1),
+            BorderFactory.createEmptyBorder(12, 15, 12, 15)
+        ));
+        controlSection.setBackground(ModernUIStyle.BG_CARD);
+        
+        JLabel controlTitle = new JLabel("Control Automático (Polling)");
+        controlTitle.setFont(controlTitle.getFont().deriveFont(Font.BOLD, 14f));
+        controlTitle.setForeground(ModernUIStyle.ACCENT_PRIMARY);
+        controlSection.add(controlTitle, BorderLayout.NORTH);
+        
+        JPanel controlContent = new JPanel();
+        controlContent.setLayout(new BoxLayout(controlContent, BoxLayout.Y_AXIS));
+        controlContent.setOpaque(false);
+        
+        controlContent.add(apiStartControlCheck);
+        controlContent.add(Box.createVerticalStrut(5));
+        
+        JPanel pollingPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        pollingPanel.setOpaque(false);
+        pollingPanel.add(apiPollingCheck);
+        pollingPanel.add(new JLabel("cada"));
+        pollingPanel.add(apiPollingIntervalSpinner);
+        pollingPanel.add(new JLabel("segundos"));
+        controlContent.add(pollingPanel);
+        
+        controlSection.add(controlContent, BorderLayout.CENTER);
+        mainPanel.add(controlSection);
+        
+        mainPanel.add(Box.createVerticalGlue());
+        
+        JScrollPane scrollPane = new JScrollPane(mainPanel);
+        scrollPane.setBorder(null);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.add(scrollPane, BorderLayout.CENTER);
+        
+        return wrapper;
     }
     
     /**
@@ -1092,6 +1204,37 @@ public class RFIDMainWindow extends JFrame {
         reportSection.add(reportContent, BorderLayout.CENTER);
         mainPanel.add(reportSection);
         
+        // ========== SECCIÓN: FILTRO DE DUPLICADOS ==========
+        JPanel dupSection = createAdvancedSection(
+            "Filtro de Tags Duplicados",
+            "Evita procesar el mismo tag múltiples veces dentro de un período de tiempo."
+        );
+        
+        JPanel dupContent = new JPanel(new GridBagLayout());
+        dupContent.setOpaque(false);
+        gbc = new GridBagConstraints();
+        gbc.insets = new Insets(6, 8, 6, 8);
+        gbc.anchor = GridBagConstraints.WEST;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        dupContent.add(duplicateFilterCheck, gbc);
+        
+        gbc.gridx = 1;
+        dupContent.add(new JLabel("Expiración (segundos):"), gbc);
+        
+        gbc.gridx = 2;
+        dupContent.add(duplicateExpirationSpinner, gbc);
+        
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 3;
+        dupContent.add(noExpirationCheck, gbc);
+        
+        gbc.gridy = 2;
+        dupContent.add(duplicateStatsLabel, gbc);
+        
+        dupSection.add(dupContent, BorderLayout.CENTER);
+        mainPanel.add(dupSection);
+        mainPanel.add(Box.createVerticalStrut(15));
+        
         mainPanel.add(Box.createVerticalGlue());
         
         JScrollPane scrollPane = new JScrollPane(mainPanel);
@@ -1150,58 +1293,41 @@ public class RFIDMainWindow extends JFrame {
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         
+        // Generadores de Servicio
         gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 3;
-        JLabel filterTitle = new JLabel("Filtro de Tags Duplicados");
-        filterTitle.setFont(filterTitle.getFont().deriveFont(Font.BOLD, 14f));
-        panel.add(filterTitle, gbc);
-        
-        gbc.gridy = 1; gbc.gridwidth = 1;
-        panel.add(duplicateFilterCheck, gbc);
-        
-        gbc.gridx = 1;
-        panel.add(new JLabel("Tiempo de expiración (segundos):"), gbc);
-        
-        gbc.gridx = 2;
-        panel.add(duplicateExpirationSpinner, gbc);
-        
-        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 3;
-        panel.add(duplicateStatsLabel, gbc);
-        
-        gbc.gridy = 3; gbc.fill = GridBagConstraints.HORIZONTAL;
-        panel.add(new JSeparator(), gbc);
-        
-        gbc.gridy = 4; gbc.fill = GridBagConstraints.NONE;
         JLabel serviceTitle = new JLabel("Generadores de Servicio");
         serviceTitle.setFont(serviceTitle.getFont().deriveFont(Font.BOLD, 14f));
         panel.add(serviceTitle, gbc);
         
-        gbc.gridy = 5; gbc.gridwidth = 1;
+        gbc.gridy = 1; gbc.gridwidth = 1;
         gbc.gridx = 0;
         panel.add(generateWindowsServiceButton, gbc);
         
         gbc.gridx = 1;
         panel.add(generateUbuntuServiceButton, gbc);
         
-        gbc.gridy = 6; gbc.gridx = 0; gbc.gridwidth = 3;
+        gbc.gridy = 2; gbc.gridx = 0; gbc.gridwidth = 3;
         JLabel serviceInfo = new JLabel("<html><i>Genera scripts de instalación para ejecutar como servicio del sistema.</i></html>");
         panel.add(serviceInfo, gbc);
         
-        gbc.gridy = 7; gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridy = 3; gbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(new JSeparator(), gbc);
         
-        gbc.gridy = 8; gbc.fill = GridBagConstraints.NONE;
+        // Configuración
+        gbc.gridy = 4; gbc.fill = GridBagConstraints.NONE;
         JLabel configTitle = new JLabel("Configuración");
         configTitle.setFont(configTitle.getFont().deriveFont(Font.BOLD, 14f));
         panel.add(configTitle, gbc);
         
-        gbc.gridy = 9; gbc.gridwidth = 1;
+        gbc.gridy = 5; gbc.gridwidth = 1;
         panel.add(saveConfigButton, gbc);
         
         gbc.gridx = 1; gbc.gridwidth = 2;
         JLabel saveInfo = new JLabel("Guarda la configuración actual en rfid_config.json");
         panel.add(saveInfo, gbc);
         
-        gbc.gridx = 0; gbc.gridy = 10; gbc.gridwidth = 3;
+        // Espaciador
+        gbc.gridx = 0; gbc.gridy = 6; gbc.gridwidth = 3;
         gbc.weighty = 1.0;
         panel.add(new JLabel(), gbc);
         
@@ -1278,6 +1404,50 @@ public class RFIDMainWindow extends JFrame {
             int seconds = (Integer) duplicateExpirationSpinner.getValue();
             duplicateFilter.setExpirationSeconds(seconds);
             config.setDuplicateFilterExpiration(seconds);
+        });
+        
+        noExpirationCheck.addActionListener(e -> {
+            boolean noExp = noExpirationCheck.isSelected();
+            duplicateFilter.setNoExpiration(noExp);
+            duplicateExpirationSpinner.setEnabled(!noExp);
+            config.setDuplicateFilterNoExpiration(noExp);
+            autoSaveConfiguration();
+            if (noExp) {
+                duplicateFilter.clear();
+            }
+        });
+        
+        apiEnabledCheck.addActionListener(e -> {
+            boolean enabled = apiEnabledCheck.isSelected();
+            config.setApiEnabled(enabled);
+            autoSaveConfiguration();
+            logger.debug("Config", "Envío automático API: " + (enabled ? "ACTIVADO" : "DESACTIVADO"));
+            System.out.println("[Config] Envío automático API: " + (enabled ? "ACTIVADO" : "DESACTIVADO"));
+        });
+        
+        apiStartControlCheck.addActionListener(e -> {
+            config.setApiStartControlEnabled(apiStartControlCheck.isSelected());
+            autoSaveConfiguration();
+        });
+        
+        apiPollingCheck.addActionListener(e -> {
+            boolean enabled = apiPollingCheck.isSelected();
+            config.setApiPollingEnabled(enabled);
+            apiPollingEnabled = enabled;
+            autoSaveConfiguration();
+            
+            if (enabled && connection != null && connection.isConnected() && apiClient != null) {
+                startApiPolling();
+            } else {
+                stopApiPolling();
+            }
+        });
+        
+        apiPollingIntervalSpinner.addChangeListener(e -> {
+            int interval = (Integer) apiPollingIntervalSpinner.getValue();
+            config.setApiPollingIntervalSeconds(interval);
+            apiPollingIntervalSeconds = interval;
+            autoSaveConfiguration();
         });
         
         generateWindowsServiceButton.addActionListener(e -> generateWindowsService());
@@ -1465,6 +1635,7 @@ public class RFIDMainWindow extends JFrame {
     
     /**
      * Inicia la lectura de etiquetas RFID.
+     * Si la API está habilitada, primero consulta si tiene autorización para iniciar.
      */
     private void startReading() {
         if (connection == null || !connection.isConnected()) {
@@ -1476,16 +1647,59 @@ public class RFIDMainWindow extends JFrame {
         }
         
         saveUIToConfig();
-        setStatus("Iniciando lectura de etiquetas...");
+        setStatus("Consultando API para iniciar lectura...");
         activityIndicator.setIndeterminate(true);
         startReadingButton.setEnabled(false);
         
         new SwingWorker<Boolean, Void>() {
             private String errorMessage = "";
+            private boolean apiAutorizado = true;
             
             @Override
             protected Boolean doInBackground() {
                 try {
+                    // Si la API está habilitada, consultar primero
+                    if (apiClient != null && apiStartControlCheck.isSelected()) {
+                        System.out.println("[RFID] Consultando API antes de iniciar lectura...");
+                        APIClient.InicioResponse respuesta = apiClient.consultarAPIInicio();
+                        
+                        if (!respuesta.resultado) {
+                            apiAutorizado = false;
+                            errorMessage = "API denegó inicio: " + respuesta.mensaje;
+                            logger.warn("RFID", errorMessage);
+                            System.out.println("[RFID] " + errorMessage);
+                            return false;
+                        }
+                        
+                        logger.info("RFID", "API autorizó inicio. Iniciando lectura...");
+                        System.out.println("[RFID] API autorizó inicio. Fecha servidor: " + 
+                                         respuesta.fechaInicio + ", Pausa: " + respuesta.milisegundosParada + "ms");
+                        
+                        // Verificar si cambió la fecha de inicio (estilo VZEBRA)
+                        if (ultimaFechaInicioAPI != respuesta.fechaInicio) {
+                            if (ultimaFechaInicioAPI != 0) {
+                                // Si ya teníamos una fecha anterior y cambió, resetear duplicados
+                                duplicateFilter.clear();
+                                logger.info("RFID", "Nueva sesión API - Filtro de duplicados reseteado");
+                                System.out.println("[RFID] Nueva sesión API detectada. Filtro de duplicados limpiado.");
+                            }
+                            ultimaFechaInicioAPI = respuesta.fechaInicio;
+                        }
+                        
+                        // Guardar milisegundos de parada
+                        milisegundosParada = respuesta.milisegundosParada > 0 ? respuesta.milisegundosParada : 100;
+                        
+                        // Iniciar reintentos automáticos de lecturas fallidas
+                        if (failedTagStorage != null && config.isRetryFailedEnabled()) {
+                            failedTagStorage.setRetryEnabled(true);
+                            failedTagStorage.setRetryIntervalSeconds(config.getRetryIntervalSeconds());
+                            failedTagStorage.iniciarReintentos(apiClient);
+                            logger.info("RFID", "Reintentos automáticos activados (cada " + 
+                                       config.getRetryIntervalSeconds() + "s)");
+                        }
+                    }
+                    
+                    // Iniciar lectura en el lector
                     return connection.startReading();
                 } catch (Exception e) {
                     errorMessage = e.getMessage();
@@ -1584,6 +1798,7 @@ public class RFIDMainWindow extends JFrame {
      * Llamado cuando la conexión es exitosa.
      */
     private void onConnected() {
+        logger.logConnection(config.getReaderIP(), true);
         connectionIndicator.setBackground(ModernUIStyle.ACCENT_SUCCESS);
         connectionStatusLabel.setText("Conectado");
         connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
@@ -1597,6 +1812,15 @@ public class RFIDMainWindow extends JFrame {
         config.setLastConnectedIP(config.getReaderIP());
         autoSaveConfiguration();
         System.out.println("[Config] Última IP conectada guardada: " + config.getReaderIP());
+        
+        // Iniciar polling automático si está habilitado en la configuración
+        if (config.isApiPollingEnabled() && apiClient != null) {
+            apiPollingEnabled = true;
+            apiPollingIntervalSeconds = config.getApiPollingIntervalSeconds();
+            startApiPolling();
+            System.out.println("[APIPolling] Polling automático iniciado al conectar");
+            logger.info("APIPolling", "Polling automático iniciado al conectar (cada " + apiPollingIntervalSeconds + "s)");
+        }
         
         if (apiEnabledCheck.isSelected() && !apiEndpointField.getText().trim().isEmpty()) {
             startApiClient();
@@ -1622,6 +1846,11 @@ public class RFIDMainWindow extends JFrame {
      * Llamado cuando se desconecta.
      */
     private void onDisconnected() {
+        // Detener reintentos y polling al desconectar
+        if (failedTagStorage != null) {
+            failedTagStorage.shutdown();
+        }
+        stopApiPolling();
         connectionIndicator.setBackground(ModernUIStyle.ACCENT_ERROR);
         connectionStatusLabel.setText("Desconectado");
         connectionStatusLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
@@ -1701,6 +1930,15 @@ public class RFIDMainWindow extends JFrame {
             }
         }
         
+        // Filtro HEX/DECIMAL: en modo DECIMAL solo acepta EPCs con dígitos 0-9
+        if (!config.isDisplayHexMode()) {
+            String epcToCheck = tag.getEpc();
+            if (epcToCheck != null && !epcToCheck.matches("[0-9]+")) {
+                // EPC contiene letras (A-F), ignorar en modo DECIMAL
+                return;
+            }
+        }
+        
         if (duplicateFilter.isEnabled() && !duplicateFilter.shouldProcess(tag.getEpc())) {
             return;
         }
@@ -1720,8 +1958,41 @@ public class RFIDMainWindow extends JFrame {
         
         statistics.recordTagRead(tag);
         
-        if (apiClient != null && apiClient.isRunning()) {
-            apiClient.enqueue(tag);
+        // Envío directo a la API estilo VZEBRA (throttling se aplica en el hilo de envío)
+        if (apiClient != null && apiEnabledCheck.isSelected()) {
+            final String tagEpc = tag.getEpc();
+            final int antenna = tag.getAntennaPort();
+            final int rssiValue = (int) tag.getRssi();
+            final TagData tagRef = tag;
+            
+            // Marcar como "Enviando"
+            tagRef.setApiStatus("Enviando...");
+            SwingUtilities.invokeLater(this::updateTagTable);
+            
+            // Envío en hilo separado con throttling para no bloquear EDT
+            new Thread(() -> {
+                try {
+                    long ahora = System.currentTimeMillis();
+                    long espera = milisegundosParada - (ahora - ultimoEnvioAPI);
+                    
+                    // Aplicar throttling si es necesario (máximo 200ms de espera)
+                    if (milisegundosParada > 0 && espera > 0 && espera < 200) {
+                        Thread.sleep(espera);
+                    }
+                    
+                    ultimoEnvioAPI = System.currentTimeMillis();
+                    boolean exito = apiClient.enviarTagAPI(tagEpc, antenna, rssiValue);
+                    
+                    // Actualizar estado según resultado
+                    tagRef.setApiStatus(exito ? "OK" : "Error");
+                    SwingUtilities.invokeLater(this::updateTagTable);
+                    
+                } catch (Exception e) {
+                    logger.error("API", "Error en envío throttled: " + e.getMessage());
+                    tagRef.setApiStatus("Error");
+                    SwingUtilities.invokeLater(this::updateTagTable);
+                }
+            }, "API-Send-" + tagEpc.substring(Math.max(0, tagEpc.length()-4))).start();
         }
         
         updateTagTable();
@@ -1746,7 +2017,8 @@ public class RFIDMainWindow extends JFrame {
                 String.format("%.1f", tag.getRssi()),
                 tag.getAntennaPort(),
                 tag.getReadCount(),
-                sdf.format(new Date(tag.getLastSeen()))
+                sdf.format(new Date(tag.getLastSeen())),
+                tag.getApiStatus()
             });
         }
         
@@ -1932,11 +2204,154 @@ public class RFIDMainWindow extends JFrame {
         
         if (!endpoint.isEmpty()) {
             apiClient = new APIClient(endpoint, key);
+            apiClient.setReaderIP(config.getReaderIP());
             apiClient.setApiTrabajo(trabajo);
             apiClient.setDisplayHexMode(displayHexMode);
+            apiClient.setFailedTagStorage(failedTagStorage);
             apiClient.start();
             apiStatusLabel.setText("Cliente API iniciado");
             apiStatusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
+            
+            // Iniciar polling si está habilitado
+            if (apiPollingEnabled && apiPollingCheck != null && apiPollingCheck.isSelected()) {
+                startApiPolling();
+            }
+        }
+    }
+    
+    /**
+     * Inicia el polling periódico a la API de inicio (estilo VZEBRA).
+     * Consulta la API cada X segundos y controla lectura automáticamente.
+     */
+    private void startApiPolling() {
+        if (apiPollingExecutor != null && !apiPollingExecutor.isShutdown()) {
+            logger.debug("APIPolling", "Polling ya activo");
+            return; // Ya está corriendo
+        }
+        
+        logger.info("APIPolling", "Iniciando polling cada " + apiPollingIntervalSeconds + "s");
+        System.out.println("[APIPolling] Iniciando polling cada " + apiPollingIntervalSeconds + "s");
+        
+        apiPollingExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "API-Polling");
+            t.setDaemon(true);
+            return t;
+        });
+        
+        int interval = config.getApiPollingIntervalSeconds();
+        if (interval < 1) interval = 5;
+        
+        apiPollingExecutor.scheduleAtFixedRate(() -> {
+            try {
+                pollApiInicio();
+            } catch (Exception e) {
+                logger.error("APIPolling", "Error en polling: " + e.getMessage());
+            }
+        }, 0, interval, java.util.concurrent.TimeUnit.SECONDS);
+        
+        logger.info("APIPolling", "Polling iniciado (cada " + interval + "s)");
+        System.out.println("[APIPolling] Polling iniciado cada " + interval + " segundos");
+    }
+    
+    /**
+     * Detiene el polling periódico.
+     */
+    private void stopApiPolling() {
+        if (apiPollingExecutor != null && !apiPollingExecutor.isShutdown()) {
+            apiPollingExecutor.shutdown();
+            logger.info("APIPolling", "Polling detenido");
+            System.out.println("[APIPolling] Polling detenido");
+        }
+    }
+    
+    /**
+     * Ejecuta una consulta a la API de inicio y controla la lectura automáticamente.
+     * Este método se ejecuta en un thread de background, pero todas las operaciones
+     * de UI y lector se ejecutan en el EDT mediante SwingUtilities.invokeLater.
+     */
+    private void pollApiInicio() {
+        if (apiClient == null || connection == null || !connection.isConnected()) {
+            return;
+        }
+        
+        try {
+            final APIClient.InicioResponse respuesta = apiClient.consultarAPIInicio();
+            
+            // Todas las operaciones de UI/lector deben ir en el EDT
+            SwingUtilities.invokeLater(() -> {
+                procesarRespuestaPolling(respuesta);
+            });
+            
+        } catch (Exception e) {
+            logger.error("APIPolling", "Error consultando API: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Procesa la respuesta del polling en el EDT.
+     * Controla inicio/detención de lectura automáticamente.
+     */
+    private void procesarRespuestaPolling(APIClient.InicioResponse respuesta) {
+        if (respuesta.resultado) {
+            // API autoriza lectura
+            
+            // Verificar si cambió fecha_inicio (reset de duplicados)
+            if (ultimaFechaInicioAPI != respuesta.fechaInicio) {
+                if (ultimaFechaInicioAPI != 0) {
+                    duplicateFilter.clear();
+                    logger.info("APIPolling", "Nueva sesión - Filtro de duplicados reseteado");
+                    System.out.println("[APIPolling] Nueva fecha_inicio detectada. Duplicados limpiados.");
+                }
+                ultimaFechaInicioAPI = respuesta.fechaInicio;
+            }
+            
+            // Guardar milisegundos de parada
+            milisegundosParada = respuesta.milisegundosParada > 0 ? respuesta.milisegundosParada : 100;
+            
+            // Iniciar lectura si no está leyendo
+            if (!isReading && connection != null && connection.isConnected()) {
+                logger.info("APIPolling", "API autoriza - Iniciando lectura automática");
+                System.out.println("[APIPolling] API autoriza. Iniciando lectura...");
+                
+                try {
+                    if (connection.startReading()) {
+                        isReading = true;
+                        startReadingButton.setEnabled(false);
+                        stopReadingButton.setEnabled(true);
+                        connectionStatusLabel.setText("Leyendo (Auto)");
+                        connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
+                        setStatus("Lectura activa - Control por API");
+                        
+                        // Iniciar reintentos si está habilitado
+                        if (failedTagStorage != null && config.isRetryFailedEnabled()) {
+                            failedTagStorage.setRetryEnabled(true);
+                            failedTagStorage.setRetryIntervalSeconds(config.getRetryIntervalSeconds());
+                            failedTagStorage.iniciarReintentos(apiClient);
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.error("APIPolling", "Error iniciando lectura: " + e.getMessage());
+                }
+            }
+            
+        } else {
+            // API NO autoriza lectura - detener si está leyendo
+            if (isReading && connection != null) {
+                logger.warn("APIPolling", "API denegó lectura: " + respuesta.mensaje);
+                System.out.println("[APIPolling] API denegó. Deteniendo: " + respuesta.mensaje);
+                
+                try {
+                    connection.stopReading();
+                    isReading = false;
+                    startReadingButton.setEnabled(true);
+                    stopReadingButton.setEnabled(false);
+                    connectionStatusLabel.setText("Pausado por API");
+                    connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_WARNING);
+                    setStatus("Lectura pausada: " + respuesta.mensaje);
+                } catch (Exception e) {
+                    logger.error("APIPolling", "Error deteniendo lectura: " + e.getMessage());
+                }
+            }
         }
     }
     
