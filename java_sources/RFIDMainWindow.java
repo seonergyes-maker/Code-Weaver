@@ -2300,8 +2300,8 @@ public class RFIDMainWindow extends JFrame {
         // Tiempo actual en segundos UNIX
         long ahoraUnix = System.currentTimeMillis() / 1000;
         
-        // Ventana de validez: 60 segundos
-        final int VENTANA_SEGUNDOS = 60;
+        // Ventana de validez: 5 segundos
+        final int VENTANA_SEGUNDOS = 5;
         
         // Calcular diferencia entre fecha del servidor y ahora
         long diferencia = respuesta.fechaInicio - ahoraUnix;

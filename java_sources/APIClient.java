@@ -630,7 +630,7 @@ public class APIClient implements AutoCloseable {
                 String jsonStr = response.toString();
                 boolean resultado = parseJsonBoolean(jsonStr, "resultado");
                 String mensaje = parseJsonString(jsonStr, "mensaje");
-                long fechaInicio = parseJsonLong(jsonStr, "fecha_inicio");
+                long fechaInicio = parseJsonLong(jsonStr, "fecha");
                 int milisParada = parseJsonInt(jsonStr, "milisegundos_parada", 100);
                 
                 System.out.println("[APIClient] Respuesta de inicio: resultado=" + resultado + 
