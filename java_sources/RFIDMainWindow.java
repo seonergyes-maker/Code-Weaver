@@ -28,7 +28,7 @@ public class RFIDMainWindow extends JFrame {
     private static final long serialVersionUID = 1L;
     
     /** Título de la ventana */
-    private static final String WINDOW_TITLE = "Zebra FX7500 RFID Manager";
+    private static final String WINDOW_TITLE = "Zebra FX7500 RFID Manager by Daemon4 v1.2";
     
     /** Ruta del archivo de configuración */
     private static final String CONFIG_FILE_PATH = "rfid_config.json";
@@ -2300,8 +2300,8 @@ public class RFIDMainWindow extends JFrame {
         // Tiempo actual en segundos UNIX
         long ahoraUnix = System.currentTimeMillis() / 1000;
         
-        // Ventana de validez: 5 segundos
-        final int VENTANA_SEGUNDOS = 5;
+        // Ventana de validez: 15 segundos
+        final int VENTANA_SEGUNDOS = 15;
         
         // Calcular diferencia entre fecha del servidor y ahora
         long diferencia = respuesta.fechaInicio - ahoraUnix;
