@@ -2304,10 +2304,10 @@ public class RFIDMainWindow extends JFrame {
         final int VENTANA_SEGUNDOS = 15;
         
         // Calcular diferencia entre fecha del servidor y ahora
-        long diferencia = respuesta.fechaInicio - ahoraUnix;
+        long diferencia = respuesta.fecha - ahoraUnix;
         
         System.out.println("[APIPolling] Respuesta: resultado=" + respuesta.resultado + 
-                         ", fecha=" + respuesta.fechaInicio + 
+                         ", fecha=" + respuesta.fecha + ", fecha_inicio=" + respuesta.fechaInicio + 
                          ", ahora=" + ahoraUnix + 
                          ", diferencia=" + diferencia + "s");
         

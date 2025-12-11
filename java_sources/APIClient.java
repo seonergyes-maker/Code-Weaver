@@ -142,26 +142,29 @@ public class APIClient implements AutoCloseable {
         public final boolean resultado;
         /** Mensaje de la API (error o información) */
         public final String mensaje;
-        /** Fecha de inicio del servidor (epoch seconds) */
+        /** Fecha actual del servidor para validación de tiempo (epoch seconds) */
+        public final long fecha;
+        /** Fecha de inicio de sesión para reset de duplicados (epoch seconds) */
         public final long fechaInicio;
         /** Milisegundos de pausa entre lecturas */
         public final int milisegundosParada;
         
-        public InicioResponse(boolean resultado, String mensaje, long fechaInicio, int milisegundosParada) {
+        public InicioResponse(boolean resultado, String mensaje, long fecha, long fechaInicio, int milisegundosParada) {
             this.resultado = resultado;
             this.mensaje = mensaje;
+            this.fecha = fecha;
             this.fechaInicio = fechaInicio;
             this.milisegundosParada = milisegundosParada;
         }
         
         public static InicioResponse error(String mensaje) {
-            return new InicioResponse(false, mensaje, 0, 100);
+            return new InicioResponse(false, mensaje, 0, 0, 100);
         }
         
         @Override
         public String toString() {
-            return String.format("InicioResponse[resultado=%s, mensaje=%s, fechaInicio=%d, parada=%dms]",
-                resultado, mensaje, fechaInicio, milisegundosParada);
+            return String.format("InicioResponse[resultado=%s, mensaje=%s, fecha=%d, fechaInicio=%d, parada=%dms]",
+                resultado, mensaje, fecha, fechaInicio, milisegundosParada);
         }
     }
 
@@ -630,13 +633,14 @@ public class APIClient implements AutoCloseable {
                 String jsonStr = response.toString();
                 boolean resultado = parseJsonBoolean(jsonStr, "resultado");
                 String mensaje = parseJsonString(jsonStr, "mensaje");
-                long fechaInicio = parseJsonLong(jsonStr, "fecha");
+                long fecha = parseJsonLong(jsonStr, "fecha");
+                long fechaInicio = parseJsonLong(jsonStr, "fecha_inicio");
                 int milisParada = parseJsonInt(jsonStr, "milisegundos_parada", 100);
                 
                 System.out.println("[APIClient] Respuesta de inicio: resultado=" + resultado + 
-                                 ", mensaje=" + mensaje + ", fecha=" + fechaInicio);
+                                 ", mensaje=" + mensaje + ", fecha=" + fecha + ", fecha_inicio=" + fechaInicio);
                 
-                return new InicioResponse(resultado, mensaje, fechaInicio, milisParada);
+                return new InicioResponse(resultado, mensaje, fecha, fechaInicio, milisParada);
                 
             } else {
                 String errorMsg = "Error HTTP " + responseCode;
