@@ -1765,6 +1765,11 @@ public class RFIDMainWindow extends JFrame {
                 connectionStatusLabel.setText("Conectado");
                 setStatus("Lectura detenida - Conectado a " + config.getReaderIP());
                 System.out.println("[RFID] Lectura detenida");
+                
+                // Limpiar lista de tags al detener
+                tagCache.clear();
+                updateTagTable();
+                System.out.println("[RFID] Lista de tags limpiada");
             }
         }.execute();
     }
@@ -2010,10 +2015,9 @@ public class RFIDMainWindow extends JFrame {
         sorted.sort((a, b) -> Long.compare(b.getLastSeen(), a.getLastSeen()));
         
         for (TagData tag : sorted) {
-            String displayEpc = displayHexMode ? tag.getEpc() : hexToDecimal(tag.getEpc());
-            
+            // Mostrar EPC original sin conversión (el filtro ya se aplicó en addTag)
             tagTableModel.addRow(new Object[]{
-                displayEpc,
+                tag.getEpc(),
                 String.format("%.1f", tag.getRssi()),
                 tag.getAntennaPort(),
                 tag.getReadCount(),
@@ -2390,6 +2394,11 @@ public class RFIDMainWindow extends JFrame {
                     connectionStatusLabel.setText("Pausado por API");
                     connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_WARNING);
                     setStatus("Lectura pausada: " + razon);
+                    
+                    // Limpiar lista de tags al detener
+                    tagCache.clear();
+                    updateTagTable();
+                    System.out.println("[APIPolling] Lista de tags limpiada");
                 } catch (Exception e) {
                     logger.error("APIPolling", "Error deteniendo lectura: " + e.getMessage());
                 }
