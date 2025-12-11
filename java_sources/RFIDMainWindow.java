@@ -479,7 +479,7 @@ public class RFIDMainWindow extends JFrame {
         ModernUIStyle.styleCheckBox(autoScrollCheck);
         
         hexDecimalToggle = new JToggleButton("HEX", true);
-        hexDecimalToggle.setToolTipText("Alternar entre visualización Hexadecimal y Decimal del EPC");
+        hexDecimalToggle.setToolTipText(displayHexMode ? "Filtro HEX: Acepta todos los tags (A-F, 0-9)" : "Filtro DEC: Solo tags numéricos (0-9)");
         hexDecimalToggle.setFont(new Font("Consolas", Font.BOLD, 11));
         hexDecimalToggle.setBackground(ModernUIStyle.ACCENT_INFO);
         hexDecimalToggle.setForeground(Color.WHITE);
@@ -1377,15 +1377,15 @@ public class RFIDMainWindow extends JFrame {
             displayHexMode = hexDecimalToggle.isSelected();
             hexDecimalToggle.setText(displayHexMode ? "HEX" : "DEC");
             hexDecimalToggle.setToolTipText(displayHexMode ? 
-                "Mostrando en Hexadecimal - Clic para cambiar a Decimal" : 
-                "Mostrando en Decimal - Clic para cambiar a Hexadecimal");
+                "Filtro HEX: Acepta todos los tags (A-F, 0-9)" : 
+                "Filtro DEC: Solo tags numéricos (0-9)");
             updateTagTable();
             if (apiClient != null) {
                 apiClient.setDisplayHexMode(displayHexMode);
             }
             config.setDisplayHexMode(displayHexMode);
             autoSaveConfiguration();
-            System.out.println("[Config] Formato EPC cambiado a: " + (displayHexMode ? "Hexadecimal" : "Decimal"));
+            System.out.println("[Config] Filtro EPC cambiado a: " + (displayHexMode ? "HEX (todos)" : "DEC (solo numéricos)"));
         });
         
         testApiButton.addActionListener(e -> testApiConnection());
