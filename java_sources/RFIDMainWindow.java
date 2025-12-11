@@ -2292,8 +2292,50 @@ public class RFIDMainWindow extends JFrame {
      * Controla inicio/detención de lectura automáticamente.
      */
     private void procesarRespuestaPolling(APIClient.InicioResponse respuesta) {
-        if (respuesta.resultado) {
-            // API autoriza lectura
+        // Tiempo actual en segundos UNIX
+        long ahoraUnix = System.currentTimeMillis() / 1000;
+        
+        // Ventana de validez: 60 segundos
+        final int VENTANA_SEGUNDOS = 60;
+        
+        // Calcular diferencia entre fecha del servidor y ahora
+        long diferencia = respuesta.fechaInicio - ahoraUnix;
+        
+        System.out.println("[APIPolling] Respuesta: resultado=" + respuesta.resultado + 
+                         ", fecha=" + respuesta.fechaInicio + 
+                         ", ahora=" + ahoraUnix + 
+                         ", diferencia=" + diferencia + "s");
+        
+        // Determinar si debemos leer basado en resultado Y fecha
+        boolean deberíaLeer = false;
+        String razon = "";
+        
+        if (!respuesta.resultado) {
+            // API explícitamente dice NO
+            deberíaLeer = false;
+            razon = respuesta.mensaje.isEmpty() ? "API denegó lectura" : respuesta.mensaje;
+        } else {
+            // API dice SÍ, pero verificar la fecha
+            // La fecha debe estar dentro de la ventana: ahora-60s <= fecha <= ahora+60s
+            if (diferencia >= -VENTANA_SEGUNDOS && diferencia <= VENTANA_SEGUNDOS) {
+                // Fecha válida, dentro de la ventana de 60 segundos
+                deberíaLeer = true;
+                razon = "Fecha válida (diferencia: " + diferencia + "s)";
+            } else if (diferencia < -VENTANA_SEGUNDOS) {
+                // Fecha expirada (pasaron más de 60 segundos)
+                deberíaLeer = false;
+                razon = "Fecha expirada (hace " + Math.abs(diferencia) + "s)";
+            } else {
+                // Fecha en el futuro lejano
+                deberíaLeer = false;
+                razon = "Fecha futura (en " + diferencia + "s)";
+            }
+        }
+        
+        System.out.println("[APIPolling] Decisión: " + (deberíaLeer ? "LEER" : "DETENER") + " - " + razon);
+        
+        if (deberíaLeer) {
+            // DEBE LEER
             
             // Verificar si cambió fecha_inicio (reset de duplicados)
             if (ultimaFechaInicioAPI != respuesta.fechaInicio) {
@@ -2310,8 +2352,8 @@ public class RFIDMainWindow extends JFrame {
             
             // Iniciar lectura si no está leyendo
             if (!isReading && connection != null && connection.isConnected()) {
-                logger.info("APIPolling", "API autoriza - Iniciando lectura automática");
-                System.out.println("[APIPolling] API autoriza. Iniciando lectura...");
+                logger.info("APIPolling", "Iniciando lectura: " + razon);
+                System.out.println("[APIPolling] Iniciando lectura...");
                 
                 try {
                     if (connection.startReading()) {
@@ -2335,10 +2377,10 @@ public class RFIDMainWindow extends JFrame {
             }
             
         } else {
-            // API NO autoriza lectura - detener si está leyendo
+            // DEBE DETENER
             if (isReading && connection != null) {
-                logger.warn("APIPolling", "API denegó lectura: " + respuesta.mensaje);
-                System.out.println("[APIPolling] API denegó. Deteniendo: " + respuesta.mensaje);
+                logger.warn("APIPolling", "Deteniendo lectura: " + razon);
+                System.out.println("[APIPolling] Deteniendo lectura: " + razon);
                 
                 try {
                     connection.stopReading();
@@ -2347,7 +2389,7 @@ public class RFIDMainWindow extends JFrame {
                     stopReadingButton.setEnabled(false);
                     connectionStatusLabel.setText("Pausado por API");
                     connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_WARNING);
-                    setStatus("Lectura pausada: " + respuesta.mensaje);
+                    setStatus("Lectura pausada: " + razon);
                 } catch (Exception e) {
                     logger.error("APIPolling", "Error deteniendo lectura: " + e.getMessage());
                 }
