@@ -1818,17 +1818,18 @@ public class RFIDMainWindow extends JFrame {
         autoSaveConfiguration();
         System.out.println("[Config] Última IP conectada guardada: " + config.getReaderIP());
         
-        // Iniciar polling automático si está habilitado en la configuración
+        // PRIMERO: Iniciar cliente API si está configurado
+        if (!apiEndpointField.getText().trim().isEmpty()) {
+            startApiClient();
+        }
+        
+        // DESPUÉS: Iniciar polling automático si está habilitado
         if (config.isApiPollingEnabled() && apiClient != null) {
             apiPollingEnabled = true;
             apiPollingIntervalSeconds = config.getApiPollingIntervalSeconds();
             startApiPolling();
             System.out.println("[APIPolling] Polling automático iniciado al conectar");
             logger.info("APIPolling", "Polling automático iniciado al conectar (cada " + apiPollingIntervalSeconds + "s)");
-        }
-        
-        if (apiEnabledCheck.isSelected() && !apiEndpointField.getText().trim().isEmpty()) {
-            startApiClient();
         }
     }
     
