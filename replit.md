@@ -45,8 +45,33 @@ java -Djava.library.path=. -cp "ZebraRFIDReader.jar;Symbol.RFID.API3.jar" ZebraR
 - Código Java bien comentado
 - Mensajes de error claros y explicativos
 
+## Integración PLC (Modbus TCP)
+El sistema incluye comunicación con PLCs industriales via Modbus TCP:
+
+**Flujo de operación:**
+1. PLC activa coil enabler → App detecta activación
+2. App lee último tag RFID leído
+3. App consulta API para obtener datos del producto (tipo_embalaje, ancho, largo)
+4. App escribe valores a registros holding del PLC
+5. App activa registro de confirmación
+
+**Configuración PLC:**
+- IP y puerto del PLC (default 502)
+- Intervalo de polling (default 500ms)
+- Referencia del coil enabler + Unit ID
+- Referencias de registros: tipo_embalaje, ancho, largo, activa
+
+**Archivos relacionados:**
+- `ModbusClient.java` - Cliente Modbus TCP
+- Pestaña "PLC" en RFIDMainWindow
+
 ## Recent Changes
 - Diciembre 2025:
+  - **V1.3**: Integración PLC con Modbus TCP
+    - Nueva pestaña PLC con configuración completa
+    - ModbusClient para comunicación industrial
+    - Polling automático del coil enabler
+    - Escritura de datos de producto a registros holding
   - **V1.2**: Migración completa a SDK oficial de Zebra
   - Eliminado protocolo LLRP4J (reemplazado por SDK nativo)
   - Proyecto limpio solo con código del SDK
