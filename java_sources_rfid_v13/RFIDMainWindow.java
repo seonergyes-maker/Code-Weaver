@@ -2875,6 +2875,7 @@ public class RFIDMainWindow extends JFrame {
             apiClient.setApiTrabajo(trabajo);
             apiClient.setDisplayHexMode(displayHexMode);
             apiClient.setFailedTagStorage(failedTagStorage);
+            apiClient.setApilado(apiApiladoCheck.isSelected());
             apiClient.start();
             apiStatusLabel.setText("Cliente API iniciado");
             apiStatusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
