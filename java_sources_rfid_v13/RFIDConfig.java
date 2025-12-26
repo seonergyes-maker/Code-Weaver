@@ -919,6 +919,10 @@ public class RFIDConfig implements Serializable {
         sb.append("  \"autoConnectEnabled\": ").append(autoConnectEnabled).append(",\n");
         sb.append("  \"displayHexMode\": ").append(displayHexMode).append("\n");
         
+        // Opciones de API
+        sb.append("  \"apiApilado\": ").append(apiApilado).append(",\n");
+        sb.append("  \"clearQueueOnStop\": ").append(clearQueueOnStop).append("\n");
+        
         sb.append("}");
         return sb.toString();
     }
@@ -948,6 +952,10 @@ public class RFIDConfig implements Serializable {
         config.apiEndpoint = extractStringValue(json, "apiEndpoint", null);
         config.apiKey = extractStringValue(json, "apiKey", null);
         config.apiTrabajo = extractStringValue(json, "apiTrabajo", null);
+        
+        // Opciones de API
+        config.apiApilado = extractBooleanValue(json, "apiApilado", false);
+        config.clearQueueOnStop = extractBooleanValue(json, "clearQueueOnStop", true);
         
         String modeStr = extractStringValue(json, "operationMode", "CONTINUOUS");
         try {
