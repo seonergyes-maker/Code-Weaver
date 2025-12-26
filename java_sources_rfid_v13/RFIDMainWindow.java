@@ -1967,7 +1967,19 @@ public class RFIDMainWindow extends JFrame {
         
         statusBar.add(statusLabel, BorderLayout.WEST);
         statusBar.add(statsLabel, BorderLayout.CENTER);
-        statusBar.add(activityIndicator, BorderLayout.EAST);
+        
+        // Panel derecho con indicador de actividad y botón guardar
+        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        rightPanel.setOpaque(false);
+        rightPanel.add(activityIndicator);
+        
+        // Botón Guardar Configuración visible en todas las pestañas
+        JButton globalSaveButton = new JButton("Guardar Configuracion");
+        ModernUIStyle.styleSuccessButton(globalSaveButton);
+        globalSaveButton.addActionListener(e -> saveConfiguration());
+        rightPanel.add(globalSaveButton);
+        
+        statusBar.add(rightPanel, BorderLayout.EAST);
         
         return statusBar;
     }
@@ -2121,6 +2133,18 @@ public class RFIDMainWindow extends JFrame {
             config.setReportChannelIndex(reportChannelCheck.isSelected());
         });
         
+        // Listeners para Apilado y Borrar cola
+        apiApiladoCheck.addActionListener(e -> {
+            config.setApiApilado(apiApiladoCheck.isSelected());
+            if (apiClient != null) {
+                apiClient.setApilado(apiApiladoCheck.isSelected());
+            }
+        });
+        
+        clearQueueOnStopCheck.addActionListener(e -> {
+            config.setClearQueueOnStop(clearQueueOnStopCheck.isSelected());
+        });
+        
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
@@ -2186,6 +2210,10 @@ public class RFIDMainWindow extends JFrame {
         config.setApiTrabajo(apiTrabajoField.getText().trim());
         
         config.setDisplayHexMode(displayHexMode);
+        
+        // Opciones de API - Apilado y Borrar cola
+        config.setApiApilado(apiApiladoCheck.isSelected());
+        config.setClearQueueOnStop(clearQueueOnStopCheck.isSelected());
     }
     
     // ==================== Acciones ====================
@@ -2388,7 +2416,7 @@ public class RFIDMainWindow extends JFrame {
                 stopPlcPolling();
                 
                 // Limpiar cola de envío si está configurado
-                if (config.isClearQueueOnStop() && apiClient != null) {
+                if (clearQueueOnStopCheck.isSelected() && apiClient != null) {
                     int cleared = apiClient.clearQueue();
                     System.out.println("[RFID] Cola de API limpiada: " + cleared + " tags descartados");
                 }
