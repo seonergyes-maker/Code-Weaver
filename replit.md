@@ -75,11 +75,23 @@ Aplicación Java para monitoreo de API JSON y control de PLC via Modbus TCP.
 
 **Archivos del proyecto:**
 - `Main.java` - Punto de entrada
-- `PLCCojerWindow.java` - Ventana principal (pestañas: Monitoreo, API, PLC)
-- `PLCCojerConfig.java` - Configuración persistente
+- `PLCCojerWindow.java` - Ventana principal (4 pestañas: Monitoreo, API, PLC, Opciones)
+- `PLCCojerConfig.java` - Configuración en formato INI (config.ini)
 - `CojerAPIClient.java` - Cliente API con polling
 - `CojerModbusClient.java` - Cliente Modbus TCP
-- `ModernUIStyle.java` - Estilos UI tema oscuro
+- `LogManager.java` - Sistema de logs separados (tags y errores)
+- `ModernUIStyle.java` - Estilos UI tema claro (fondo blanco)
+
+**Características:**
+- Configuración persistente en `config.ini` (formato INI)
+- Logs diarios en carpeta `logs/`:
+  - `tags_YYYYMMDD.log` - Tags gestionados
+  - `errores_YYYYMMDD.log` - Errores del sistema
+- System Tray de Windows (minimizar a bandeja)
+- Pestaña Opciones con:
+  - Inicio automático de API/PLC
+  - Minimizar al iniciar
+  - Generador de script para servicio Windows (NSSM)
 
 **Ejecución:**
 ```cmd
@@ -91,11 +103,16 @@ java -jar PLCCojer.jar
 ## Recent Changes
 - Diciembre 2025:
   - **PLC COJER**: Nuevo proyecto Java para monitoreo API + control PLC
-    - Interfaz gráfica con tema oscuro similar a RFID ZEBRA
-    - 3 pestañas: Monitoreo, API, PLC
+    - Interfaz gráfica con tema claro (fondo blanco, letras oscuras, sin emojis)
+    - 4 pestañas: Monitoreo, API, PLC, Opciones
     - Polling configurable de API JSON
     - Comunicación Modbus TCP con PLCs
     - Transiciones de coil: 0→1 escribe datos, 1→0 llama baja
+    - Configuración en formato INI local (config.ini)
+    - Logs separados: tags_YYYYMMDD.log y errores_YYYYMMDD.log
+    - System Tray de Windows (minimizar a bandeja)
+    - Opciones de inicio automático (API y PLC)
+    - Generador de script para servicio Windows (NSSM)
   - **V1.3+**: Opciones "Apilado" y "Borrar cola al parar" en RFID
   - **V1.3**: Integración PLC con Modbus TCP
     - Nueva pestaña PLC con configuración completa
