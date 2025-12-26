@@ -65,8 +65,38 @@ El sistema incluye comunicación con PLCs industriales via Modbus TCP:
 - `ModbusClient.java` - Cliente Modbus TCP
 - Pestaña "PLC" en RFIDMainWindow
 
+## Proyecto: PLC COJER
+Aplicación Java para monitoreo de API JSON y control de PLC via Modbus TCP.
+
+**Flujo de operación:**
+1. Consulta periódica a API: `{endpoint}/rfid_lecturas/apilado`
+2. Cuando Coil Enabler cambia 0→1: Escribe datos del primer item a Holding Registers
+3. Cuando Coil cambia 1→0: Llama API de baja: `{endpoint}/rfid_lecturas/baja_apilado/{token}/{ip}/{trabajo}/{tag}/{numero}`
+
+**Archivos del proyecto:**
+- `Main.java` - Punto de entrada
+- `PLCCojerWindow.java` - Ventana principal (pestañas: Monitoreo, API, PLC)
+- `PLCCojerConfig.java` - Configuración persistente
+- `CojerAPIClient.java` - Cliente API con polling
+- `CojerModbusClient.java` - Cliente Modbus TCP
+- `ModernUIStyle.java` - Estilos UI tema oscuro
+
+**Ejecución:**
+```cmd
+java -jar PLCCojer.jar
+```
+
+**Directorio de salida:** `output_plc_cojer/`
+
 ## Recent Changes
 - Diciembre 2025:
+  - **PLC COJER**: Nuevo proyecto Java para monitoreo API + control PLC
+    - Interfaz gráfica con tema oscuro similar a RFID ZEBRA
+    - 3 pestañas: Monitoreo, API, PLC
+    - Polling configurable de API JSON
+    - Comunicación Modbus TCP con PLCs
+    - Transiciones de coil: 0→1 escribe datos, 1→0 llama baja
+  - **V1.3+**: Opciones "Apilado" y "Borrar cola al parar" en RFID
   - **V1.3**: Integración PLC con Modbus TCP
     - Nueva pestaña PLC con configuración completa
     - ModbusClient para comunicación industrial
