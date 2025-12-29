@@ -1,7 +1,7 @@
 import javax.swing.*;
 
 /**
- * PLC COGER - Aplicación de Monitoreo API y Control PLC
+ * PLC ROBOT FANUC v1.0.2 by Daemon4 - Aplicación de Monitoreo API y Control PLC
  * Punto de entrada principal
  */
 public class Main {
@@ -17,7 +17,7 @@ public class Main {
         // Iniciar aplicación en el Event Dispatch Thread
         SwingUtilities.invokeLater(() -> {
             try {
-                PLCCogerWindow window = new PLCCogerWindow();
+                PLCRobotFanucWindow window = new PLCRobotFanucWindow();
                 window.setVisible(true);
             } catch (Exception e) {
                 e.printStackTrace();

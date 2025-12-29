@@ -5,10 +5,10 @@ import javax.net.ssl.*;
 import java.security.cert.X509Certificate;
 
 /**
- * Cliente API para PLC COGER
+ * Cliente API para PLC ROBOT FANUC v1.0.2 by Daemon4
  * Consulta periodica a endpoint de apilado
  */
-public class CogerAPIClient {
+public class RobotFanucAPIClient {
     
     private String endpoint = "http://localhost:8080";
     private String token = "";
@@ -44,7 +44,7 @@ public class CogerAPIClient {
         void onBajaError(String tag, String error);
     }
     
-    public CogerAPIClient() {
+    public RobotFanucAPIClient() {
         // Deshabilitar verificacion SSL para desarrollo
         disableSSLVerification();
     }

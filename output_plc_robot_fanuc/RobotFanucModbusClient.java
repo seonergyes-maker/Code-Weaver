@@ -4,10 +4,10 @@ import java.nio.*;
 import java.util.concurrent.*;
 
 /**
- * Cliente Modbus TCP para PLC COGER
+ * Cliente Modbus TCP para PLC ROBOT FANUC v1.0.2 by Daemon4
  * Comunicación con PLCs industriales
  */
-public class CogerModbusClient {
+public class RobotFanucModbusClient {
     
     /** Listener para eventos del PLC */
     public interface PLCListener {
@@ -35,7 +35,7 @@ public class CogerModbusClient {
     private PLCListener listener;
     
     /** Constructor */
-    public CogerModbusClient() {
+    public RobotFanucModbusClient() {
         scheduler = Executors.newSingleThreadScheduledExecutor();
     }
     

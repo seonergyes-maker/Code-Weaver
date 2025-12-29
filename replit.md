@@ -65,22 +65,29 @@ El sistema incluye comunicación con PLCs industriales via Modbus TCP:
 - `ModbusClient.java` - Cliente Modbus TCP
 - Pestaña "PLC" en RFIDMainWindow
 
-## Proyecto: PLC COJER
+## Proyecto: PLC ROBOT FANUC v1.0.2 by Daemon4
 Aplicación Java para monitoreo de API JSON y control de PLC via Modbus TCP.
 
 **Flujo de operación:**
 1. Consulta periódica a API: `{endpoint}/rfid_lecturas/apilado`
-2. Cuando Coil Enabler cambia 0→1: Escribe datos del primer item a Holding Registers
-3. Cuando Coil cambia 1→0: Llama API de baja: `{endpoint}/rfid_lecturas/baja_apilado/{token}/{ip}/{trabajo}/{tag}/{numero}`
+2. Cuando Coil Enabler cambia 0→1: Escribe datos del primer item a Holding Registers (TipoEmbalaje, Ancho, Largo, Pila, Control)
+3. Cuando Coil cambia 1→0: Llama API de baja (GET): `{endpoint}/rfid_lecturas/baja_apilado/{token}/{ip}/{trabajo}/{tag}/{numero}`
 
 **Archivos del proyecto:**
 - `Main.java` - Punto de entrada
-- `PLCCojerWindow.java` - Ventana principal (4 pestañas: Monitoreo, API, PLC, Opciones)
-- `PLCCojerConfig.java` - Configuración en formato INI (config.ini)
-- `CojerAPIClient.java` - Cliente API con polling
-- `CojerModbusClient.java` - Cliente Modbus TCP
+- `PLCRobotFanucWindow.java` - Ventana principal (4 pestañas: Monitoreo, API, PLC, Opciones)
+- `PLCRobotFanucConfig.java` - Configuración en formato INI (config.ini)
+- `RobotFanucAPIClient.java` - Cliente API con polling
+- `RobotFanucModbusClient.java` - Cliente Modbus TCP
 - `LogManager.java` - Sistema de logs separados (tags y errores)
 - `ModernUIStyle.java` - Estilos UI tema claro (fondo blanco)
+
+**Registros Holding por defecto:**
+- HR 0 = TipoEmbalaje
+- HR 1 = Ancho
+- HR 2 = Largo
+- HR 3 = Pila
+- HR 4 = Control
 
 **Características:**
 - Configuración persistente en `config.ini` (formato INI)
@@ -95,19 +102,19 @@ Aplicación Java para monitoreo de API JSON y control de PLC via Modbus TCP.
 
 **Ejecución:**
 ```cmd
-java -jar PLCCojer.jar
+java -jar PLCRobotFanuc.jar
 ```
 
-**Directorio de salida:** `output_plc_cojer/`
+**Directorio de salida:** `output_plc_robot_fanuc/`
 
 ## Recent Changes
 - Diciembre 2025:
-  - **PLC COJER**: Nuevo proyecto Java para monitoreo API + control PLC
+  - **PLC ROBOT FANUC v1.0.2**: Renombrado de PLC COGER, añadido campo "pila"
     - Interfaz gráfica con tema claro (fondo blanco, letras oscuras, sin emojis)
     - 4 pestañas: Monitoreo, API, PLC, Opciones
     - Polling configurable de API JSON
     - Comunicación Modbus TCP con PLCs
-    - Transiciones de coil: 0→1 escribe datos, 1→0 llama baja
+    - Transiciones de coil: 0→1 escribe datos, 1→0 llama baja (GET)
     - Configuración en formato INI local (config.ini)
     - Logs separados: tags_YYYYMMDD.log y errores_YYYYMMDD.log
     - System Tray de Windows (minimizar a bandeja)

@@ -2,10 +2,10 @@ import java.io.*;
 import java.util.Properties;
 
 /**
- * Configuracion de la aplicacion PLC COGER
+ * Configuracion de la aplicacion PLC ROBOT FANUC v1.0.2 by Daemon4
  * Persiste en archivo config.ini (formato INI)
  */
-public class PLCCogerConfig {
+public class PLCRobotFanucConfig {
     
     private static final String CONFIG_FILE = "config.ini";
     
@@ -39,7 +39,7 @@ public class PLCCogerConfig {
     private boolean startWithWindows = false;
     
     /** Constructor - carga configuracion si existe */
-    public PLCCogerConfig() {
+    public PLCRobotFanucConfig() {
         load();
     }
     
@@ -139,7 +139,7 @@ public class PLCCogerConfig {
     /** Guarda la configuracion a archivo INI */
     public void save() {
         try (PrintWriter writer = new PrintWriter(new FileWriter(CONFIG_FILE))) {
-            writer.println("; PLC COGER - Archivo de Configuracion");
+            writer.println("; PLC ROBOT FANUC v1.0.2 by Daemon4 - Archivo de Configuracion");
             writer.println("; Generado automaticamente");
             writer.println();
             

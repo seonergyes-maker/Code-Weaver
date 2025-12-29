@@ -5,25 +5,25 @@ import java.awt.event.*;
 import java.util.List;
 
 /**
- * PLC COGER - Ventana Principal
+ * PLC ROBOT FANUC v1.0.2 by Daemon4 - Ventana Principal
  * Monitoreo de API JSON y Control de PLC via Modbus TCP
  * Con soporte para System Tray y inicio automatico
  */
-public class PLCCogerWindow extends JFrame implements 
-    CogerAPIClient.APIListener, CogerModbusClient.PLCListener {
+public class PLCRobotFanucWindow extends JFrame implements 
+    RobotFanucAPIClient.APIListener, RobotFanucModbusClient.PLCListener {
     
     // Configuracion
-    private PLCCogerConfig config;
+    private PLCRobotFanucConfig config;
     private LogManager logManager;
     
     // Clientes
-    private CogerAPIClient apiClient;
-    private CogerModbusClient modbusClient;
+    private RobotFanucAPIClient apiClient;
+    private RobotFanucModbusClient modbusClient;
     
     // Estado
     private boolean apiPolling = false;
     private boolean plcConnected = false;
-    private CogerAPIClient.ItemData currentProcessingItem = null;
+    private RobotFanucAPIClient.ItemData currentProcessingItem = null;
     
     // System Tray
     private TrayIcon trayIcon;
@@ -76,13 +76,13 @@ public class PLCCogerWindow extends JFrame implements
     private JLabel statusBar;
     
     /** Constructor */
-    public PLCCogerWindow() {
-        super("PLC COGER - Monitoreo API y Control PLC");
+    public PLCRobotFanucWindow() {
+        super("PLC ROBOT FANUC v1.0.2 by Daemon4 - Monitoreo API y Control PLC");
         
-        config = new PLCCogerConfig();
+        config = new PLCRobotFanucConfig();
         logManager = LogManager.getInstance();
-        apiClient = new CogerAPIClient();
-        modbusClient = new CogerModbusClient();
+        apiClient = new RobotFanucAPIClient();
+        modbusClient = new RobotFanucModbusClient();
         
         apiClient.setListener(this);
         modbusClient.setListener(this);
@@ -163,7 +163,7 @@ public class PLCCogerWindow extends JFrame implements
             popup.addSeparator();
             popup.add(exitItem);
             
-            trayIcon = new TrayIcon(image, "PLC COGER", popup);
+            trayIcon = new TrayIcon(image, "PLC ROBOT FANUC v1.0.2 by Daemon4", popup);
             trayIcon.setImageAutoSize(true);
             
             // Doble click para restaurar
@@ -204,7 +204,7 @@ public class PLCCogerWindow extends JFrame implements
         if (trayIcon != null) {
             setVisible(false);
             isMinimizedToTray = true;
-            trayIcon.displayMessage("PLC COGER", 
+            trayIcon.displayMessage("PLC ROBOT FANUC v1.0.2 by Daemon4", 
                 "La aplicacion sigue ejecutandose en segundo plano", 
                 TrayIcon.MessageType.INFO);
         }
@@ -293,7 +293,7 @@ public class PLCCogerWindow extends JFrame implements
         panel.setBackground(ModernUIStyle.BACKGROUND_MEDIUM);
         panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
         
-        JLabel titleLabel = new JLabel("PLC COGER");
+        JLabel titleLabel = new JLabel("PLC ROBOT FANUC v1.0.2 by Daemon4");
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
         titleLabel.setForeground(ModernUIStyle.ACCENT_BLUE);
         
@@ -812,7 +812,7 @@ public class PLCCogerWindow extends JFrame implements
             "Para instalar como servicio de Windows:\n\n" +
             "1. Ejecutar como Administrador\n" +
             "2. Usar NSSM (Non-Sucking Service Manager) o similar\n" +
-            "3. Comando: nssm install PLCCoger java -jar PLCCoger.jar\n\n" +
+            "3. Comando: nssm install PLCRobotFanuc java -jar PLCRobotFanuc.jar\n\n" +
             "El servicio se ejecutara en segundo plano y aparecera en la bandeja del sistema.\n" +
             "Los logs se guardan en la carpeta 'logs/'."
         );
@@ -877,24 +877,24 @@ public class PLCCogerWindow extends JFrame implements
     /** Genera script de instalacion de servicio */
     private void generateServiceScript() {
         try {
-            String jarPath = new java.io.File("PLCCoger.jar").getAbsolutePath();
+            String jarPath = new java.io.File("PLCRobotFanuc.jar").getAbsolutePath();
             String workDir = new java.io.File(".").getAbsolutePath();
             
             StringBuilder bat = new StringBuilder();
             bat.append("@echo off\n");
-            bat.append("echo Instalando PLC COGER como servicio de Windows...\n");
+            bat.append("echo Instalando PLC ROBOT FANUC v1.0.2 by Daemon4 como servicio de Windows...\n");
             bat.append("echo.\n");
             bat.append("echo Requiere NSSM (https://nssm.cc/download)\n");
             bat.append("echo.\n");
-            bat.append("nssm install PLCCoger java\n");
-            bat.append("nssm set PLCCoger AppParameters -jar \"").append(jarPath).append("\"\n");
-            bat.append("nssm set PLCCoger AppDirectory \"").append(workDir).append("\"\n");
-            bat.append("nssm set PLCCoger DisplayName \"PLC COGER Service\"\n");
-            bat.append("nssm set PLCCoger Description \"Monitoreo API y Control PLC via Modbus TCP\"\n");
-            bat.append("nssm set PLCCoger Start SERVICE_AUTO_START\n");
+            bat.append("nssm install PLCRobotFanuc java\n");
+            bat.append("nssm set PLCRobotFanuc AppParameters -jar \"").append(jarPath).append("\"\n");
+            bat.append("nssm set PLCRobotFanuc AppDirectory \"").append(workDir).append("\"\n");
+            bat.append("nssm set PLCRobotFanuc DisplayName \"PLC ROBOT FANUC v1.0.2 by Daemon4 Service\"\n");
+            bat.append("nssm set PLCRobotFanuc Description \"Monitoreo API y Control PLC via Modbus TCP\"\n");
+            bat.append("nssm set PLCRobotFanuc Start SERVICE_AUTO_START\n");
             bat.append("echo.\n");
             bat.append("echo Servicio instalado. Iniciando...\n");
-            bat.append("nssm start PLCCoger\n");
+            bat.append("nssm start PLCRobotFanuc\n");
             bat.append("echo.\n");
             bat.append("pause\n");
             
@@ -1074,10 +1074,10 @@ public class PLCCogerWindow extends JFrame implements
     // ============ APIListener ============
     
     @Override
-    public void onItemsReceived(List<CogerAPIClient.ItemData> items) {
+    public void onItemsReceived(List<RobotFanucAPIClient.ItemData> items) {
         tableModel.setRowCount(0);
         
-        for (CogerAPIClient.ItemData item : items) {
+        for (RobotFanucAPIClient.ItemData item : items) {
             tableModel.addRow(new Object[] {
                 item.orden,
                 item.tag,
@@ -1133,7 +1133,7 @@ public class PLCCogerWindow extends JFrame implements
             coilStatusLabel.setForeground(value ? ModernUIStyle.ACCENT_GREEN : ModernUIStyle.TEXT_PRIMARY);
             
             if (value) {
-                CogerAPIClient.ItemData item = apiClient.getFirstItem();
+                RobotFanucAPIClient.ItemData item = apiClient.getFirstItem();
                 
                 if (item != null) {
                     currentProcessingItem = item;
