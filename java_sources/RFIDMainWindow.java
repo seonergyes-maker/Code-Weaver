@@ -144,6 +144,7 @@ public class RFIDMainWindow extends JFrame {
     private long lastProcessedTime = 0;
     private boolean plcCycleProcessed = false; // Flag para controlar un solo ciclo por evento
     private static final long PLC_DEBOUNCE_MS = 2000; // 2 segundos de debounce
+    private volatile ModbusClient activeModbusClient = null; // Cliente Modbus activo para escritura
     private JComboBox<String> sessionCombo;
     private JComboBox<String> targetCombo;
     private JSpinner tagPopulationSpinner;
@@ -1447,22 +1448,16 @@ public class RFIDMainWindow extends JFrame {
                     
                     // Controlar lectura RFID segun estado del enabler
                     if (enablerActive && !wasEnabled) {
-                        // Flanco de subida: OFF -> ON = Iniciar lectura y procesar ciclo PLC
-                        System.out.println("[PLC] Enabler ON - Iniciando lectura RFID y consultando API");
+                        // Flanco de subida: OFF -> ON = Solo iniciar lectura RFID
+                        System.out.println("[PLC] Enabler ON - Iniciando lectura RFID (esperando tag)");
                         plcCycleProcessed = false; // Reset flag para nuevo ciclo
                         
-                        // Iniciar lectura RFID
+                        // Iniciar lectura RFID - la consulta API se hara cuando llegue un tag
                         SwingUtilities.invokeLater(() -> {
                             if (!isReading && connection != null && connection.isConnected()) {
                                 startReadingFromPLC();
                             }
                         });
-                        
-                        // Procesar ciclo PLC (consultar API y escribir HR) - solo en transicion
-                        if (!plcCycleProcessed) {
-                            processPlcReadCycle(modbusClient);
-                            plcCycleProcessed = true;
-                        }
                         
                     } else if (!enablerActive && wasEnabled) {
                         // Flanco de bajada: ON -> OFF = Detener lectura y reset flag
@@ -2629,6 +2624,26 @@ public class RFIDMainWindow extends JFrame {
     private void processTag(TagData tag) {
         if (tag == null) {
             return;
+        }
+        
+        // Obtener EPC del tag
+        String epc = tag.getTagID();
+        
+        // Si PLC activo y no hemos procesado este ciclo, consultar API y escribir PLC
+        if (plcPollingActive && !plcCycleProcessed && activeModbusClient != null) {
+            // Verificar debounce por EPC
+            long now = System.currentTimeMillis();
+            if (!epc.equals(lastProcessedEpc) || (now - lastProcessedTime) > PLC_DEBOUNCE_MS) {
+                lastProcessedEpc = epc;
+                lastProcessedTime = now;
+                plcCycleProcessed = true;
+                
+                // Ejecutar consulta API y escritura PLC en hilo separado
+                final ModbusClient modbusClient = activeModbusClient;
+                new Thread(() -> {
+                    processPlcCycleWithTag(epc, modbusClient);
+                }).start();
+            }
         }
         
         SwingUtilities.invokeLater(() -> {
