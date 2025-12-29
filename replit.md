@@ -3,7 +3,7 @@
 ## Overview
 Una aplicación web tipo IDE que permite desarrollar aplicaciones Java para lectores RFID Zebra FX7500/FX9600 usando el **SDK oficial de Zebra**.
 
-## Proyecto Actual: RFID ZEBRA FX7500 V1.2
+## Proyecto Actual: RFID ZEBRA FX7500 PLC V1.4
 - Usa el **SDK oficial de Zebra** (Symbol.RFID.API3.jar)
 - Requiere DLL nativa `RFIDAPI3_JNI_HOST.dll` en Windows
 - Lectura continua de tags en tiempo real

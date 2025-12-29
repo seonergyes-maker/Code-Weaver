@@ -12,11 +12,11 @@ public class WindowsServiceInstaller {
     
     private String serviceName = "RFIDZebraService";
     private String displayName = "RFID Zebra FX7500 Service";
-    private String description = "Servicio de lectura RFID para Zebra FX7500";
+    private String description = "Servicio de lectura RFID para Zebra FX7500 de Daemon4";
     private String jarFileName = "rfid-zebra.jar";
-    private String installPath = "C:\\RFID";
+    private String installPath = "C:/daemon4/zebra_api";
     private String javaPath = "java";
-    private String jvmOptions = "-Xmx256m";
+    private String jvmOptions = "-Xmx512m";
     private boolean autoStart = true;
     
     /**

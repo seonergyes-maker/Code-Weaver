@@ -49,6 +49,9 @@ public class APIClient implements AutoCloseable {
     /** Clave de API para autenticación (token) */
     private String apiKey;
     
+    /** Indica si es modo apilado */
+    private boolean apilado = false;
+    
     /** IP del lector RFID para enviar a la API */
     private String readerIP;
     
@@ -246,6 +249,14 @@ public class APIClient implements AutoCloseable {
         return apiTrabajo;
     }
     
+    public boolean isApilado() {
+        return apilado;
+    }
+    
+    public void setApilado(boolean apilado) {
+        this.apilado = apilado;
+    }
+    
     public void setConnectTimeout(int connectTimeout) {
         this.connectTimeout = Math.max(1000, connectTimeout);
     }
@@ -353,6 +364,17 @@ public class APIClient implements AutoCloseable {
     
     public int getQueueSize() {
         return sendQueue.size();
+    }
+    
+    /**
+     * Limpia la cola de envío pendiente.
+     * @return Número de tags eliminados de la cola
+     */
+    public int clearQueue() {
+        int size = sendQueue.size();
+        sendQueue.clear();
+        System.out.println("[APIClient] Cola limpiada: " + size + " tags descartados");
+        return size;
     }
     
     public boolean isRunning() {
@@ -764,11 +786,13 @@ public class APIClient implements AutoCloseable {
         try {
             // Construir URL estilo VZEBRA: {URL}/rfid_lecturas/alta/{token}/{ip}/{trabajo}/{tag}
             String baseUrl = endpointUrl.endsWith("/") ? endpointUrl : endpointUrl + "/";
+            String apiladoParam = apilado ? "S" : "N";
             String urlAlta = baseUrl + "rfid_lecturas/alta/" + 
                            apiKey + "/" + 
                            readerIP + "/" + 
                            apiTrabajo + "/" + 
-                           tag;
+                           tag + "/" +
+                           apiladoParam;
             
             System.out.println("[APIClient] Enviando tag: " + urlAlta);
             logger.debug("APIClient", "Enviando tag: " + tag);
@@ -1068,5 +1092,63 @@ public class APIClient implements AutoCloseable {
     public String toString() {
         return String.format("APIClient[endpoint=%s, running=%s, sent=%d, failed=%d, queue=%d]",
             endpointUrl, running.get(), sentCount.get(), failedCount.get(), sendQueue.size());
+    }
+
+    
+    /**
+     * Obtiene datos del producto desde la API para un EPC específico.
+     * Usado por la integración PLC para obtener dimensiones del producto.
+     * 
+     * @param epc Código EPC del tag
+     * @return JSON string con datos del producto o null si hay error
+     */
+    public String getProductData(String epc) {
+        if (endpointUrl == null || endpointUrl.isEmpty()) {
+            System.err.println("[API] URL del endpoint no configurada");
+            return null;
+        }
+        
+        try {
+            // Construir URL para obtener datos de producto
+            String productUrl = endpointUrl;
+            if (!productUrl.contains("?")) {
+                productUrl += "?";
+            } else {
+                productUrl += "&";
+            }
+            productUrl += "epc=" + java.net.URLEncoder.encode(epc, "UTF-8") + "&action=getProduct";
+            
+            URL url = new URL(productUrl);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
+            conn.setReadTimeout(DEFAULT_READ_TIMEOUT);
+            conn.setRequestProperty("Accept", "application/json");
+            
+            if (apiKey != null && !apiKey.isEmpty()) {
+                conn.setRequestProperty("X-API-Key", apiKey);
+            }
+            
+            int responseCode = conn.getResponseCode();
+            
+            if (responseCode == HttpURLConnection.HTTP_OK) {
+                BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(conn.getInputStream(), StandardCharsets.UTF_8));
+                StringBuilder response = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+                reader.close();
+                return response.toString();
+            } else {
+                System.err.println("[API] Error obteniendo datos de producto: HTTP " + responseCode);
+                return null;
+            }
+            
+        } catch (Exception ex) {
+            System.err.println("[API] Excepcion obteniendo datos de producto: " + ex.getMessage());
+            return null;
+        }
     }
 }

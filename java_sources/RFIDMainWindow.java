@@ -28,7 +28,7 @@ public class RFIDMainWindow extends JFrame {
     private static final long serialVersionUID = 1L;
     
     /** Título de la ventana */
-    private static final String WINDOW_TITLE = "Zebra FX7500 RFID Manager by Daemon4 v1.2";
+    private static final String WINDOW_TITLE = "Zebra FX7500 RFID PLC V1.4 by Daemon4";
     
     /** Ruta del archivo de configuración */
     private static final String CONFIG_FILE_PATH = "rfid_config.json";
@@ -49,6 +49,27 @@ public class RFIDMainWindow extends JFrame {
     private JLabel connectionStatusLabel;
     private JPanel connectionIndicator;
     private volatile boolean isReading = false;
+    
+    // ==================== Componentes de PLC ====================
+    private JCheckBox plcEnabledCheck;
+    private JTextField plcIpField;
+    private JSpinner plcPortSpinner;
+    private JSpinner plcPollingSpinner;
+    private JSpinner plcRefEnableSpinner;
+    private JSpinner plcUnitIdEnableSpinner;
+    private JSpinner plcRefTipoEmbalajeSpinner;
+    private JSpinner plcUnitIdTipoEmbalajeSpinner;
+    private JSpinner plcRefAnchoSpinner;
+    private JSpinner plcUnitIdAnchoSpinner;
+    private JSpinner plcRefLargoSpinner;
+    private JSpinner plcUnitIdLargoSpinner;
+    private JSpinner plcRefActivaSpinner;
+    private JSpinner plcUnitIdActivaSpinner;
+    private JLabel plcStatusLabel;
+    private JPanel plcStatusIndicator;
+    private JButton plcTestButton;
+    private volatile boolean plcRunning = false;
+    private Thread plcPollingThread;
     
     // ==================== Componentes de antenas ====================
     private JSlider[] powerSliders = new JSlider[4];
@@ -78,6 +99,8 @@ public class RFIDMainWindow extends JFrame {
     private JLabel apiStatusLabel;
     private JCheckBox apiEnabledCheck;
     private JCheckBox apiStartControlCheck;
+    private JCheckBox apiApiladoCheck;
+    private JCheckBox clearQueueOnStopCheck;
     private JCheckBox apiPollingCheck;
     private JSpinner apiPollingIntervalSpinner;
     
@@ -538,6 +561,14 @@ public class RFIDMainWindow extends JFrame {
         apiStartControlCheck = new JCheckBox("Consultar API antes de iniciar lectura", config.isApiStartControlEnabled());
         ModernUIStyle.styleCheckBox(apiStartControlCheck);
         
+        apiApiladoCheck = new JCheckBox("Apilado", config.isApiApilado());
+        ModernUIStyle.styleCheckBox(apiApiladoCheck);
+        apiApiladoCheck.setToolTipText("Si está marcado, envía 'S' como parámetro de apilado en la URL");
+        
+        clearQueueOnStopCheck = new JCheckBox("Borrar cola al parar lectura", config.isClearQueueOnStop());
+        ModernUIStyle.styleCheckBox(clearQueueOnStopCheck);
+        clearQueueOnStopCheck.setToolTipText("Si está marcado, elimina los tags pendientes de envío al detener la lectura");
+        
         apiPollingCheck = new JCheckBox("Polling automático (control por API)", config.isApiPollingEnabled());
         ModernUIStyle.styleCheckBox(apiPollingCheck);
         apiPollingCheck.setToolTipText("Consulta la API periódicamente e inicia/detiene lectura automáticamente");
@@ -659,6 +690,7 @@ public class RFIDMainWindow extends JFrame {
         tabbedPane.addTab("Antenas", createAntennasPanel());
         tabbedPane.addTab("API", createApiPanel());
         tabbedPane.addTab("GPIO", createGpioPanel());
+        tabbedPane.addTab("PLC", createPlcPanel());
         tabbedPane.addTab("Avanzado", createAdvancedPanel());
         tabbedPane.addTab("Herramientas", createToolsPanel());
         
@@ -939,6 +971,14 @@ public class RFIDMainWindow extends JFrame {
         pollingPanel.add(apiPollingIntervalSpinner);
         pollingPanel.add(new JLabel("segundos"));
         controlContent.add(pollingPanel);
+        controlContent.add(Box.createVerticalStrut(5));
+        
+        // Opciones de Alta
+        JPanel altaOptionsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        altaOptionsPanel.setOpaque(false);
+        altaOptionsPanel.add(apiApiladoCheck);
+        altaOptionsPanel.add(clearQueueOnStopCheck);
+        controlContent.add(altaOptionsPanel);
         
         controlSection.add(controlContent, BorderLayout.CENTER);
         mainPanel.add(controlSection);
@@ -999,6 +1039,560 @@ public class RFIDMainWindow extends JFrame {
         panel.add(new JLabel(), gbc);
         
         return panel;
+    }
+    
+    /**
+     * Crea el panel de configuración PLC (Modbus TCP).
+     * Permite configurar la comunicación con el PLC para automatización industrial.
+     * 
+     * @return Panel de configuración PLC
+     */
+    private JPanel createPlcPanel() {
+        JPanel mainPanel = new JPanel();
+        mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.Y_AXIS));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        
+        // ========== SECCIÓN 1: CONEXIÓN PLC ==========
+        JPanel connectionSection = new JPanel(new GridBagLayout());
+        connectionSection.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createEtchedBorder(), "Conexion PLC (Modbus TCP)"));
+        
+        // Leyenda explicativa - Panel con ancho completo
+        JPanel legendPanel = new JPanel();
+        legendPanel.setLayout(new BoxLayout(legendPanel, BoxLayout.Y_AXIS));
+        legendPanel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createEtchedBorder(), "Guia de Configuracion"));
+        legendPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        
+        JLabel lbl1 = new JLabel("<html><b>Modbus TCP:</b> Protocolo industrial para comunicacion con PLCs</html>");
+        JLabel lbl2 = new JLabel("<html><b>IP del PLC:</b> Direccion de red del controlador (ej: 192.168.1.100)</html>");
+        JLabel lbl3 = new JLabel("<html><b>Puerto:</b> Puerto Modbus, normalmente 502</html>");
+        JLabel lbl4 = new JLabel("<html><b>Intervalo polling:</b> Cada cuantos milisegundos se verifica el PLC</html>");
+        JLabel lbl5 = new JLabel("<html><b>Referencia:</b> Direccion del registro en el PLC (0, 1, 2, 3...)</html>");
+        JLabel lbl6 = new JLabel("<html><b>Unit ID:</b> Identificador del dispositivo esclavo (normalmente 1)</html>");
+        JLabel lbl7 = new JLabel("<html><b>Coil:</b> Variable booleana del PLC (ON/OFF) - Controla inicio/parada de lectura</html>");
+        JLabel lbl8 = new JLabel("<html><b>Holding Register:</b> Variable numerica del PLC (0-65535) - Para escribir datos</html>");
+        
+        legendPanel.add(lbl1);
+        legendPanel.add(Box.createVerticalStrut(3));
+        legendPanel.add(lbl2);
+        legendPanel.add(lbl3);
+        legendPanel.add(lbl4);
+        legendPanel.add(Box.createVerticalStrut(8));
+        legendPanel.add(lbl5);
+        legendPanel.add(lbl6);
+        legendPanel.add(Box.createVerticalStrut(8));
+        legendPanel.add(lbl7);
+        legendPanel.add(lbl8);
+        
+        // Envolver en panel con BorderLayout para ocupar ancho completo
+        JPanel legendWrapper = new JPanel(new BorderLayout());
+        legendWrapper.add(legendPanel, BorderLayout.CENTER);
+        mainPanel.add(legendWrapper);
+        mainPanel.add(Box.createVerticalStrut(15));
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(8, 10, 8, 10);
+        gbc.anchor = GridBagConstraints.WEST;
+        
+        // Checkbox habilitar PLC
+        gbc.gridx = 0; gbc.gridy = 0;
+        plcEnabledCheck = new JCheckBox("Habilitar comunicacion PLC");
+        plcEnabledCheck.setSelected(config.isPlcEnabled());
+        plcEnabledCheck.addActionListener(e -> {
+            config.setPlcEnabled(plcEnabledCheck.isSelected());
+            updatePlcFieldsState();
+        });
+        connectionSection.add(plcEnabledCheck, gbc);
+        
+        // IP del PLC
+        gbc.gridx = 0; gbc.gridy = 1;
+        connectionSection.add(new JLabel("IP del PLC:"), gbc);
+        gbc.gridx = 1;
+        plcIpField = new JTextField(config.getPlcIP(), 15);
+        plcIpField.addFocusListener(new java.awt.event.FocusAdapter() {
+            public void focusLost(java.awt.event.FocusEvent evt) {
+                config.setPlcIP(plcIpField.getText().trim());
+            }
+        });
+        connectionSection.add(plcIpField, gbc);
+        
+        // Puerto Modbus
+        gbc.gridx = 2;
+        connectionSection.add(new JLabel("Puerto:"), gbc);
+        gbc.gridx = 3;
+        plcPortSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcPort(), 1, 65535, 1));
+        plcPortSpinner.addChangeListener(e -> config.setPlcPort((Integer)plcPortSpinner.getValue()));
+        connectionSection.add(plcPortSpinner, gbc);
+        
+        // Intervalo de polling
+        gbc.gridx = 0; gbc.gridy = 2;
+        connectionSection.add(new JLabel("Intervalo polling (ms):"), gbc);
+        gbc.gridx = 1;
+        plcPollingSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcPollingInterval(), 100, 10000, 100));
+        plcPollingSpinner.addChangeListener(e -> config.setPlcPollingInterval((Integer)plcPollingSpinner.getValue()));
+        connectionSection.add(plcPollingSpinner, gbc);
+        
+        // Estado de conexión
+        gbc.gridx = 2;
+        connectionSection.add(new JLabel("Estado:"), gbc);
+        gbc.gridx = 3;
+        JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
+        plcStatusIndicator = new JPanel();
+        plcStatusIndicator.setPreferredSize(new Dimension(12, 12));
+        plcStatusIndicator.setBackground(Color.GRAY);
+        plcStatusIndicator.setBorder(BorderFactory.createLineBorder(Color.DARK_GRAY));
+        plcStatusLabel = new JLabel("Desconectado");
+        statusPanel.add(plcStatusIndicator);
+        statusPanel.add(plcStatusLabel);
+        connectionSection.add(statusPanel, gbc);
+        
+        // Botón de prueba
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
+        plcTestButton = new JButton("Probar Conexion");
+        plcTestButton.addActionListener(e -> testPlcConnection());
+        connectionSection.add(plcTestButton, gbc);
+        
+        mainPanel.add(connectionSection);
+        mainPanel.add(Box.createVerticalStrut(15));
+        
+        // ========== SECCIÓN 2: REGISTRO ENABLER (COIL) ==========
+        JPanel enablerSection = new JPanel(new GridBagLayout());
+        enablerSection.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createEtchedBorder(), "Registro Enabler (Coil de activacion)"));
+        gbc = new GridBagConstraints();
+        gbc.insets = new Insets(8, 10, 8, 10);
+        gbc.anchor = GridBagConstraints.WEST;
+        
+        gbc.gridx = 0; gbc.gridy = 0;
+        enablerSection.add(new JLabel("Referencia (Coil):"), gbc);
+        gbc.gridx = 1;
+        plcRefEnableSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcRefEnable(), 0, 65535, 1));
+        plcRefEnableSpinner.addChangeListener(e -> config.setPlcRefEnable((Integer)plcRefEnableSpinner.getValue()));
+        enablerSection.add(plcRefEnableSpinner, gbc);
+        
+        gbc.gridx = 2;
+        enablerSection.add(new JLabel("Unit ID:"), gbc);
+        gbc.gridx = 3;
+        plcUnitIdEnableSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcUnitIdEnable(), 0, 255, 1));
+        plcUnitIdEnableSpinner.addChangeListener(e -> config.setPlcUnitIdEnable((Integer)plcUnitIdEnableSpinner.getValue()));
+        enablerSection.add(plcUnitIdEnableSpinner, gbc);
+        
+        mainPanel.add(enablerSection);
+        mainPanel.add(Box.createVerticalStrut(15));
+        
+        // ========== SECCIÓN 3: REGISTROS DE DATOS (HOLDING REGISTERS) ==========
+        JPanel registersSection = new JPanel(new GridBagLayout());
+        registersSection.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createEtchedBorder(), "Registros de Datos (Holding Registers)"));
+        gbc = new GridBagConstraints();
+        gbc.insets = new Insets(6, 10, 6, 10);
+        gbc.anchor = GridBagConstraints.WEST;
+        
+        // Encabezados
+        gbc.gridx = 0; gbc.gridy = 0;
+        registersSection.add(new JLabel("Registro"), gbc);
+        gbc.gridx = 1;
+        registersSection.add(new JLabel("Referencia"), gbc);
+        gbc.gridx = 2;
+        registersSection.add(new JLabel("Unit ID"), gbc);
+        gbc.gridx = 3;
+        registersSection.add(new JLabel("Descripcion"), gbc);
+        
+        // Tipo Embalaje
+        gbc.gridx = 0; gbc.gridy = 1;
+        registersSection.add(new JLabel("Tipo Embalaje:"), gbc);
+        gbc.gridx = 1;
+        plcRefTipoEmbalajeSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcRefTipoEmbalaje(), 0, 65535, 1));
+        plcRefTipoEmbalajeSpinner.addChangeListener(e -> config.setPlcRefTipoEmbalaje((Integer)plcRefTipoEmbalajeSpinner.getValue()));
+        registersSection.add(plcRefTipoEmbalajeSpinner, gbc);
+        gbc.gridx = 2;
+        plcUnitIdTipoEmbalajeSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcUnitIdTipoEmbalaje(), 0, 255, 1));
+        plcUnitIdTipoEmbalajeSpinner.addChangeListener(e -> config.setPlcUnitIdTipoEmbalaje((Integer)plcUnitIdTipoEmbalajeSpinner.getValue()));
+        registersSection.add(plcUnitIdTipoEmbalajeSpinner, gbc);
+        gbc.gridx = 3;
+        registersSection.add(new JLabel("Codigo tipo de embalaje"), gbc);
+        
+        // Ancho
+        gbc.gridx = 0; gbc.gridy = 2;
+        registersSection.add(new JLabel("Ancho:"), gbc);
+        gbc.gridx = 1;
+        plcRefAnchoSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcRefAncho(), 0, 65535, 1));
+        plcRefAnchoSpinner.addChangeListener(e -> config.setPlcRefAncho((Integer)plcRefAnchoSpinner.getValue()));
+        registersSection.add(plcRefAnchoSpinner, gbc);
+        gbc.gridx = 2;
+        plcUnitIdAnchoSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcUnitIdAncho(), 0, 255, 1));
+        plcUnitIdAnchoSpinner.addChangeListener(e -> config.setPlcUnitIdAncho((Integer)plcUnitIdAnchoSpinner.getValue()));
+        registersSection.add(plcUnitIdAnchoSpinner, gbc);
+        gbc.gridx = 3;
+        registersSection.add(new JLabel("Dimension ancho en mm"), gbc);
+        
+        // Largo
+        gbc.gridx = 0; gbc.gridy = 3;
+        registersSection.add(new JLabel("Largo:"), gbc);
+        gbc.gridx = 1;
+        plcRefLargoSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcRefLargo(), 0, 65535, 1));
+        plcRefLargoSpinner.addChangeListener(e -> config.setPlcRefLargo((Integer)plcRefLargoSpinner.getValue()));
+        registersSection.add(plcRefLargoSpinner, gbc);
+        gbc.gridx = 2;
+        plcUnitIdLargoSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcUnitIdLargo(), 0, 255, 1));
+        plcUnitIdLargoSpinner.addChangeListener(e -> config.setPlcUnitIdLargo((Integer)plcUnitIdLargoSpinner.getValue()));
+        registersSection.add(plcUnitIdLargoSpinner, gbc);
+        gbc.gridx = 3;
+        registersSection.add(new JLabel("Dimension largo en mm"), gbc);
+        
+        // Activa
+        gbc.gridx = 0; gbc.gridy = 4;
+        registersSection.add(new JLabel("Activa:"), gbc);
+        gbc.gridx = 1;
+        plcRefActivaSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcRefActiva(), 0, 65535, 1));
+        plcRefActivaSpinner.addChangeListener(e -> config.setPlcRefActiva((Integer)plcRefActivaSpinner.getValue()));
+        registersSection.add(plcRefActivaSpinner, gbc);
+        gbc.gridx = 2;
+        plcUnitIdActivaSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcUnitIdActiva(), 0, 255, 1));
+        plcUnitIdActivaSpinner.addChangeListener(e -> config.setPlcUnitIdActiva((Integer)plcUnitIdActivaSpinner.getValue()));
+        registersSection.add(plcUnitIdActivaSpinner, gbc);
+        gbc.gridx = 3;
+        registersSection.add(new JLabel("Bandera de confirmacion"), gbc);
+        
+        mainPanel.add(registersSection);
+        
+        // Espacio flexible al final
+        mainPanel.add(Box.createVerticalGlue());
+        
+        // Actualizar estado de campos según checkbox
+        updatePlcFieldsState();
+        
+        JScrollPane scrollPane = new JScrollPane(mainPanel);
+        scrollPane.setBorder(null);
+        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        
+        JPanel containerPanel = new JPanel(new BorderLayout());
+        containerPanel.add(scrollPane, BorderLayout.CENTER);
+        return containerPanel;
+    }
+    
+    /**
+     * Actualiza el estado habilitado/deshabilitado de los campos PLC.
+     */
+    private void updatePlcFieldsState() {
+        boolean enabled = plcEnabledCheck.isSelected();
+        plcIpField.setEnabled(enabled);
+        plcPortSpinner.setEnabled(enabled);
+        plcPollingSpinner.setEnabled(enabled);
+        plcRefEnableSpinner.setEnabled(enabled);
+        plcUnitIdEnableSpinner.setEnabled(enabled);
+        plcRefTipoEmbalajeSpinner.setEnabled(enabled);
+        plcUnitIdTipoEmbalajeSpinner.setEnabled(enabled);
+        plcRefAnchoSpinner.setEnabled(enabled);
+        plcUnitIdAnchoSpinner.setEnabled(enabled);
+        plcRefLargoSpinner.setEnabled(enabled);
+        plcUnitIdLargoSpinner.setEnabled(enabled);
+        plcRefActivaSpinner.setEnabled(enabled);
+        plcUnitIdActivaSpinner.setEnabled(enabled);
+        plcTestButton.setEnabled(enabled);
+    }
+    
+    /**
+     * Prueba la conexión con el PLC.
+     */
+    private void testPlcConnection() {
+        plcStatusLabel.setText("Conectando...");
+        plcStatusIndicator.setBackground(Color.YELLOW);
+        
+        new Thread(() -> {
+            try {
+                ModbusClient client = new ModbusClient(config.getPlcIP(), config.getPlcPort());
+                client.connect();
+                boolean enablerValue = client.checkEnabler(
+                    config.getPlcRefEnable(), 
+                    config.getPlcUnitIdEnable()
+                );
+                client.disconnect();
+                
+                SwingUtilities.invokeLater(() -> {
+                    plcStatusLabel.setText("Conectado (Enabler: " + (enablerValue ? "ON" : "OFF") + ")");
+                    plcStatusIndicator.setBackground(Color.GREEN);
+                    System.out.println("[PLC] Conexion exitosa - Enabler: " + (enablerValue ? "ON" : "OFF"));
+                });
+            } catch (Exception ex) {
+                SwingUtilities.invokeLater(() -> {
+                    plcStatusLabel.setText("Error: " + ex.getMessage());
+                    plcStatusIndicator.setBackground(Color.RED);
+                    System.out.println("[PLC] Error de conexion: " + ex.getMessage());
+                });
+            }
+        }).start();
+    }
+    
+    /**
+     * Inicia el polling del PLC.
+     * Verifica el coil enabler cada intervalo configurado.
+     */
+    private void startPlcPolling() {
+        System.out.println("[PLC-DEBUG] startPlcPolling() llamado");
+        System.out.println("[PLC-DEBUG] config.isPlcEnabled() = " + config.isPlcEnabled());
+        System.out.println("[PLC-DEBUG] plcRunning = " + plcRunning);
+        System.out.println("[PLC-DEBUG] IP = " + config.getPlcIP());
+        System.out.println("[PLC-DEBUG] Puerto = " + config.getPlcPort());
+        
+        if (!config.isPlcEnabled()) {
+            System.out.println("[PLC-DEBUG] PLC NO habilitado - Verifica el checkbox");
+            return;
+        }
+        if (plcRunning) {
+            System.out.println("[PLC-DEBUG] PLC ya en ejecucion");
+            return;
+        }
+        
+        plcRunning = true;
+        System.out.println("[PLC] Iniciando polling cada " + config.getPlcPollingInterval() + "ms");
+        
+        plcPollingThread = new Thread(() -> {
+            ModbusClient modbusClient = null;
+            boolean wasEnabled = false;
+            
+            while (plcRunning) {
+                try {
+                    // Conectar si no está conectado
+                    if (modbusClient == null || !modbusClient.isConnected()) {
+                        modbusClient = new ModbusClient(config.getPlcIP(), config.getPlcPort());
+                        modbusClient.connect();
+                        updatePlcStatus("Conectado", Color.GREEN);
+                    }
+                    
+                    // Leer coil enabler
+                    boolean enablerActive = modbusClient.checkEnabler(
+                        config.getPlcRefEnable(),
+                        config.getPlcUnitIdEnable()
+                    );
+                    
+                    // Controlar lectura RFID segun estado del enabler
+                    if (enablerActive && !wasEnabled) {
+                        // Flanco de subida: OFF -> ON = Iniciar lectura
+                        System.out.println("[PLC] Enabler ON - Iniciando lectura RFID");
+                        SwingUtilities.invokeLater(() -> {
+                            if (!isReading && connection != null && connection.isConnected()) {
+                                startReadingFromPLC();
+                            }
+                        });
+                    } else if (!enablerActive && wasEnabled) {
+                        // Flanco de bajada: ON -> OFF = Detener lectura
+                        System.out.println("[PLC] Enabler OFF - Deteniendo lectura RFID");
+                        SwingUtilities.invokeLater(() -> {
+                            if (isReading) {
+                                stopReadingFromPLC();
+                            }
+                        });
+                    }
+                    
+                    wasEnabled = enablerActive;
+                    
+                    Thread.sleep(config.getPlcPollingInterval());
+                    
+                } catch (InterruptedException ie) {
+                    break;
+                } catch (Exception ex) {
+                    System.out.println("[PLC] Error de polling: " + ex.getMessage());
+                    updatePlcStatus("Error", Color.RED);
+                    // Intentar reconectar
+                    try {
+                        if (modbusClient != null) {
+                            modbusClient.disconnect();
+                        }
+                    } catch (Exception ignored) {}
+                    modbusClient = null;
+                    
+                    try {
+                        Thread.sleep(2000); // Esperar antes de reintentar
+                    } catch (InterruptedException ie) {
+                        break;
+                    }
+                }
+            }
+            
+            // Cerrar conexión al terminar
+            if (modbusClient != null) {
+                try {
+                    modbusClient.disconnect();
+                } catch (Exception ignored) {}
+            }
+            updatePlcStatus("Desconectado", Color.GRAY);
+        });
+        
+        plcPollingThread.setDaemon(true);
+        plcPollingThread.setName("PLC-Polling-Thread");
+        plcPollingThread.start();
+    }
+    
+    /**
+     * Detiene el polling del PLC.
+     */
+    private void stopPlcPolling() {
+        if (!plcRunning) {
+            return;
+        }
+        
+        plcRunning = false;
+        System.out.println("[PLC] Deteniendo polling");
+        
+        if (plcPollingThread != null) {
+            plcPollingThread.interrupt();
+            try {
+                plcPollingThread.join(2000);
+            } catch (InterruptedException ignored) {}
+        }
+    }
+    
+    /**
+     * Inicia la lectura RFID desde el control del PLC.
+     * Se ejecuta en el EDT.
+     */
+    private void startReadingFromPLC() {
+        if (connection == null || !connection.isConnected()) {
+            System.out.println("[PLC] No hay conexion RFID activa");
+            return;
+        }
+        
+        try {
+            if (connection.startReading()) {
+                isReading = true;
+                startReadingButton.setEnabled(false);
+                stopReadingButton.setEnabled(true);
+                connectionStatusLabel.setText("Leyendo (PLC)");
+                connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
+                setStatus("Lectura controlada por PLC - Activa");
+                logger.info("PLC", "Lectura iniciada por enabler PLC");
+            }
+        } catch (Exception e) {
+            System.out.println("[PLC] Error iniciando lectura: " + e.getMessage());
+            logger.error("PLC", "Error iniciando lectura: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Detiene la lectura RFID desde el control del PLC.
+     * Se ejecuta en el EDT.
+     */
+    private void stopReadingFromPLC() {
+        if (connection == null) return;
+        
+        try {
+            connection.stopReading();
+            isReading = false;
+            startReadingButton.setEnabled(true);
+            stopReadingButton.setEnabled(false);
+            connectionStatusLabel.setText("Conectado");
+            connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_WARNING);
+            setStatus("Lectura detenida por PLC - Esperando enabler");
+            logger.info("PLC", "Lectura detenida por enabler PLC");
+        } catch (Exception e) {
+            System.out.println("[PLC] Error deteniendo lectura: " + e.getMessage());
+            logger.error("PLC", "Error deteniendo lectura: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Procesa un ciclo de lectura PLC -> RFID -> API -> PLC.
+     * 
+     * @param modbusClient Cliente Modbus conectado
+     */
+    private void processPlcReadCycle(ModbusClient modbusClient) {
+        try {
+            // 1. Obtener último tag leído (el más reciente del RFID)
+            String lastEpc = getLastReadTag();
+            if (lastEpc == null || lastEpc.isEmpty()) {
+                System.out.println("[PLC] No hay tags RFID leidos para procesar");
+                return;
+            }
+            
+            System.out.println("[PLC] Procesando tag: " + lastEpc);
+            
+            // 2. Consultar API para obtener datos del producto
+            APIClient apiClient = new APIClient(config);
+            String productDataJson = apiClient.getProductData(lastEpc);
+            
+            if (productDataJson == null) {
+                System.out.println("[PLC] No se obtuvieron datos del producto desde API");
+                return;
+            }
+            
+            // 3. Parsear datos del producto
+            int tipoEmbalaje = extractIntFromJson(productDataJson, "tipo_embalaje");
+            int ancho = extractIntFromJson(productDataJson, "ancho");
+            int largo = extractIntFromJson(productDataJson, "largo");
+            
+            System.out.println("[PLC] Datos producto - Tipo: " + tipoEmbalaje + ", Ancho: " + ancho + ", Largo: " + largo);
+            
+            // 4. Escribir datos al PLC
+            modbusClient.writeRegister(config.getPlcRefTipoEmbalaje(), config.getPlcUnitIdTipoEmbalaje(), tipoEmbalaje);
+            modbusClient.writeRegister(config.getPlcRefAncho(), config.getPlcUnitIdAncho(), ancho);
+            modbusClient.writeRegister(config.getPlcRefLargo(), config.getPlcUnitIdLargo(), largo);
+            
+            // 5. Activar bandera de confirmación
+            modbusClient.writeRegister(config.getPlcRefActiva(), config.getPlcUnitIdActiva(), 1);
+            
+            System.out.println("[PLC] Datos escritos al PLC correctamente");
+            
+        } catch (Exception ex) {
+            System.out.println("[PLC] Error en ciclo de lectura: " + ex.getMessage());
+        }
+    }
+    
+    /**
+     * Obtiene el último tag leído del RFID.
+     * 
+     * @return EPC del último tag o null
+     */
+    private String getLastReadTag() {
+        // Obtener del modelo de la tabla
+        int rowCount = tagTableModel.getRowCount();
+        if (rowCount > 0) {
+            return (String) tagTableModel.getValueAt(0, 0); // Primera columna es EPC
+        }
+        return null;
+    }
+    
+    /**
+     * Extrae un valor entero de un JSON simple.
+     * 
+     * @param json String JSON
+     * @param key Clave a buscar
+     * @return Valor entero o 0 si no se encuentra
+     */
+    private int extractIntFromJson(String json, String key) {
+        try {
+            String searchKey = "\"" + key + "\":";
+            int idx = json.indexOf(searchKey);
+            if (idx >= 0) {
+                int start = idx + searchKey.length();
+                // Saltar espacios
+                while (start < json.length() && Character.isWhitespace(json.charAt(start))) {
+                    start++;
+                }
+                int end = start;
+                while (end < json.length() && (Character.isDigit(json.charAt(end)) || json.charAt(end) == '-')) {
+                    end++;
+                }
+                if (end > start) {
+                    return Integer.parseInt(json.substring(start, end));
+                }
+            }
+        } catch (Exception ignored) {}
+        return 0;
+    }
+    
+    /**
+     * Actualiza el estado visual del PLC.
+     */
+    private void updatePlcStatus(String status, Color color) {
+        SwingUtilities.invokeLater(() -> {
+            if (plcStatusLabel != null) {
+                plcStatusLabel.setText(status);
+            }
+            if (plcStatusIndicator != null) {
+                plcStatusIndicator.setBackground(color);
+            }
+        });
     }
     
     /**
@@ -1373,7 +1967,19 @@ public class RFIDMainWindow extends JFrame {
         
         statusBar.add(statusLabel, BorderLayout.WEST);
         statusBar.add(statsLabel, BorderLayout.CENTER);
-        statusBar.add(activityIndicator, BorderLayout.EAST);
+        
+        // Panel derecho con indicador de actividad y botón guardar
+        JPanel rightPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        rightPanel.setOpaque(false);
+        rightPanel.add(activityIndicator);
+        
+        // Botón Guardar Configuración visible en todas las pestañas
+        JButton globalSaveButton = new JButton("Guardar Configuracion");
+        ModernUIStyle.styleSuccessButton(globalSaveButton);
+        globalSaveButton.addActionListener(e -> saveConfiguration());
+        rightPanel.add(globalSaveButton);
+        
+        statusBar.add(rightPanel, BorderLayout.EAST);
         
         return statusBar;
     }
@@ -1527,6 +2133,18 @@ public class RFIDMainWindow extends JFrame {
             config.setReportChannelIndex(reportChannelCheck.isSelected());
         });
         
+        // Listeners para Apilado y Borrar cola
+        apiApiladoCheck.addActionListener(e -> {
+            config.setApiApilado(apiApiladoCheck.isSelected());
+            if (apiClient != null) {
+                apiClient.setApilado(apiApiladoCheck.isSelected());
+            }
+        });
+        
+        clearQueueOnStopCheck.addActionListener(e -> {
+            config.setClearQueueOnStop(clearQueueOnStopCheck.isSelected());
+        });
+        
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
@@ -1592,6 +2210,10 @@ public class RFIDMainWindow extends JFrame {
         config.setApiTrabajo(apiTrabajoField.getText().trim());
         
         config.setDisplayHexMode(displayHexMode);
+        
+        // Opciones de API - Apilado y Borrar cola
+        config.setApiApilado(apiApiladoCheck.isSelected());
+        config.setClearQueueOnStop(clearQueueOnStopCheck.isSelected());
     }
     
     // ==================== Acciones ====================
@@ -1739,6 +2361,9 @@ public class RFIDMainWindow extends JFrame {
                         isReading = true;
                         startReadingButton.setEnabled(false);
                         stopReadingButton.setEnabled(true);
+                        
+                        // Iniciar polling PLC si está habilitado
+                        startPlcPolling();
                         connectionStatusLabel.setText("Leyendo");
                         connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
                         setStatus("Lectura activa - Esperando etiquetas RFID...");
@@ -1786,6 +2411,16 @@ public class RFIDMainWindow extends JFrame {
                 isReading = false;
                 startReadingButton.setEnabled(true);
                 stopReadingButton.setEnabled(false);
+                
+                // Detener polling PLC
+                stopPlcPolling();
+                
+                // Limpiar cola de envío si está configurado
+                if (clearQueueOnStopCheck.isSelected() && apiClient != null) {
+                    int cleared = apiClient.clearQueue();
+                    System.out.println("[RFID] Cola de API limpiada: " + cleared + " tags descartados");
+                }
+                
                 connectionStatusLabel.setText("Conectado");
                 setStatus("Lectura detenida - Conectado a " + config.getReaderIP());
                 System.out.println("[RFID] Lectura detenida");
@@ -1837,6 +2472,9 @@ public class RFIDMainWindow extends JFrame {
         stopReadingButton.setEnabled(false);
         setStatus("Conectado a " + config.getReaderIP() + " - Presione 'Iniciar Lectura' para leer etiquetas");
         statistics.recordConnection();
+        
+        // Iniciar polling PLC si está habilitado (el PLC controlará la lectura)
+        startPlcPolling();
         
         config.setLastConnectedIP(config.getReaderIP());
         autoSaveConfiguration();
@@ -2237,6 +2875,7 @@ public class RFIDMainWindow extends JFrame {
             apiClient.setApiTrabajo(trabajo);
             apiClient.setDisplayHexMode(displayHexMode);
             apiClient.setFailedTagStorage(failedTagStorage);
+            apiClient.setApilado(apiApiladoCheck.isSelected());
             apiClient.start();
             apiStatusLabel.setText("Cliente API iniciado");
             apiStatusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
@@ -2389,6 +3028,9 @@ public class RFIDMainWindow extends JFrame {
                         isReading = true;
                         startReadingButton.setEnabled(false);
                         stopReadingButton.setEnabled(true);
+                        
+                        // Iniciar polling PLC si está habilitado
+                        startPlcPolling();
                         connectionStatusLabel.setText("Leyendo (Auto)");
                         connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_SUCCESS);
                         setStatus("Lectura activa - Control por API");

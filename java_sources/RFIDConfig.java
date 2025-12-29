@@ -86,11 +86,57 @@ public class RFIDConfig implements Serializable {
     /** Tiempo de expiración del filtro de duplicados en segundos */
     private int duplicateFilterExpiration;
     
+    // ==================== CONFIGURACIÓN PLC ====================
+    
+    /** Habilitar comunicación con PLC */
+    private boolean plcEnabled;
+    
+    /** IP del PLC */
+    private String plcIP;
+    
+    /** Puerto Modbus del PLC (por defecto 502) */
+    private int plcPort;
+    
+    /** Intervalo de polling PLC en milisegundos */
+    private int plcPollingInterval;
+    
+    /** Referencia del coil enabler */
+    private int plcRefEnable;
+    
+    /** Unit ID del coil enabler */
+    private int plcUnitIdEnable;
+    
+    /** Referencia del registro tipo embalaje */
+    private int plcRefTipoEmbalaje;
+    
+    /** Unit ID del registro tipo embalaje */
+    private int plcUnitIdTipoEmbalaje;
+    
+    /** Referencia del registro ancho */
+    private int plcRefAncho;
+    
+    /** Unit ID del registro ancho */
+    private int plcUnitIdAncho;
+    
+    /** Referencia del registro largo */
+    private int plcRefLargo;
+    
+    /** Unit ID del registro largo */
+    private int plcUnitIdLargo;
+    
+    /** Referencia del registro de activación */
+    private int plcRefActiva;
+    
+    /** Unit ID del registro de activación */
+    private int plcUnitIdActiva;
+    
     /** Modo sin expiración para el filtro de duplicados (estilo VZEBRA) */
     private boolean duplicateFilterNoExpiration;
     
     /** Control de inicio por API habilitado */
     private boolean apiStartControlEnabled;
+    private boolean apiApilado;
+    private boolean clearQueueOnStop;
     private boolean retryFailedEnabled = true;
     private int retryIntervalSeconds = 60;
     private boolean apiPollingEnabled = false;
@@ -185,8 +231,26 @@ public class RFIDConfig implements Serializable {
         
         this.duplicateFilterEnabled = true;
         this.duplicateFilterExpiration = 5;
+        
+        // Valores por defecto PLC
+        this.plcEnabled = false;
+        this.plcIP = "localhost";
+        this.plcPort = 502;
+        this.plcPollingInterval = 500;
+        this.plcRefEnable = 0;
+        this.plcUnitIdEnable = 1;
+        this.plcRefTipoEmbalaje = 0;
+        this.plcUnitIdTipoEmbalaje = 1;
+        this.plcRefAncho = 1;
+        this.plcUnitIdAncho = 1;
+        this.plcRefLargo = 2;
+        this.plcUnitIdLargo = 1;
+        this.plcRefActiva = 3;
+        this.plcUnitIdActiva = 1;
         this.duplicateFilterNoExpiration = false;
         this.apiStartControlEnabled = false;
+        this.apiApilado = false;
+        this.clearQueueOnStop = true;
         
         // Configuración avanzada Zebra - valores por defecto
         this.rssiThreshold = -70;           // -70 dBm es un buen umbral por defecto
@@ -398,6 +462,50 @@ public class RFIDConfig implements Serializable {
         if (seconds < 1) seconds = 1;
         this.duplicateFilterExpiration = seconds;
     }
+    
+    // ==================== GETTERS/SETTERS PLC ====================
+    
+    public boolean isPlcEnabled() { return plcEnabled; }
+    public void setPlcEnabled(boolean enabled) { this.plcEnabled = enabled; }
+    
+    public String getPlcIP() { return plcIP; }
+    public void setPlcIP(String ip) { this.plcIP = ip; }
+    
+    public int getPlcPort() { return plcPort; }
+    public void setPlcPort(int port) { this.plcPort = port; }
+    
+    public int getPlcPollingInterval() { return plcPollingInterval; }
+    public void setPlcPollingInterval(int interval) { this.plcPollingInterval = interval; }
+    
+    public int getPlcRefEnable() { return plcRefEnable; }
+    public void setPlcRefEnable(int ref) { this.plcRefEnable = ref; }
+    
+    public int getPlcUnitIdEnable() { return plcUnitIdEnable; }
+    public void setPlcUnitIdEnable(int unitId) { this.plcUnitIdEnable = unitId; }
+    
+    public int getPlcRefTipoEmbalaje() { return plcRefTipoEmbalaje; }
+    public void setPlcRefTipoEmbalaje(int ref) { this.plcRefTipoEmbalaje = ref; }
+    
+    public int getPlcUnitIdTipoEmbalaje() { return plcUnitIdTipoEmbalaje; }
+    public void setPlcUnitIdTipoEmbalaje(int unitId) { this.plcUnitIdTipoEmbalaje = unitId; }
+    
+    public int getPlcRefAncho() { return plcRefAncho; }
+    public void setPlcRefAncho(int ref) { this.plcRefAncho = ref; }
+    
+    public int getPlcUnitIdAncho() { return plcUnitIdAncho; }
+    public void setPlcUnitIdAncho(int unitId) { this.plcUnitIdAncho = unitId; }
+    
+    public int getPlcRefLargo() { return plcRefLargo; }
+    public void setPlcRefLargo(int ref) { this.plcRefLargo = ref; }
+    
+    public int getPlcUnitIdLargo() { return plcUnitIdLargo; }
+    public void setPlcUnitIdLargo(int unitId) { this.plcUnitIdLargo = unitId; }
+    
+    public int getPlcRefActiva() { return plcRefActiva; }
+    public void setPlcRefActiva(int ref) { this.plcRefActiva = ref; }
+    
+    public int getPlcUnitIdActiva() { return plcUnitIdActiva; }
+    public void setPlcUnitIdActiva(int unitId) { this.plcUnitIdActiva = unitId; }
 
     public boolean isDuplicateFilterNoExpiration() {
         return duplicateFilterNoExpiration;
@@ -771,6 +879,22 @@ public class RFIDConfig implements Serializable {
         sb.append("  \"duplicateFilterEnabled\": ").append(duplicateFilterEnabled).append(",\n");
         sb.append("  \"duplicateFilterExpiration\": ").append(duplicateFilterExpiration).append(",\n");
         sb.append("  \"duplicateFilterNoExpiration\": ").append(duplicateFilterNoExpiration).append(",\n");
+        
+        // Configuración PLC
+        sb.append("  \"plcEnabled\": ").append(plcEnabled).append(",\n");
+        sb.append("  \"plcIP\": \"").append(escapeJson(plcIP)).append("\",\n");
+        sb.append("  \"plcPort\": ").append(plcPort).append(",\n");
+        sb.append("  \"plcPollingInterval\": ").append(plcPollingInterval).append(",\n");
+        sb.append("  \"plcRefEnable\": ").append(plcRefEnable).append(",\n");
+        sb.append("  \"plcUnitIdEnable\": ").append(plcUnitIdEnable).append(",\n");
+        sb.append("  \"plcRefTipoEmbalaje\": ").append(plcRefTipoEmbalaje).append(",\n");
+        sb.append("  \"plcUnitIdTipoEmbalaje\": ").append(plcUnitIdTipoEmbalaje).append(",\n");
+        sb.append("  \"plcRefAncho\": ").append(plcRefAncho).append(",\n");
+        sb.append("  \"plcUnitIdAncho\": ").append(plcUnitIdAncho).append(",\n");
+        sb.append("  \"plcRefLargo\": ").append(plcRefLargo).append(",\n");
+        sb.append("  \"plcUnitIdLargo\": ").append(plcUnitIdLargo).append(",\n");
+        sb.append("  \"plcRefActiva\": ").append(plcRefActiva).append(",\n");
+        sb.append("  \"plcUnitIdActiva\": ").append(plcUnitIdActiva).append(",\n");
         sb.append("  \"apiStartControlEnabled\": ").append(apiStartControlEnabled).append(",\n");
         sb.append("  \"retryFailedEnabled\": ").append(retryFailedEnabled).append(",\n");
         sb.append("  \"retryIntervalSeconds\": ").append(retryIntervalSeconds).append(",\n");
@@ -794,6 +918,10 @@ public class RFIDConfig implements Serializable {
         sb.append("  \"reportChannelIndex\": ").append(reportChannelIndex).append(",\n");
         sb.append("  \"autoConnectEnabled\": ").append(autoConnectEnabled).append(",\n");
         sb.append("  \"displayHexMode\": ").append(displayHexMode).append("\n");
+        
+        // Opciones de API
+        sb.append("  \"apiApilado\": ").append(apiApilado).append(",\n");
+        sb.append("  \"clearQueueOnStop\": ").append(clearQueueOnStop).append("\n");
         
         sb.append("}");
         return sb.toString();
@@ -824,6 +952,10 @@ public class RFIDConfig implements Serializable {
         config.apiEndpoint = extractStringValue(json, "apiEndpoint", null);
         config.apiKey = extractStringValue(json, "apiKey", null);
         config.apiTrabajo = extractStringValue(json, "apiTrabajo", null);
+        
+        // Opciones de API
+        config.apiApilado = extractBooleanValue(json, "apiApilado", false);
+        config.clearQueueOnStop = extractBooleanValue(json, "clearQueueOnStop", true);
         
         String modeStr = extractStringValue(json, "operationMode", "CONTINUOUS");
         try {
@@ -871,6 +1003,22 @@ public class RFIDConfig implements Serializable {
         config.duplicateFilterEnabled = extractBooleanValue(json, "duplicateFilterEnabled", config.duplicateFilterEnabled);
         config.duplicateFilterExpiration = extractIntValue(json, "duplicateFilterExpiration", config.duplicateFilterExpiration);
         config.duplicateFilterNoExpiration = extractBooleanValue(json, "duplicateFilterNoExpiration", config.duplicateFilterNoExpiration);
+            
+            // Cargar configuración PLC
+            config.plcEnabled = extractBooleanValue(json, "plcEnabled", config.plcEnabled);
+            config.plcIP = extractStringValue(json, "plcIP", config.plcIP);
+            config.plcPort = extractIntValue(json, "plcPort", config.plcPort);
+            config.plcPollingInterval = extractIntValue(json, "plcPollingInterval", config.plcPollingInterval);
+            config.plcRefEnable = extractIntValue(json, "plcRefEnable", config.plcRefEnable);
+            config.plcUnitIdEnable = extractIntValue(json, "plcUnitIdEnable", config.plcUnitIdEnable);
+            config.plcRefTipoEmbalaje = extractIntValue(json, "plcRefTipoEmbalaje", config.plcRefTipoEmbalaje);
+            config.plcUnitIdTipoEmbalaje = extractIntValue(json, "plcUnitIdTipoEmbalaje", config.plcUnitIdTipoEmbalaje);
+            config.plcRefAncho = extractIntValue(json, "plcRefAncho", config.plcRefAncho);
+            config.plcUnitIdAncho = extractIntValue(json, "plcUnitIdAncho", config.plcUnitIdAncho);
+            config.plcRefLargo = extractIntValue(json, "plcRefLargo", config.plcRefLargo);
+            config.plcUnitIdLargo = extractIntValue(json, "plcUnitIdLargo", config.plcUnitIdLargo);
+            config.plcRefActiva = extractIntValue(json, "plcRefActiva", config.plcRefActiva);
+            config.plcUnitIdActiva = extractIntValue(json, "plcUnitIdActiva", config.plcUnitIdActiva);
         config.apiStartControlEnabled = extractBooleanValue(json, "apiStartControlEnabled", config.apiStartControlEnabled);
         config.retryFailedEnabled = extractBooleanValue(json, "retryFailedEnabled", config.retryFailedEnabled);
         config.retryIntervalSeconds = extractIntValue(json, "retryIntervalSeconds", config.retryIntervalSeconds);
@@ -994,5 +1142,22 @@ public class RFIDConfig implements Serializable {
         return String.format(
             "RFIDConfig[ip=%s, puerto=%d, modo=%s, antenas=%d habilitadas]",
             readerIP, readerPort, operationMode, getEnabledAntennaCount());
+    }
+
+    // Getters y Setters para Apilado y ClearQueueOnStop
+    public boolean isApiApilado() {
+        return apiApilado;
+    }
+    
+    public void setApiApilado(boolean apiApilado) {
+        this.apiApilado = apiApilado;
+    }
+    
+    public boolean isClearQueueOnStop() {
+        return clearQueueOnStop;
+    }
+    
+    public void setClearQueueOnStop(boolean clearQueueOnStop) {
+        this.clearQueueOnStop = clearQueueOnStop;
     }
 }
