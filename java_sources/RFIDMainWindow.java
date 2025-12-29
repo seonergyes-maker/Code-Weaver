@@ -1213,10 +1213,19 @@ public class RFIDMainWindow extends JFrame {
         plcPollingSpinner.addChangeListener(e -> config.setPlcPollingInterval((Integer)plcPollingSpinner.getValue()));
         connectionSection.add(plcPollingSpinner, gbc);
         
-        // Estado de conexión
+        // Debounce de tags
         gbc.gridx = 2;
-        connectionSection.add(new JLabel("Estado:"), gbc);
+        connectionSection.add(new JLabel("Debounce (ms):"), gbc);
         gbc.gridx = 3;
+        plcDebounceSpinner = new JSpinner(new SpinnerNumberModel(config.getPlcDebounceMs(), 0, 60000, 100));
+        plcDebounceSpinner.setToolTipText("Tiempo minimo entre procesamiento del mismo tag (0 = sin debounce)");
+        plcDebounceSpinner.addChangeListener(e -> config.setPlcDebounceMs((Integer)plcDebounceSpinner.getValue()));
+        connectionSection.add(plcDebounceSpinner, gbc);
+        
+        // Estado de conexión
+        gbc.gridx = 0; gbc.gridy = 3;
+        connectionSection.add(new JLabel("Estado:"), gbc);
+        gbc.gridx = 1;
         JPanel statusPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0));
         plcStatusIndicator = new JPanel();
         plcStatusIndicator.setPreferredSize(new Dimension(12, 12));
@@ -1228,7 +1237,7 @@ public class RFIDMainWindow extends JFrame {
         connectionSection.add(statusPanel, gbc);
         
         // Botón de prueba
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
+        gbc.gridx = 2; gbc.gridy = 3; gbc.gridwidth = 2;
         plcTestButton = new JButton("Probar Conexion");
         plcTestButton.addActionListener(e -> testPlcConnection());
         connectionSection.add(plcTestButton, gbc);
