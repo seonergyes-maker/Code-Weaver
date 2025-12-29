@@ -203,9 +203,8 @@ public class ModbusClient {
         } catch (Exception e) {
             System.err.println("[ModbusClient] Error leyendo enabler: " + e.getMessage());
             return false;
-        } finally {
-            disconnect();
         }
+        // Nota: No desconectar aqui - mantener conexion abierta para escritura
     }
     
     /**
@@ -250,9 +249,8 @@ public class ModbusClient {
         } catch (Exception e) {
             System.err.println("[ModbusClient] Error escribiendo al PLC: " + e.getMessage());
             return false;
-        } finally {
-            disconnect();
         }
+        // Nota: No desconectar aqui - mantener conexion para siguiente escritura
     }
     
     /**

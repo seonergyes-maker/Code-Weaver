@@ -55,6 +55,7 @@ public class RFIDMainWindow extends JFrame {
     private JTextField plcIpField;
     private JSpinner plcPortSpinner;
     private JSpinner plcPollingSpinner;
+    private JSpinner plcDebounceSpinner;
     private JSpinner plcRefEnableSpinner;
     private JSpinner plcUnitIdEnableSpinner;
     private JSpinner plcRefTipoEmbalajeSpinner;
@@ -143,7 +144,7 @@ public class RFIDMainWindow extends JFrame {
     private String lastProcessedEpc = "";
     private long lastProcessedTime = 0;
     private volatile boolean plcWaitingForTag = false; // Esperando tag para procesar
-    private static final long PLC_DEBOUNCE_MS = 2000; // 2 segundos de debounce
+    // Debounce configurable desde pestaña PLC
     private volatile ModbusClient activeModbusClient = null; // Cliente Modbus activo para escritura
     private JComboBox<String> sessionCombo;
     private JComboBox<String> targetCombo;
@@ -1596,7 +1597,7 @@ public class RFIDMainWindow extends JFrame {
             
             // Debounce: evitar reprocesar el mismo tag en poco tiempo
             long now = System.currentTimeMillis();
-            if (lastEpc.equals(lastProcessedEpc) && (now - lastProcessedTime) < PLC_DEBOUNCE_MS) {
+            if (lastEpc.equals(lastProcessedEpc) && (now - lastProcessedTime) < config.getPlcDebounceMs()) {
                 System.out.println("[PLC] Debounce: tag " + lastEpc + " ya procesado recientemente");
                 return;
             }
