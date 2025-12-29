@@ -130,6 +130,9 @@ public class RFIDConfig implements Serializable {
     /** Unit ID del registro de activación */
     private int plcUnitIdActiva;
     
+    /** Debounce PLC en milisegundos */
+    private int plcDebounceMs = 2000;
+    
     /** Modo sin expiración para el filtro de duplicados (estilo VZEBRA) */
     private boolean duplicateFilterNoExpiration;
     
@@ -506,6 +509,9 @@ public class RFIDConfig implements Serializable {
     
     public int getPlcUnitIdActiva() { return plcUnitIdActiva; }
     public void setPlcUnitIdActiva(int unitId) { this.plcUnitIdActiva = unitId; }
+    
+    public int getPlcDebounceMs() { return plcDebounceMs; }
+    public void setPlcDebounceMs(int ms) { this.plcDebounceMs = ms; }
 
     public boolean isDuplicateFilterNoExpiration() {
         return duplicateFilterNoExpiration;
