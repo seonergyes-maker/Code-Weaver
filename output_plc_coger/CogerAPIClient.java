@@ -31,6 +31,7 @@ public class CogerAPIClient {
         public String descTipoEmbalaje;
         public int ancho;
         public int largo;
+        public int pila;
         public String unidadMedida;
         public String variante;
     }
@@ -280,6 +281,7 @@ public class CogerAPIClient {
             item.descTipoEmbalaje = getStringValue(json, "desc_tipo_embalaje");
             item.ancho = getIntValue(json, "ancho");
             item.largo = getIntValue(json, "largo");
+            item.pila = getIntValue(json, "pila");
             item.unidadMedida = getStringValue(json, "unidad_medida");
             item.variante = getStringValue(json, "variante");
             

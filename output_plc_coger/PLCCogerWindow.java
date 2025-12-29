@@ -56,6 +56,7 @@ public class PLCCogerWindow extends JFrame implements
     private JSpinner hrTipoSpinner;
     private JSpinner hrAnchoSpinner;
     private JSpinner hrLargoSpinner;
+    private JSpinner hrPilaSpinner;
     private JSpinner hrControlSpinner;
     private JButton plcConnectButton;
     private JButton plcDisconnectButton;
@@ -346,7 +347,7 @@ public class PLCCogerWindow extends JFrame implements
         panel.add(controlPanel, BorderLayout.NORTH);
         
         // Tabla de items
-        String[] columns = {"Orden", "Tag", "Codigo", "Descripcion", "Tipo", "Desc. Tipo", "Ancho", "Largo", "Unidad", "Variante"};
+        String[] columns = {"Orden", "Tag", "Codigo", "Descripcion", "Tipo", "Desc. Tipo", "Ancho", "Largo", "Pila", "Unidad", "Variante"};
         tableModel = new DefaultTableModel(columns, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -695,6 +696,17 @@ public class PLCCogerWindow extends JFrame implements
         ModernUIStyle.styleSpinner(hrLargoSpinner);
         hrPanel.add(hrLargoSpinner, gbc);
         
+        // HR Pila
+        gbc.gridx = 0; gbc.gridy++;
+        JLabel hrPilaLabel = new JLabel("HR Pila:");
+        ModernUIStyle.styleLabel(hrPilaLabel);
+        hrPanel.add(hrPilaLabel, gbc);
+        
+        gbc.gridx = 1;
+        hrPilaSpinner = new JSpinner(new SpinnerNumberModel(3, 0, 65535, 1));
+        ModernUIStyle.styleSpinner(hrPilaSpinner);
+        hrPanel.add(hrPilaSpinner, gbc);
+        
         row++;
         
         // HR Control
@@ -916,6 +928,7 @@ public class PLCCogerWindow extends JFrame implements
         hrTipoSpinner.setEnabled(enabled);
         hrAnchoSpinner.setEnabled(enabled);
         hrLargoSpinner.setEnabled(enabled);
+        hrPilaSpinner.setEnabled(enabled);
         hrControlSpinner.setEnabled(enabled);
         plcConnectButton.setEnabled(plcEnabledCheck.isSelected() && !plcConnected);
         plcDisconnectButton.setEnabled(plcConnected);
@@ -942,6 +955,7 @@ public class PLCCogerWindow extends JFrame implements
         hrTipoSpinner.setValue(config.getHrTipoEmbalaje());
         hrAnchoSpinner.setValue(config.getHrAncho());
         hrLargoSpinner.setValue(config.getHrLargo());
+        hrPilaSpinner.setValue(config.getHrPila());
         hrControlSpinner.setValue(config.getHrControl());
         
         // Opciones
@@ -974,6 +988,7 @@ public class PLCCogerWindow extends JFrame implements
         config.setHrTipoEmbalaje((Integer) hrTipoSpinner.getValue());
         config.setHrAncho((Integer) hrAnchoSpinner.getValue());
         config.setHrLargo((Integer) hrLargoSpinner.getValue());
+        config.setHrPila((Integer) hrPilaSpinner.getValue());
         config.setHrControl((Integer) hrControlSpinner.getValue());
         
         // Opciones
@@ -1072,6 +1087,7 @@ public class PLCCogerWindow extends JFrame implements
                 item.descTipoEmbalaje,
                 item.ancho,
                 item.largo,
+                item.pila,
                 item.unidadMedida,
                 item.variante
             });
@@ -1121,16 +1137,18 @@ public class PLCCogerWindow extends JFrame implements
                 
                 if (item != null) {
                     currentProcessingItem = item;
-                    setStatus("Escribiendo al PLC: " + item.codigo + " (ancho=" + item.ancho + ", largo=" + item.largo + ")");
+                    setStatus("Escribiendo al PLC: " + item.codigo + " (ancho=" + item.ancho + ", largo=" + item.largo + ", pila=" + item.pila + ")");
                     
                     modbusClient.writeProductData(
                         config.getHrTipoEmbalaje(),
                         config.getHrAncho(),
                         config.getHrLargo(),
+                        config.getHrPila(),
                         config.getHrControl(),
                         item.tipoEmbalaje,
                         item.ancho,
-                        item.largo
+                        item.largo,
+                        item.pila
                     );
                     
                     logManager.logTagEnviado(item.tag, item.codigo, item.ancho, item.largo, item.tipoEmbalaje);

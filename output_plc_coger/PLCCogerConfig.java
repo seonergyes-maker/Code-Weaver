@@ -31,7 +31,8 @@ public class PLCCogerConfig {
     private int hrTipoEmbalaje = 0;
     private int hrAncho = 1;
     private int hrLargo = 2;
-    private int hrControl = 3;
+    private int hrPila = 3;
+    private int hrControl = 4;
     
     // Opciones generales
     private boolean startMinimized = false;
@@ -118,6 +119,7 @@ public class PLCCogerConfig {
                         case "tipoembalaje": hrTipoEmbalaje = Integer.parseInt(value); break;
                         case "ancho": hrAncho = Integer.parseInt(value); break;
                         case "largo": hrLargo = Integer.parseInt(value); break;
+                        case "pila": hrPila = Integer.parseInt(value); break;
                         case "control": hrControl = Integer.parseInt(value); break;
                     }
                     break;
@@ -165,6 +167,7 @@ public class PLCCogerConfig {
             writer.println("TipoEmbalaje=" + hrTipoEmbalaje);
             writer.println("Ancho=" + hrAncho);
             writer.println("Largo=" + hrLargo);
+            writer.println("Pila=" + hrPila);
             writer.println("Control=" + hrControl);
             writer.println();
             
@@ -234,6 +237,9 @@ public class PLCCogerConfig {
     
     public int getHrLargo() { return hrLargo; }
     public void setHrLargo(int hrLargo) { this.hrLargo = hrLargo; }
+    
+    public int getHrPila() { return hrPila; }
+    public void setHrPila(int hrPila) { this.hrPila = hrPila; }
     
     public int getHrControl() { return hrControl; }
     public void setHrControl(int hrControl) { this.hrControl = hrControl; }

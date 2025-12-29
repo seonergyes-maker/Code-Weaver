@@ -273,18 +273,20 @@ public class CogerModbusClient {
     }
     
     /** Escribe los datos del producto en los holding registers */
-    public void writeProductData(int hrTipo, int hrAncho, int hrLargo, int hrControl,
-                                  int tipoEmbalaje, int ancho, int largo) {
+    public void writeProductData(int hrTipo, int hrAncho, int hrLargo, int hrPila, int hrControl,
+                                  int tipoEmbalaje, int ancho, int largo, int pila) {
         try {
             System.out.println("[MODBUS] Escribiendo datos del producto:");
             System.out.println("   HR " + hrTipo + " (tipo) = " + tipoEmbalaje);
             System.out.println("   HR " + hrAncho + " (ancho) = " + ancho);
             System.out.println("   HR " + hrLargo + " (largo) = " + largo);
+            System.out.println("   HR " + hrPila + " (pila) = " + pila);
             System.out.println("   HR " + hrControl + " (control) = 1");
             
             writeHoldingRegister(hrTipo, tipoEmbalaje);
             writeHoldingRegister(hrAncho, ancho);
             writeHoldingRegister(hrLargo, largo);
+            writeHoldingRegister(hrPila, pila);
             writeHoldingRegister(hrControl, 1);  // Activar control
             
             if (listener != null) {
