@@ -1661,6 +1661,77 @@ public class RFIDMainWindow extends JFrame {
         }
     }
     
+    /**
+     * Procesa un tag especifico recibido en tiempo real.
+     * Esta version recibe el EPC directamente del tag leido, no del cache.
+     * 
+     * @param modbusClient Cliente Modbus conectado
+     * @param epc EPC del tag a procesar
+     */
+    private void processPlcReadCycleForTag(ModbusClient modbusClient, String epc) {
+        if (epc == null || epc.isEmpty()) {
+            return;
+        }
+        
+        // Debounce: evitar reprocesar el mismo tag en poco tiempo
+        long now = System.currentTimeMillis();
+        synchronized(this) {
+            if (epc.equals(lastProcessedEpc) && (now - lastProcessedTime) < config.getPlcDebounceMs()) {
+                System.out.println("[PLC] Debounce: tag " + epc + " ya procesado hace " + (now - lastProcessedTime) + "ms");
+                return;
+            }
+            // Actualizar debounce inmediatamente para evitar duplicados concurrentes
+            lastProcessedEpc = epc;
+            lastProcessedTime = now;
+        }
+        
+        try {
+            updatePlcMonitorLog("[PLC] Procesando tag: " + epc);
+            updatePlcMonitorTagLabel(epc);
+            updatePlcMonitorApiStatus("Consultando...", ModernUIStyle.ACCENT_WARNING);
+            
+            // Consultar API /rfid_lecturas/modelo
+            APIClient apiClient = new APIClient(config);
+            APIClient.ModeloResponse modelo = apiClient.consultarModelo(epc);
+            
+            if (!modelo.valido) {
+                String error = modelo.mensajeError != null ? modelo.mensajeError : "Tag no valido";
+                updatePlcMonitorLog("[PLC] Error API: " + error);
+                updatePlcMonitorApiStatus("Error: " + error, ModernUIStyle.ACCENT_ERROR);
+                updatePlcMonitorGrabacion("Error API", ModernUIStyle.ACCENT_ERROR);
+                return;
+            }
+            
+            updatePlcMonitorApiStatus("OK", ModernUIStyle.ACCENT_SUCCESS);
+            updatePlcMonitorLog("[PLC] API OK - Codigo: " + modelo.codigo + ", " + modelo.descripcion);
+            updatePlcMonitorCodigo(modelo.codigo);
+            updatePlcMonitorDatos(modelo.tipoEmbalaje, modelo.ancho, modelo.largo);
+            
+            // Escribir datos al PLC
+            updatePlcMonitorLog("[PLC] Escribiendo al PLC - Tipo: " + modelo.tipoEmbalaje + 
+                               ", Ancho: " + modelo.ancho + ", Largo: " + modelo.largo);
+            updatePlcMonitorGrabacion("Escribiendo...", ModernUIStyle.ACCENT_WARNING);
+            
+            synchronized(modbusClient) {
+                modbusClient.writeRegister(config.getPlcRefTipoEmbalaje(), config.getPlcUnitIdTipoEmbalaje(), modelo.tipoEmbalaje);
+                modbusClient.writeRegister(config.getPlcRefAncho(), config.getPlcUnitIdAncho(), modelo.ancho);
+                modbusClient.writeRegister(config.getPlcRefLargo(), config.getPlcUnitIdLargo(), modelo.largo);
+                modbusClient.writeRegister(config.getPlcRefActiva(), config.getPlcUnitIdActiva(), 1);
+            }
+            
+            updatePlcMonitorLog("[PLC] Datos escritos al PLC correctamente");
+            updatePlcMonitorGrabacion("OK - Grabado", ModernUIStyle.ACCENT_SUCCESS);
+            
+            logger.info("PLC", "Tag " + epc + " -> Tipo:" + modelo.tipoEmbalaje + 
+                       " Ancho:" + modelo.ancho + " Largo:" + modelo.largo);
+            
+        } catch (Exception ex) {
+            updatePlcMonitorLog("[PLC] Error: " + ex.getMessage());
+            updatePlcMonitorGrabacion("Error: " + ex.getMessage(), ModernUIStyle.ACCENT_ERROR);
+            logger.error("PLC", "Error en ciclo: " + ex.getMessage());
+        }
+    }
+    
     // === Metodos de actualizacion del panel de estado PLC en Monitoreo ===
     
     private void updatePlcMonitorLog(String message) {
@@ -2642,16 +2713,17 @@ public class RFIDMainWindow extends JFrame {
             addTag(tag);
         });
         
-        // Si PLC está esperando un tag, procesar el ciclo ahora
+        // Si PLC está esperando tags, procesar cada tag que llegue
         if (plcWaitingForTag && activeModbusClient != null) {
-            plcWaitingForTag = false; // Solo un ciclo por activación
+            // NO resetear plcWaitingForTag - seguir procesando mientras enabler esté activo
             final ModbusClient client = activeModbusClient;
+            final String epc = tag.getEpc();
             
             // Procesar en hilo separado para no bloquear lectura RFID
             new Thread(() -> {
                 try {
-                    Thread.sleep(100); // Pequeña pausa para que addTag complete
-                    processPlcReadCycle(client);
+                    Thread.sleep(50); // Pequeña pausa para que addTag complete
+                    processPlcReadCycleForTag(client, epc);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
