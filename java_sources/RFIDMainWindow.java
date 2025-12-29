@@ -1437,6 +1437,7 @@ public class RFIDMainWindow extends JFrame {
                     if (modbusClient == null || !modbusClient.isConnected()) {
                         modbusClient = new ModbusClient(config.getPlcIP(), config.getPlcPort());
                         modbusClient.connect();
+                        activeModbusClient = modbusClient; // Guardar referencia para processTag
                         updatePlcStatus("Conectado", Color.GREEN);
                     }
                     
