@@ -4,10 +4,10 @@ import java.nio.*;
 import java.util.concurrent.*;
 
 /**
- * Cliente Modbus TCP para PLC COJER
+ * Cliente Modbus TCP para PLC COGER
  * Comunicación con PLCs industriales
  */
-public class CojerModbusClient {
+public class CogerModbusClient {
     
     /** Listener para eventos del PLC */
     public interface PLCListener {
@@ -35,7 +35,7 @@ public class CojerModbusClient {
     private PLCListener listener;
     
     /** Constructor */
-    public CojerModbusClient() {
+    public CogerModbusClient() {
         scheduler = Executors.newSingleThreadScheduledExecutor();
     }
     

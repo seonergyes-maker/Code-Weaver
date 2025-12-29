@@ -3,7 +3,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 /**
- * Gestor de logs para PLC COJER
+ * Gestor de logs para PLC COGER
  * Mantiene dos archivos de log separados:
  * - tags_YYYYMMDD.log: Tags gestionados
  * - errores_YYYYMMDD.log: Errores del sistema

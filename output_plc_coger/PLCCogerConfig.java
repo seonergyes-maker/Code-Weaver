@@ -2,10 +2,10 @@ import java.io.*;
 import java.util.Properties;
 
 /**
- * Configuracion de la aplicacion PLC COJER
+ * Configuracion de la aplicacion PLC COGER
  * Persiste en archivo config.ini (formato INI)
  */
-public class PLCCojerConfig {
+public class PLCCogerConfig {
     
     private static final String CONFIG_FILE = "config.ini";
     
@@ -38,7 +38,7 @@ public class PLCCojerConfig {
     private boolean startWithWindows = false;
     
     /** Constructor - carga configuracion si existe */
-    public PLCCojerConfig() {
+    public PLCCogerConfig() {
         load();
     }
     

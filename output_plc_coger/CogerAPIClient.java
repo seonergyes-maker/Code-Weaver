@@ -5,10 +5,10 @@ import javax.net.ssl.*;
 import java.security.cert.X509Certificate;
 
 /**
- * Cliente API para PLC COJER
+ * Cliente API para PLC COGER
  * Consulta periodica a endpoint de apilado
  */
-public class CojerAPIClient {
+public class CogerAPIClient {
     
     private String endpoint = "http://localhost:8080";
     private String token = "";
@@ -43,7 +43,7 @@ public class CojerAPIClient {
         void onBajaError(String tag, String error);
     }
     
-    public CojerAPIClient() {
+    public CogerAPIClient() {
         // Deshabilitar verificacion SSL para desarrollo
         disableSSLVerification();
     }

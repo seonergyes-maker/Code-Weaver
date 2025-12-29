@@ -17,7 +17,7 @@ public class Main {
         // Iniciar aplicación en el Event Dispatch Thread
         SwingUtilities.invokeLater(() -> {
             try {
-                PLCCojerWindow window = new PLCCojerWindow();
+                PLCCogerWindow window = new PLCCogerWindow();
                 window.setVisible(true);
             } catch (Exception e) {
                 e.printStackTrace();

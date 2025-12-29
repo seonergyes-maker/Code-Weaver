@@ -5,25 +5,25 @@ import java.awt.event.*;
 import java.util.List;
 
 /**
- * PLC COJER - Ventana Principal
+ * PLC COGER - Ventana Principal
  * Monitoreo de API JSON y Control de PLC via Modbus TCP
  * Con soporte para System Tray y inicio automatico
  */
-public class PLCCojerWindow extends JFrame implements 
-    CojerAPIClient.APIListener, CojerModbusClient.PLCListener {
+public class PLCCogerWindow extends JFrame implements 
+    CogerAPIClient.APIListener, CogerModbusClient.PLCListener {
     
     // Configuracion
-    private PLCCojerConfig config;
+    private PLCCogerConfig config;
     private LogManager logManager;
     
     // Clientes
-    private CojerAPIClient apiClient;
-    private CojerModbusClient modbusClient;
+    private CogerAPIClient apiClient;
+    private CogerModbusClient modbusClient;
     
     // Estado
     private boolean apiPolling = false;
     private boolean plcConnected = false;
-    private CojerAPIClient.ItemData currentProcessingItem = null;
+    private CogerAPIClient.ItemData currentProcessingItem = null;
     
     // System Tray
     private TrayIcon trayIcon;
@@ -75,13 +75,13 @@ public class PLCCojerWindow extends JFrame implements
     private JLabel statusBar;
     
     /** Constructor */
-    public PLCCojerWindow() {
+    public PLCCogerWindow() {
         super("PLC COGER - Monitoreo API y Control PLC");
         
-        config = new PLCCojerConfig();
+        config = new PLCCogerConfig();
         logManager = LogManager.getInstance();
-        apiClient = new CojerAPIClient();
-        modbusClient = new CojerModbusClient();
+        apiClient = new CogerAPIClient();
+        modbusClient = new CogerModbusClient();
         
         apiClient.setListener(this);
         modbusClient.setListener(this);
@@ -162,7 +162,7 @@ public class PLCCojerWindow extends JFrame implements
             popup.addSeparator();
             popup.add(exitItem);
             
-            trayIcon = new TrayIcon(image, "PLC COJER", popup);
+            trayIcon = new TrayIcon(image, "PLC COGER", popup);
             trayIcon.setImageAutoSize(true);
             
             // Doble click para restaurar
@@ -203,7 +203,7 @@ public class PLCCojerWindow extends JFrame implements
         if (trayIcon != null) {
             setVisible(false);
             isMinimizedToTray = true;
-            trayIcon.displayMessage("PLC COJER", 
+            trayIcon.displayMessage("PLC COGER", 
                 "La aplicacion sigue ejecutandose en segundo plano", 
                 TrayIcon.MessageType.INFO);
         }
@@ -292,7 +292,7 @@ public class PLCCojerWindow extends JFrame implements
         panel.setBackground(ModernUIStyle.BACKGROUND_MEDIUM);
         panel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
         
-        JLabel titleLabel = new JLabel("PLC COJER");
+        JLabel titleLabel = new JLabel("PLC COGER");
         titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
         titleLabel.setForeground(ModernUIStyle.ACCENT_BLUE);
         
@@ -865,24 +865,24 @@ public class PLCCojerWindow extends JFrame implements
     /** Genera script de instalacion de servicio */
     private void generateServiceScript() {
         try {
-            String jarPath = new java.io.File("PLCCojer.jar").getAbsolutePath();
+            String jarPath = new java.io.File("PLCCoger.jar").getAbsolutePath();
             String workDir = new java.io.File(".").getAbsolutePath();
             
             StringBuilder bat = new StringBuilder();
             bat.append("@echo off\n");
-            bat.append("echo Instalando PLC COJER como servicio de Windows...\n");
+            bat.append("echo Instalando PLC COGER como servicio de Windows...\n");
             bat.append("echo.\n");
             bat.append("echo Requiere NSSM (https://nssm.cc/download)\n");
             bat.append("echo.\n");
-            bat.append("nssm install PLCCojer java\n");
-            bat.append("nssm set PLCCojer AppParameters -jar \"").append(jarPath).append("\"\n");
-            bat.append("nssm set PLCCojer AppDirectory \"").append(workDir).append("\"\n");
-            bat.append("nssm set PLCCojer DisplayName \"PLC COJER Service\"\n");
-            bat.append("nssm set PLCCojer Description \"Monitoreo API y Control PLC via Modbus TCP\"\n");
-            bat.append("nssm set PLCCojer Start SERVICE_AUTO_START\n");
+            bat.append("nssm install PLCCoger java\n");
+            bat.append("nssm set PLCCoger AppParameters -jar \"").append(jarPath).append("\"\n");
+            bat.append("nssm set PLCCoger AppDirectory \"").append(workDir).append("\"\n");
+            bat.append("nssm set PLCCoger DisplayName \"PLC COGER Service\"\n");
+            bat.append("nssm set PLCCoger Description \"Monitoreo API y Control PLC via Modbus TCP\"\n");
+            bat.append("nssm set PLCCoger Start SERVICE_AUTO_START\n");
             bat.append("echo.\n");
             bat.append("echo Servicio instalado. Iniciando...\n");
-            bat.append("nssm start PLCCojer\n");
+            bat.append("nssm start PLCCoger\n");
             bat.append("echo.\n");
             bat.append("pause\n");
             
@@ -1059,10 +1059,10 @@ public class PLCCojerWindow extends JFrame implements
     // ============ APIListener ============
     
     @Override
-    public void onItemsReceived(List<CojerAPIClient.ItemData> items) {
+    public void onItemsReceived(List<CogerAPIClient.ItemData> items) {
         tableModel.setRowCount(0);
         
-        for (CojerAPIClient.ItemData item : items) {
+        for (CogerAPIClient.ItemData item : items) {
             tableModel.addRow(new Object[] {
                 item.orden,
                 item.tag,
@@ -1117,7 +1117,7 @@ public class PLCCojerWindow extends JFrame implements
             coilStatusLabel.setForeground(value ? ModernUIStyle.ACCENT_GREEN : ModernUIStyle.TEXT_PRIMARY);
             
             if (value) {
-                CojerAPIClient.ItemData item = apiClient.getFirstItem();
+                CogerAPIClient.ItemData item = apiClient.getFirstItem();
                 
                 if (item != null) {
                     currentProcessingItem = item;
