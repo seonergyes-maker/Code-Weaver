@@ -16,10 +16,14 @@ Una aplicación web tipo IDE que permite desarrollar aplicaciones Java para lect
    - `Symbol.RFID.API3.jar` - Librería Java
    - `RFIDAPI3_JNI_HOST.dll` - DLL nativa JNI
 
-## Ejecución en Windows
+## Compilación y Ejecución en Windows
 ```cmd
+cd java_sources
+javac -encoding UTF-8 -cp ".;../libs/Symbol.RFID.API3.jar;../libs/gson-2.10.1.jar" *.java
+jar cfm ZebraRFIDReader.jar MANIFEST.MF *.class
+
 cd "C:\Program Files\Zebra Technologies\RFID Host Java SDK\lib"
-java -Djava.library.path=. -cp "ZebraRFIDReader.jar;Symbol.RFID.API3.jar" ZebraRFIDReader 192.168.1.117
+java -Djava.library.path=. -cp "ZebraRFIDReader.jar;Symbol.RFID.API3.jar;gson-2.10.1.jar" Main
 ```
 
 ## Project Structure

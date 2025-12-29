@@ -130,6 +130,20 @@ public class RFIDMainWindow extends JFrame {
     private JCheckBox rssiFilterCheck;
     private JSpinner rssiThresholdSpinner;
     private JLabel rssiStatsLabel;
+    
+    // Panel de estado PLC en Monitoreo
+    private JLabel plcMonitorTagLabel;
+    private JLabel plcMonitorApiStatusLabel;
+    private JLabel plcMonitorCodigoLabel;
+    private JLabel plcMonitorDatosLabel;
+    private JLabel plcMonitorGrabacionLabel;
+    private JTextArea plcMonitorLogArea;
+    
+    // Variables de debounce para PLC
+    private String lastProcessedEpc = "";
+    private long lastProcessedTime = 0;
+    private boolean plcCycleProcessed = false; // Flag para controlar un solo ciclo por evento
+    private static final long PLC_DEBOUNCE_MS = 2000; // 2 segundos de debounce
     private JComboBox<String> sessionCombo;
     private JComboBox<String> targetCombo;
     private JSpinner tagPopulationSpinner;
@@ -851,7 +865,7 @@ public class RFIDMainWindow extends JFrame {
         JPanel statsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 5));
         statsPanel.add(new JLabel("Total:"));
         statsPanel.add(tagsReadLabel);
-        statsPanel.add(new JLabel("Únicos:"));
+        statsPanel.add(new JLabel("Unicos:"));
         statsPanel.add(uniqueTagsLabel);
         statsPanel.add(new JLabel("Tags/s:"));
         statsPanel.add(tpsLabel);
@@ -860,9 +874,74 @@ public class RFIDMainWindow extends JFrame {
         statsPanel.add(hexDecimalToggle);
         panel.add(statsPanel, BorderLayout.NORTH);
         
+        // Panel central con tabla de tags
         JScrollPane scrollPane = new JScrollPane(tagTable);
         scrollPane.setBorder(BorderFactory.createLineBorder(ModernUIStyle.BORDER_DEFAULT));
-        panel.add(scrollPane, BorderLayout.CENTER);
+        
+        // Panel de estado PLC
+        JPanel plcMonitorPanel = createPlcMonitorStatusPanel();
+        
+        // Split pane para tabla y estado PLC
+        JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, scrollPane, plcMonitorPanel);
+        splitPane.setResizeWeight(0.7);
+        splitPane.setDividerLocation(300);
+        
+        panel.add(splitPane, BorderLayout.CENTER);
+        
+        return panel;
+    }
+    
+    /**
+     * Crea el panel de estado PLC para la pestaña Monitoreo.
+     */
+    private JPanel createPlcMonitorStatusPanel() {
+        JPanel panel = new JPanel(new BorderLayout(5, 5));
+        panel.setBorder(BorderFactory.createTitledBorder(
+            BorderFactory.createEtchedBorder(), "Estado PLC - Proceso de Consulta API"));
+        
+        // Panel superior con labels de estado
+        JPanel statusGridPanel = new JPanel(new GridLayout(2, 4, 10, 5));
+        statusGridPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
+        
+        // Fila 1: Tag, Estado API
+        statusGridPanel.add(new JLabel("Tag RFID:"));
+        plcMonitorTagLabel = new JLabel("--");
+        plcMonitorTagLabel.setFont(new Font(Font.MONOSPACED, Font.BOLD, 12));
+        statusGridPanel.add(plcMonitorTagLabel);
+        
+        statusGridPanel.add(new JLabel("Estado API:"));
+        plcMonitorApiStatusLabel = new JLabel("Inactivo");
+        plcMonitorApiStatusLabel.setForeground(Color.GRAY);
+        statusGridPanel.add(plcMonitorApiStatusLabel);
+        
+        // Fila 2: Codigo, Datos
+        statusGridPanel.add(new JLabel("Codigo:"));
+        plcMonitorCodigoLabel = new JLabel("--");
+        plcMonitorCodigoLabel.setFont(new Font(Font.MONOSPACED, Font.BOLD, 12));
+        statusGridPanel.add(plcMonitorCodigoLabel);
+        
+        statusGridPanel.add(new JLabel("Datos:"));
+        plcMonitorDatosLabel = new JLabel("Tipo: --, Ancho: --, Largo: --");
+        statusGridPanel.add(plcMonitorDatosLabel);
+        
+        panel.add(statusGridPanel, BorderLayout.NORTH);
+        
+        // Panel central con log de proceso
+        plcMonitorLogArea = new JTextArea(5, 50);
+        plcMonitorLogArea.setEditable(false);
+        plcMonitorLogArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 11));
+        plcMonitorLogArea.setBackground(new Color(245, 245, 245));
+        JScrollPane logScroll = new JScrollPane(plcMonitorLogArea);
+        logScroll.setBorder(BorderFactory.createTitledBorder("Log de proceso"));
+        panel.add(logScroll, BorderLayout.CENTER);
+        
+        // Panel inferior con estado de grabacion
+        JPanel grabacionPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        grabacionPanel.add(new JLabel("Grabacion PLC:"));
+        plcMonitorGrabacionLabel = new JLabel("Esperando...");
+        plcMonitorGrabacionLabel.setForeground(Color.GRAY);
+        grabacionPanel.add(plcMonitorGrabacionLabel);
+        panel.add(grabacionPanel, BorderLayout.SOUTH);
         
         return panel;
     }
@@ -1368,16 +1447,29 @@ public class RFIDMainWindow extends JFrame {
                     
                     // Controlar lectura RFID segun estado del enabler
                     if (enablerActive && !wasEnabled) {
-                        // Flanco de subida: OFF -> ON = Iniciar lectura
-                        System.out.println("[PLC] Enabler ON - Iniciando lectura RFID");
+                        // Flanco de subida: OFF -> ON = Iniciar lectura y procesar ciclo PLC
+                        System.out.println("[PLC] Enabler ON - Iniciando lectura RFID y consultando API");
+                        plcCycleProcessed = false; // Reset flag para nuevo ciclo
+                        
+                        // Iniciar lectura RFID
                         SwingUtilities.invokeLater(() -> {
                             if (!isReading && connection != null && connection.isConnected()) {
                                 startReadingFromPLC();
                             }
                         });
+                        
+                        // Procesar ciclo PLC (consultar API y escribir HR) - solo en transicion
+                        if (!plcCycleProcessed) {
+                            processPlcReadCycle(modbusClient);
+                            plcCycleProcessed = true;
+                        }
+                        
                     } else if (!enablerActive && wasEnabled) {
-                        // Flanco de bajada: ON -> OFF = Detener lectura
+                        // Flanco de bajada: ON -> OFF = Detener lectura y reset flag
                         System.out.println("[PLC] Enabler OFF - Deteniendo lectura RFID");
+                        plcCycleProcessed = false; // Reset para proximo ciclo
+                        lastProcessedEpc = ""; // Reset tag procesado
+                        
                         SwingUtilities.invokeLater(() -> {
                             if (isReading) {
                                 stopReadingFromPLC();
@@ -1498,44 +1590,140 @@ public class RFIDMainWindow extends JFrame {
      */
     private void processPlcReadCycle(ModbusClient modbusClient) {
         try {
-            // 1. Obtener último tag leído (el más reciente del RFID)
+            // 1. Obtener ultimo tag leido (el mas reciente del RFID)
             String lastEpc = getLastReadTag();
             if (lastEpc == null || lastEpc.isEmpty()) {
-                System.out.println("[PLC] No hay tags RFID leidos para procesar");
+                updatePlcMonitorLog("[PLC] No hay tags RFID leidos para procesar");
+                updatePlcMonitorStatus("--", "Sin tags", "--", "--", "Esperando tag");
                 return;
             }
             
-            System.out.println("[PLC] Procesando tag: " + lastEpc);
+            // Debounce: evitar reprocesar el mismo tag en poco tiempo
+            long now = System.currentTimeMillis();
+            if (lastEpc.equals(lastProcessedEpc) && (now - lastProcessedTime) < PLC_DEBOUNCE_MS) {
+                System.out.println("[PLC] Debounce: tag " + lastEpc + " ya procesado recientemente");
+                return;
+            }
             
-            // 2. Consultar API para obtener datos del producto
+            updatePlcMonitorLog("[PLC] Procesando tag: " + lastEpc);
+            updatePlcMonitorTagLabel(lastEpc);
+            updatePlcMonitorApiStatus("Consultando...", ModernUIStyle.ACCENT_WARNING);
+            
+            // 2. Consultar API /rfid_lecturas/modelo
             APIClient apiClient = new APIClient(config);
-            String productDataJson = apiClient.getProductData(lastEpc);
+            APIClient.ModeloResponse modelo = apiClient.consultarModelo(lastEpc);
             
-            if (productDataJson == null) {
-                System.out.println("[PLC] No se obtuvieron datos del producto desde API");
+            if (!modelo.valido) {
+                String error = modelo.mensajeError != null ? modelo.mensajeError : "Tag no valido";
+                updatePlcMonitorLog("[PLC] Error API: " + error);
+                updatePlcMonitorApiStatus("Error: " + error, ModernUIStyle.ACCENT_ERROR);
+                updatePlcMonitorGrabacion("Error API", ModernUIStyle.ACCENT_ERROR);
                 return;
             }
             
-            // 3. Parsear datos del producto
-            int tipoEmbalaje = extractIntFromJson(productDataJson, "tipo_embalaje");
-            int ancho = extractIntFromJson(productDataJson, "ancho");
-            int largo = extractIntFromJson(productDataJson, "largo");
+            updatePlcMonitorApiStatus("OK", ModernUIStyle.ACCENT_SUCCESS);
+            updatePlcMonitorLog("[PLC] API OK - Codigo: " + modelo.codigo + ", " + modelo.descripcion);
+            updatePlcMonitorCodigo(modelo.codigo);
+            updatePlcMonitorDatos(modelo.tipoEmbalaje, modelo.ancho, modelo.largo);
             
-            System.out.println("[PLC] Datos producto - Tipo: " + tipoEmbalaje + ", Ancho: " + ancho + ", Largo: " + largo);
+            // 3. Escribir datos al PLC
+            updatePlcMonitorLog("[PLC] Escribiendo al PLC - Tipo: " + modelo.tipoEmbalaje + 
+                               ", Ancho: " + modelo.ancho + ", Largo: " + modelo.largo);
+            updatePlcMonitorGrabacion("Escribiendo...", ModernUIStyle.ACCENT_WARNING);
             
-            // 4. Escribir datos al PLC
-            modbusClient.writeRegister(config.getPlcRefTipoEmbalaje(), config.getPlcUnitIdTipoEmbalaje(), tipoEmbalaje);
-            modbusClient.writeRegister(config.getPlcRefAncho(), config.getPlcUnitIdAncho(), ancho);
-            modbusClient.writeRegister(config.getPlcRefLargo(), config.getPlcUnitIdLargo(), largo);
+            modbusClient.writeRegister(config.getPlcRefTipoEmbalaje(), config.getPlcUnitIdTipoEmbalaje(), modelo.tipoEmbalaje);
+            modbusClient.writeRegister(config.getPlcRefAncho(), config.getPlcUnitIdAncho(), modelo.ancho);
+            modbusClient.writeRegister(config.getPlcRefLargo(), config.getPlcUnitIdLargo(), modelo.largo);
             
-            // 5. Activar bandera de confirmación
+            // 4. Activar bandera de confirmacion
             modbusClient.writeRegister(config.getPlcRefActiva(), config.getPlcUnitIdActiva(), 1);
             
-            System.out.println("[PLC] Datos escritos al PLC correctamente");
+            updatePlcMonitorLog("[PLC] Datos escritos al PLC correctamente");
+            updatePlcMonitorGrabacion("OK - Grabado", ModernUIStyle.ACCENT_SUCCESS);
+            
+            // Actualizar debounce
+            lastProcessedEpc = lastEpc;
+            lastProcessedTime = System.currentTimeMillis();
+            
+            logger.info("PLC", "Tag " + lastEpc + " -> Tipo:" + modelo.tipoEmbalaje + 
+                       " Ancho:" + modelo.ancho + " Largo:" + modelo.largo);
             
         } catch (Exception ex) {
-            System.out.println("[PLC] Error en ciclo de lectura: " + ex.getMessage());
+            updatePlcMonitorLog("[PLC] Error: " + ex.getMessage());
+            updatePlcMonitorGrabacion("Error: " + ex.getMessage(), ModernUIStyle.ACCENT_ERROR);
+            logger.error("PLC", "Error en ciclo: " + ex.getMessage());
         }
+    }
+    
+    // === Metodos de actualizacion del panel de estado PLC en Monitoreo ===
+    
+    private void updatePlcMonitorLog(String message) {
+        SwingUtilities.invokeLater(() -> {
+            if (plcMonitorLogArea != null) {
+                String timestamp = new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date());
+                plcMonitorLogArea.append("[" + timestamp + "] " + message + "\n");
+                plcMonitorLogArea.setCaretPosition(plcMonitorLogArea.getDocument().getLength());
+            }
+        });
+        System.out.println(message);
+    }
+    
+    private void updatePlcMonitorTagLabel(String tag) {
+        SwingUtilities.invokeLater(() -> {
+            if (plcMonitorTagLabel != null) {
+                plcMonitorTagLabel.setText(tag);
+            }
+        });
+    }
+    
+    private void updatePlcMonitorApiStatus(String status, Color color) {
+        SwingUtilities.invokeLater(() -> {
+            if (plcMonitorApiStatusLabel != null) {
+                plcMonitorApiStatusLabel.setText(status);
+                plcMonitorApiStatusLabel.setForeground(color);
+            }
+        });
+    }
+    
+    private void updatePlcMonitorCodigo(String codigo) {
+        SwingUtilities.invokeLater(() -> {
+            if (plcMonitorCodigoLabel != null) {
+                plcMonitorCodigoLabel.setText(codigo);
+            }
+        });
+    }
+    
+    private void updatePlcMonitorDatos(int tipo, int ancho, int largo) {
+        SwingUtilities.invokeLater(() -> {
+            if (plcMonitorDatosLabel != null) {
+                plcMonitorDatosLabel.setText("Tipo: " + tipo + ", Ancho: " + ancho + ", Largo: " + largo);
+            }
+        });
+    }
+    
+    private void updatePlcMonitorGrabacion(String status, Color color) {
+        SwingUtilities.invokeLater(() -> {
+            if (plcMonitorGrabacionLabel != null) {
+                plcMonitorGrabacionLabel.setText(status);
+                plcMonitorGrabacionLabel.setForeground(color);
+            }
+        });
+    }
+    
+    private void updatePlcMonitorStatus(String tag, String apiStatus, String codigo, String datos, String grabacion) {
+        SwingUtilities.invokeLater(() -> {
+            if (plcMonitorTagLabel != null) plcMonitorTagLabel.setText(tag);
+            if (plcMonitorApiStatusLabel != null) {
+                plcMonitorApiStatusLabel.setText(apiStatus);
+                plcMonitorApiStatusLabel.setForeground(Color.GRAY);
+            }
+            if (plcMonitorCodigoLabel != null) plcMonitorCodigoLabel.setText(codigo);
+            if (plcMonitorDatosLabel != null) plcMonitorDatosLabel.setText(datos);
+            if (plcMonitorGrabacionLabel != null) {
+                plcMonitorGrabacionLabel.setText(grabacion);
+                plcMonitorGrabacionLabel.setForeground(Color.GRAY);
+            }
+        });
     }
     
     /**

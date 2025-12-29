@@ -6,6 +6,9 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
 import java.util.function.Consumer;
+import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.annotations.SerializedName;
 
 /**
  * Cliente HTTP para envío asíncrono de datos de etiquetas RFID a una API externa.
@@ -170,6 +173,73 @@ public class APIClient implements AutoCloseable {
                 resultado, mensaje, fecha, fechaInicio, milisegundosParada);
         }
     }
+
+    /**
+     * Respuesta de la API de consulta de modelo de producto.
+     * Contiene los datos del producto asociado al tag RFID.
+     */
+    public static class ModeloResponse {
+        /** Indica si el tag es válido */
+        public final boolean valido;
+        /** Código del producto */
+        public final String codigo;
+        /** Descripción del producto */
+        public final String descripcion;
+        /** Tipo de embalaje (valor numérico) */
+        public final int tipoEmbalaje;
+        /** Descripción del tipo de embalaje */
+        public final String descTipoEmbalaje;
+        /** Ancho en cm */
+        public final int ancho;
+        /** Largo en cm */
+        public final int largo;
+        /** Unidad de medida */
+        public final String unidadMedida;
+        /** Variante del producto */
+        public final String variante;
+        /** Mensaje de error (si aplica) */
+        public final String mensajeError;
+        
+        public ModeloResponse(boolean valido, String codigo, String descripcion, 
+                              int tipoEmbalaje, String descTipoEmbalaje,
+                              int ancho, int largo, String unidadMedida, String variante) {
+            this.valido = valido;
+            this.codigo = codigo;
+            this.descripcion = descripcion;
+            this.tipoEmbalaje = tipoEmbalaje;
+            this.descTipoEmbalaje = descTipoEmbalaje;
+            this.ancho = ancho;
+            this.largo = largo;
+            this.unidadMedida = unidadMedida;
+            this.variante = variante;
+            this.mensajeError = null;
+        }
+        
+        private ModeloResponse(String error) {
+            this.valido = false;
+            this.codigo = "";
+            this.descripcion = "";
+            this.tipoEmbalaje = 0;
+            this.descTipoEmbalaje = "";
+            this.ancho = 0;
+            this.largo = 0;
+            this.unidadMedida = "";
+            this.variante = "";
+            this.mensajeError = error;
+        }
+        
+        public static ModeloResponse error(String mensaje) {
+            return new ModeloResponse(mensaje);
+        }
+        
+        @Override
+        public String toString() {
+            if (!valido) return "ModeloResponse[error=" + mensajeError + "]";
+            return "ModeloResponse[codigo=" + codigo + ", tipo=" + tipoEmbalaje + 
+                   ", ancho=" + ancho + ", largo=" + largo + "]";
+        }
+    }
+
 
     
     /**
@@ -1151,4 +1221,177 @@ public class APIClient implements AutoCloseable {
             return null;
         }
     }
+
+    /**
+     * Consulta la API de modelo para obtener datos del producto asociado a un tag RFID.
+     * POST a {endpoint}/rfid_lecturas/modelo con headers api-tag y api-token.
+     * 
+     * @param tag EPC del tag RFID a consultar
+     * @return ModeloResponse con los datos del producto
+     */
+    public ModeloResponse consultarModelo(String tag) {
+        System.out.println("[APIClient] Consultando modelo para tag: " + tag);
+        
+        if (endpointUrl == null || endpointUrl.isEmpty()) {
+            System.out.println("[APIClient] Error: URL no configurada");
+            return ModeloResponse.error("URL de API no configurada");
+        }
+        
+        if (apiKey == null || apiKey.isEmpty()) {
+            System.out.println("[APIClient] Error: Token no configurado");
+            return ModeloResponse.error("Token de API no configurado");
+        }
+        
+        // Construir URL de modelo
+        String urlModelo = endpointUrl;
+        
+        // Ajustar URL base para /rfid_lecturas/modelo
+        if (urlModelo.contains("/rfid_lecturas/alta")) {
+            urlModelo = urlModelo.substring(0, urlModelo.indexOf("/rfid_lecturas/alta")) + "/rfid_lecturas/modelo";
+        } else if (urlModelo.contains("/rfid_lecturas/")) {
+            int idx = urlModelo.indexOf("/rfid_lecturas/");
+            String base = urlModelo.substring(0, idx);
+            urlModelo = base + "/rfid_lecturas/modelo";
+        } else {
+            urlModelo = urlModelo + "/rfid_lecturas/modelo";
+        }
+        
+        System.out.println("[APIClient] URL modelo: " + urlModelo);
+        
+        HttpURLConnection conn = null;
+        InputStream inputStream = null;
+        InputStream errorStream = null;
+        OutputStream outputStream = null;
+        
+        try {
+            URL url = new URL(urlModelo);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(connectTimeout);
+            conn.setReadTimeout(readTimeout);
+            
+            // Headers requeridos
+            conn.setRequestProperty("api-tag", tag);
+            conn.setRequestProperty("api-token", apiKey);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setDoOutput(true);
+            
+            // Body vacio
+            outputStream = conn.getOutputStream();
+            outputStream.write("".getBytes(StandardCharsets.UTF_8));
+            outputStream.flush();
+            
+            int responseCode = conn.getResponseCode();
+            System.out.println("[APIClient] Respuesta modelo: " + responseCode);
+            
+            if (responseCode == 200) {
+                inputStream = conn.getInputStream();
+                StringBuilder response = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        response.append(line);
+                    }
+                }
+                
+                String jsonResponse = response.toString();
+                System.out.println("[APIClient] Respuesta JSON: " + jsonResponse);
+                
+                return parseModeloResponse(jsonResponse);
+                
+            } else {
+                StringBuilder error = new StringBuilder();
+                errorStream = conn.getErrorStream();
+                if (errorStream != null) {
+                    try (BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(errorStream, StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            error.append(line);
+                        }
+                    }
+                }
+                return ModeloResponse.error("HTTP " + responseCode + ": " + error.toString());
+            }
+            
+        } catch (java.net.SocketTimeoutException e) {
+            System.out.println("[APIClient] Timeout consultando modelo");
+            return ModeloResponse.error("Timeout de conexion");
+        } catch (Exception e) {
+            System.out.println("[APIClient] Error consultando modelo: " + e.getMessage());
+            return ModeloResponse.error(e.getMessage());
+        } finally {
+            // Cerrar todos los streams
+            try { if (outputStream != null) outputStream.close(); } catch (Exception ignored) {}
+            try { if (inputStream != null) inputStream.close(); } catch (Exception ignored) {}
+            try { if (errorStream != null) errorStream.close(); } catch (Exception ignored) {}
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+    
+    /**
+     * DTO interno para deserializar respuesta JSON del endpoint /modelo.
+     */
+    private static class ModeloDto {
+        public String valido;
+        public String codigo;
+        public String descripcion;
+        @SerializedName("tipo_embalaje")
+        public int tipoEmbalaje;
+        @SerializedName("desc_tipo_embalaje")
+        public String descTipoEmbalaje;
+        public int ancho;
+        public int largo;
+        @SerializedName("unidad_medida")
+        public String unidadMedida;
+        public String variante;
+    }
+    
+    /** Instancia de Gson para parseo JSON */
+    private static final Gson gson = new Gson();
+    
+    /**
+     * Parsea la respuesta JSON del endpoint de modelo usando Gson.
+     */
+    private ModeloResponse parseModeloResponse(String json) {
+        try {
+            if (json == null || json.trim().isEmpty()) {
+                return ModeloResponse.error("Respuesta JSON vacia");
+            }
+            
+            ModeloDto dto = gson.fromJson(json, ModeloDto.class);
+            
+            if (dto == null) {
+                return ModeloResponse.error("No se pudo parsear JSON");
+            }
+            
+            boolean valido = "TRUE".equalsIgnoreCase(dto.valido);
+            
+            System.out.println("[APIClient] Modelo parseado con Gson: valido=" + valido + 
+                             ", codigo=" + dto.codigo + ", tipo=" + dto.tipoEmbalaje);
+            
+            return new ModeloResponse(
+                valido,
+                dto.codigo != null ? dto.codigo : "",
+                dto.descripcion != null ? dto.descripcion : "",
+                dto.tipoEmbalaje,
+                dto.descTipoEmbalaje != null ? dto.descTipoEmbalaje : "",
+                dto.ancho,
+                dto.largo,
+                dto.unidadMedida != null ? dto.unidadMedida : "",
+                dto.variante != null ? dto.variante : ""
+            );
+            
+        } catch (JsonSyntaxException e) {
+            System.out.println("[APIClient] Error de sintaxis JSON: " + e.getMessage());
+            return ModeloResponse.error("Error de sintaxis JSON: " + e.getMessage());
+        } catch (Exception e) {
+            System.out.println("[APIClient] Error parseando modelo: " + e.getMessage());
+            return ModeloResponse.error("Error parseando JSON: " + e.getMessage());
+        }
+    }
+
 }
