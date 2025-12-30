@@ -913,6 +913,8 @@ public class RFIDConfig implements Serializable {
         sb.append("  \"plcUnitIdLargo\": ").append(plcUnitIdLargo).append(",\n");
         sb.append("  \"plcRefActiva\": ").append(plcRefActiva).append(",\n");
         sb.append("  \"plcUnitIdActiva\": ").append(plcUnitIdActiva).append(",\n");
+        sb.append("  \"plcSingleTagMode\": ").append(plcSingleTagMode).append(",\n");
+        sb.append("  \"plcStopOnDisable\": ").append(plcStopOnDisable).append(",\n");
         sb.append("  \"apiStartControlEnabled\": ").append(apiStartControlEnabled).append(",\n");
         sb.append("  \"retryFailedEnabled\": ").append(retryFailedEnabled).append(",\n");
         sb.append("  \"retryIntervalSeconds\": ").append(retryIntervalSeconds).append(",\n");
@@ -1037,6 +1039,8 @@ public class RFIDConfig implements Serializable {
             config.plcUnitIdLargo = extractIntValue(json, "plcUnitIdLargo", config.plcUnitIdLargo);
             config.plcRefActiva = extractIntValue(json, "plcRefActiva", config.plcRefActiva);
             config.plcUnitIdActiva = extractIntValue(json, "plcUnitIdActiva", config.plcUnitIdActiva);
+            config.plcSingleTagMode = extractBooleanValue(json, "plcSingleTagMode", config.plcSingleTagMode);
+            config.plcStopOnDisable = extractBooleanValue(json, "plcStopOnDisable", config.plcStopOnDisable);
         config.apiStartControlEnabled = extractBooleanValue(json, "apiStartControlEnabled", config.apiStartControlEnabled);
         config.retryFailedEnabled = extractBooleanValue(json, "retryFailedEnabled", config.retryFailedEnabled);
         config.retryIntervalSeconds = extractIntValue(json, "retryIntervalSeconds", config.retryIntervalSeconds);
