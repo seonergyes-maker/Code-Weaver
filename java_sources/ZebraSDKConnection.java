@@ -194,30 +194,46 @@ public class ZebraSDKConnection implements RfidEventsListener {
             notifyStatus("Leyendo configuracion de antenas del lector...");
             
             int[] powerLevels = capabilities.getTransmitPowerLevelValues();
+            System.out.println("[ZebraSDK] Power levels disponibles: " + 
+                (powerLevels != null ? powerLevels.length : 0) + " niveles");
+            
+            // Obtener antenas conectadas
+            short[] connectedAntennas = null;
+            try {
+                connectedAntennas = reader.Config.Antennas.getAntennaID();
+                System.out.println("[ZebraSDK] Antenas conectadas: " + 
+                    (connectedAntennas != null ? connectedAntennas.length : 0));
+            } catch (Exception e) {
+                System.out.println("[ZebraSDK] No se pudo obtener lista de antenas: " + e.getMessage());
+            }
             
             for (int ant = 1; ant <= 4; ant++) {
+                AntennaConfig antConfig = config.getAntennaConfig(ant);
+                if (antConfig == null) continue;
+                
                 try {
                     Antennas.AntennaRfConfig rfConfig = reader.Config.Antennas.getAntennaRfConfig(ant);
                     int powerIndex = rfConfig.getTransmitPowerIndex();
                     
-                    // Convertir indice a dBm (cada indice = 0.1 dBm tipicamente)
-                    double powerDbm = 10.0; // Minimo
-                    if (powerLevels != null && powerIndex < powerLevels.length) {
+                    System.out.println("[ZebraSDK] Antena " + ant + " powerIndex: " + powerIndex);
+                    
+                    // Convertir indice a dBm
+                    double powerDbm = 10.0; // Minimo por defecto
+                    if (powerLevels != null && powerIndex >= 0 && powerIndex < powerLevels.length) {
                         powerDbm = powerLevels[powerIndex] / 10.0; // Valor en decimas de dBm
+                    } else if (powerIndex >= 0) {
+                        // Aproximacion: cada indice es 0.1 dBm desde 10 dBm
+                        powerDbm = 10.0 + (powerIndex * 0.1);
                     }
                     
-                    AntennaConfig antConfig = config.getAntennaConfig(ant);
-                    if (antConfig != null) {
-                        antConfig.setTransmitPower(powerDbm);
-                        notifyStatus("Antena " + ant + " potencia leida: " + powerDbm + " dBm");
-                    }
+                    antConfig.setTransmitPower(powerDbm);
+                    antConfig.setEnabled(true); // Marcar como habilitada si se pudo leer
+                    notifyStatus("Antena " + ant + " potencia: " + String.format("%.1f", powerDbm) + " dBm");
                     
                 } catch (Exception e) {
-                    // Antena no disponible o error
-                    AntennaConfig antConfig = config.getAntennaConfig(ant);
-                    if (antConfig != null) {
-                        antConfig.setEnabled(false);
-                    }
+                    // Solo log, NO deshabilitar la antena automaticamente
+                    System.out.println("[ZebraSDK] Antena " + ant + " error: " + e.getMessage());
+                    notifyStatus("Antena " + ant + " no disponible en lector");
                 }
             }
             
@@ -229,6 +245,7 @@ public class ZebraSDKConnection implements RfidEventsListener {
             
         } catch (Exception e) {
             notifyError("Error leyendo configuracion: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
