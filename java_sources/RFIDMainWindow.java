@@ -143,7 +143,7 @@ public class RFIDMainWindow extends JFrame {
     // Variables de control para PLC
     private String lastProcessedEpc = "";
     private long lastProcessedTime = 0;
-    private volatile boolean plcWaitingForTag = false; // Esperando tag para procesar
+    // plcWaitingForTag eliminado - ahora el proceso se dispara en transicion 0->1 del Coil
     // Debounce configurable desde pestaña PLC
     private volatile ModbusClient activeModbusClient = null; // Cliente Modbus activo para escritura
     private JComboBox<String> sessionCombo;
@@ -1493,6 +1493,7 @@ public class RFIDMainWindow extends JFrame {
         plcPollingThread = new Thread(() -> {
             ModbusClient modbusClient = null;
             boolean wasEnabled = false;
+            boolean processedThisHigh = false; // Bandera para evitar doble procesamiento
             
             while (plcRunning) {
                 try {
@@ -1500,7 +1501,7 @@ public class RFIDMainWindow extends JFrame {
                     if (modbusClient == null || !modbusClient.isConnected()) {
                         modbusClient = new ModbusClient(config.getPlcIP(), config.getPlcPort());
                         modbusClient.connect();
-                        activeModbusClient = modbusClient; // Guardar referencia para processTag
+                        activeModbusClient = modbusClient;
                         updatePlcStatus("Conectado", Color.GREEN);
                     }
                     
@@ -1510,30 +1511,21 @@ public class RFIDMainWindow extends JFrame {
                         config.getPlcUnitIdEnable()
                     );
                     
-                    // Controlar lectura RFID segun estado del enabler
-                    if (enablerActive && !wasEnabled) {
-                        // Flanco de subida: OFF -> ON = Iniciar lectura y esperar tag
-                        System.out.println("[PLC] Enabler ON - Iniciando lectura RFID (esperando tag)");
-                        plcWaitingForTag = true; // Esperar a que llegue un tag
+                    // Controlar proceso segun estado del enabler
+                    if (enablerActive && !wasEnabled && !processedThisHigh) {
+                        // Flanco de subida: OFF -> ON = Procesar UN tag de la tabla de monitoreo
+                        System.out.println("[PLC] Enabler 0->1 - Procesando tag de tabla de monitoreo");
+                        processedThisHigh = true; // Marcar como procesado para este ciclo alto
                         
-                        // Iniciar lectura RFID
-                        SwingUtilities.invokeLater(() -> {
-                            if (!isReading && connection != null && connection.isConnected()) {
-                                startReadingFromPLC();
-                            }
-                        });
+                        // Tomar el ultimo tag de la tabla y procesarlo
+                        final ModbusClient clientRef = modbusClient;
+                        processTagFromMonitoringTable(clientRef);
                         
                     } else if (!enablerActive && wasEnabled) {
-                        // Flanco de bajada: ON -> OFF = Detener lectura
-                        System.out.println("[PLC] Enabler OFF - Deteniendo lectura RFID");
-                        plcWaitingForTag = false; // Reset flag
-                        lastProcessedEpc = ""; // Reset tag procesado
-                        
-                        SwingUtilities.invokeLater(() -> {
-                            if (isReading) {
-                                stopReadingFromPLC();
-                            }
-                        });
+                        // Flanco de bajada: ON -> OFF = Listo para siguiente ciclo
+                        System.out.println("[PLC] Enabler 1->0 - Listo para siguiente ciclo");
+                        processedThisHigh = false; // Reset para permitir siguiente 0->1
+                        lastProcessedEpc = ""; // Reset tag procesado para permitir reenvio
                     }
                     
                     wasEnabled = enablerActive;
@@ -1643,6 +1635,27 @@ public class RFIDMainWindow extends JFrame {
     }
     
     /**
+     * Procesa un tag de la tabla de monitoreo cuando el Coil cambia de 0 a 1.
+     * Este es el nuevo flujo: cada transicion 0->1 procesa UN tag de la tabla.
+     * 
+     * @param modbusClient Cliente Modbus conectado
+     */
+    private void processTagFromMonitoringTable(ModbusClient modbusClient) {
+        // Obtener el ultimo tag de la tabla de monitoreo
+        String lastEpc = getLastReadTag();
+        
+        if (lastEpc == null || lastEpc.isEmpty()) {
+            updatePlcMonitorLog("[PLC] No hay tags en la tabla de monitoreo");
+            updatePlcMonitorStatus("--", "Sin tags", "--", "--", "Tabla vacia");
+            return;
+        }
+        
+        // Procesar el tag (sin debounce - cada 0->1 debe procesar)
+        updatePlcMonitorLog("[PLC] Transicion 0->1 - Procesando tag: " + lastEpc);
+        processPlcReadCycleForTag(modbusClient, lastEpc);
+    }
+    
+    /**
      * Procesa un ciclo de lectura PLC -> RFID -> API -> PLC.
      * 
      * @param modbusClient Cliente Modbus conectado
@@ -1664,13 +1677,30 @@ public class RFIDMainWindow extends JFrame {
                 return;
             }
             
-            updatePlcMonitorLog("[PLC] Procesando tag: " + lastEpc);
-            updatePlcMonitorTagLabel(lastEpc);
+            processPlcReadCycleForTag(modbusClient, lastEpc);
+            
+        } catch (Exception ex) {
+            updatePlcMonitorLog("[PLC] Error: " + ex.getMessage());
+            updatePlcMonitorGrabacion("Error: " + ex.getMessage(), ModernUIStyle.ACCENT_ERROR);
+            logger.error("PLC", "Error en ciclo: " + ex.getMessage());
+        }
+    }
+    
+    /**
+     * Procesa un tag especifico: consulta API y escribe al PLC.
+     * 
+     * @param modbusClient Cliente Modbus conectado
+     * @param epc EPC del tag a procesar
+     */
+    private void processPlcReadCycleForTag(ModbusClient modbusClient, String epc) {
+        try {
+            updatePlcMonitorLog("[PLC] Procesando tag: " + epc);
+            updatePlcMonitorTagLabel(epc);
             updatePlcMonitorApiStatus("Consultando...", ModernUIStyle.ACCENT_WARNING);
             
             // 2. Consultar API /rfid_lecturas/modelo
             APIClient apiClient = new APIClient(config);
-            APIClient.ModeloResponse modelo = apiClient.consultarModelo(lastEpc);
+            APIClient.ModeloResponse modelo = apiClient.consultarModelo(epc);
             
             if (!modelo.valido) {
                 String error = modelo.mensajeError != null ? modelo.mensajeError : "Tag no valido";
@@ -1700,11 +1730,11 @@ public class RFIDMainWindow extends JFrame {
             updatePlcMonitorLog("[PLC] Datos escritos al PLC correctamente");
             updatePlcMonitorGrabacion("OK - Grabado", ModernUIStyle.ACCENT_SUCCESS);
             
-            // Actualizar debounce
-            lastProcessedEpc = lastEpc;
+            // Actualizar ultimo tag procesado
+            lastProcessedEpc = epc;
             lastProcessedTime = System.currentTimeMillis();
             
-            logger.info("PLC", "Tag " + lastEpc + " -> Tipo:" + modelo.tipoEmbalaje + 
+            logger.info("PLC", "Tag " + epc + " -> Tipo:" + modelo.tipoEmbalaje + 
                        " Ancho:" + modelo.ancho + " Largo:" + modelo.largo);
             
         } catch (Exception ex) {
@@ -2682,6 +2712,8 @@ public class RFIDMainWindow extends JFrame {
     
     /**
      * Procesa un tag leído recibido del callback de ZebraSDKConnection.
+     * Solo añade el tag a la tabla de monitoreo.
+     * El envío a API/PLC se hace cuando el Coil cambia de 0 a 1.
      * 
      * @param tag Datos del tag leído
      */
@@ -2690,26 +2722,13 @@ public class RFIDMainWindow extends JFrame {
             return;
         }
         
-        // Añadir tag a la tabla
+        // Añadir tag a la tabla de monitoreo
         SwingUtilities.invokeLater(() -> {
             addTag(tag);
         });
         
-        // Si PLC está esperando un tag, procesar el ciclo ahora
-        if (plcWaitingForTag && activeModbusClient != null) {
-            plcWaitingForTag = false; // Solo un ciclo por activación
-            final ModbusClient client = activeModbusClient;
-            
-            // Procesar en hilo separado para no bloquear lectura RFID
-            new Thread(() -> {
-                try {
-                    Thread.sleep(100); // Pequeña pausa para que addTag complete
-                    processPlcReadCycle(client);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }).start();
-        }
+        // NOTA: El proceso API/PLC se ejecuta desde el polling del Coil
+        // cuando detecta transicion 0->1, tomando el ultimo tag de la tabla
     }
     
     /**
