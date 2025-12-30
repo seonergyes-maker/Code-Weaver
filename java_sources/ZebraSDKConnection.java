@@ -210,25 +210,11 @@ public class ZebraSDKConnection implements RfidEventsListener {
                 if (antConfig == null) continue;
                 
                 try {
-                    // Primero verificar si la antena esta fisicamente conectada
-                    boolean isConnected = false;
-                    try {
-                        Antennas.AntennaStatus status = reader.Config.Antennas.getAntennaStatus((short) ant);
-                        if (status != null) {
-                            isConnected = true; // Si no lanza excepcion, esta conectada
-                            System.out.println("[ZebraSDK] Antena " + ant + " estado obtenido OK");
-                        }
-                    } catch (Exception statusEx) {
-                        // Si falla getAntennaStatus, intentar leer la config RF
-                        // Si eso funciona, asumimos que esta conectada
-                        System.out.println("[ZebraSDK] Antena " + ant + " getAntennaStatus: " + statusEx.getMessage());
-                    }
-                    
+                    // Intentar leer la configuracion RF - si funciona, la antena esta conectada
                     Antennas.AntennaRfConfig rfConfig = reader.Config.Antennas.getAntennaRfConfig(ant);
                     int powerIndex = rfConfig.getTransmitPowerIndex();
                     
                     // Si llegamos aqui, la antena responde - esta conectada
-                    isConnected = true;
                     antConfig.setPhysicallyConnected(true);
                     
                     System.out.println("[ZebraSDK] Antena " + ant + " powerIndex: " + powerIndex + " (conectada)");
