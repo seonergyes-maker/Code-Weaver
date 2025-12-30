@@ -1525,7 +1525,7 @@ public class RFIDMainWindow extends JFrame {
                         // Flanco de bajada: ON -> OFF = Listo para siguiente ciclo
                         System.out.println("[PLC] Enabler 1->0 - Listo para siguiente ciclo");
                         processedThisHigh = false; // Reset para permitir siguiente 0->1
-                        lastProcessedEpc = ""; // Reset tag procesado para permitir reenvio
+                        // NO reseteamos lastProcessedEpc - el filtro de duplicados sigue activo
                     }
                     
                     wasEnabled = enablerActive;
@@ -1637,6 +1637,7 @@ public class RFIDMainWindow extends JFrame {
     /**
      * Procesa un tag de la tabla de monitoreo cuando el Coil cambia de 0 a 1.
      * Este es el nuevo flujo: cada transicion 0->1 procesa UN tag de la tabla.
+     * El filtro de duplicados evita reprocesar tags ya enviados.
      * 
      * @param modbusClient Cliente Modbus conectado
      */
@@ -1650,7 +1651,19 @@ public class RFIDMainWindow extends JFrame {
             return;
         }
         
-        // Procesar el tag (sin debounce - cada 0->1 debe procesar)
+        // Filtro de duplicados: evitar reprocesar el mismo tag
+        long now = System.currentTimeMillis();
+        if (lastEpc.equals(lastProcessedEpc)) {
+            // Verificar debounce solo si es el mismo tag
+            if ((now - lastProcessedTime) < config.getPlcDebounceMs()) {
+                updatePlcMonitorLog("[PLC] Tag duplicado ignorado: " + lastEpc);
+                updatePlcMonitorStatus(lastEpc, "Duplicado", "--", "--", "Filtrado");
+                System.out.println("[PLC] Filtro duplicados: tag " + lastEpc + " ya procesado");
+                return;
+            }
+        }
+        
+        // Procesar el tag
         updatePlcMonitorLog("[PLC] Transicion 0->1 - Procesando tag: " + lastEpc);
         processPlcReadCycleForTag(modbusClient, lastEpc);
     }
