@@ -741,11 +741,11 @@ public class RFIDMainWindow extends JFrame {
         Color pastelYellow = new Color(255, 255, 180);  // Amarillo pastel
         Color pastelPink = new Color(255, 182, 193);    // Rosa pastel
         
-        // Fuentes
-        Font titleFont = new Font("Arial", Font.BOLD, 16);
-        Font valueFont = new Font("Arial", Font.BOLD, 48);
-        Font tagFont = new Font("Monospaced", Font.BOLD, 36);
-        Font descFont = new Font("Arial", Font.BOLD, 28);
+        // Fuentes - tamaños grandes para ver a 10 metros en monitor 32"
+        Font titleFont = new Font("Arial", Font.BOLD, 24);
+        Font valueFont = new Font("Arial", Font.BOLD, 120);  // Horas muy grandes
+        Font tagFont = new Font("Monospaced", Font.BOLD, 48);
+        Font descFont = new Font("Arial", Font.BOLD, 72);    // Descripcion grande
         
         // Panel principal con BoxLayout vertical para apilar las filas
         JPanel mainContainer = new JPanel();
