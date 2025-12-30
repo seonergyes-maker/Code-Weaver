@@ -199,7 +199,7 @@ public class ZebraSDKConnection implements RfidEventsListener {
             
             // Obtener numero de antenas soportadas
             try {
-                short numAntennas = capabilities.getNumAntennaSupported();
+                int numAntennas = capabilities.getNumAntennaSupported();
                 System.out.println("[ZebraSDK] Antenas soportadas por el lector: " + numAntennas);
             } catch (Exception e) {
                 System.out.println("[ZebraSDK] No se pudo obtener numero de antenas: " + e.getMessage());
