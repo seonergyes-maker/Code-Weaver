@@ -127,9 +127,12 @@ public class ZebraSDKConnection implements RfidEventsListener {
                     rfConfig.setTari(0);
                     reader.Config.Antennas.setAntennaRfConfig(ant, rfConfig);
                     
-                    notifyStatus("Antena " + ant + " configurada: potencia índice " + powerIndex);
+                    notifyStatus("Antena " + ant + " configurada: potencia indice " + powerIndex);
                 }
             }
+            
+            // Configurar Cable Loss para todas las antenas habilitadas
+            configureCableLoss();
             
             Antennas.SingulationControl singulation = reader.Config.Antennas.getSingulationControl(1);
             
@@ -150,6 +153,120 @@ public class ZebraSDKConnection implements RfidEventsListener {
             
         } catch (Exception e) {
             notifyError("Error configurando antenas: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Configura la compensacion de perdida de cable para cada antena.
+     * Envia los valores de cable loss al lector FX7500.
+     * 
+     * NOTA: El valor de "Perdida cable (dB)" en la UI representa la perdida TOTAL
+     * del cable en dB. El SDK espera dB/100ft, asi que usamos 100 pies como longitud
+     * base para que el valor ingresado sea la perdida total aplicada.
+     */
+    private void configureCableLoss() {
+        try {
+            java.util.List<CableLossCompensation> cableLossList = new java.util.ArrayList<>();
+            
+            for (int ant = 1; ant <= 4; ant++) {
+                AntennaConfig antConfig = config.getAntennaConfig(ant);
+                if (antConfig != null && antConfig.isEnabled()) {
+                    double cableLossDb = antConfig.getCableLoss();
+                    
+                    // Siempre enviar la configuracion (incluyendo 0 para limpiar valores previos)
+                    CableLossCompensation clc = new CableLossCompensation();
+                    clc.setAntennaID(ant);
+                    // SDK usa dB/100ft y longitud en pies
+                    // Usamos 100 pies como base para que el valor sea directo en dB total
+                    clc.setCableLoss((int)(cableLossDb * 10)); // Valor en decimas de dB
+                    clc.setCableLength(100);
+                    cableLossList.add(clc);
+                    
+                    if (cableLossDb > 0) {
+                        notifyStatus("Antena " + ant + " cable loss: " + cableLossDb + " dB");
+                    }
+                }
+            }
+            
+            if (!cableLossList.isEmpty()) {
+                CableLossCompensation[] clcArray = cableLossList.toArray(new CableLossCompensation[0]);
+                reader.Config.setCableLossCompensation(clcArray);
+                notifyStatus("Cable Loss configurado en el lector");
+            }
+            
+        } catch (Exception e) {
+            notifyError("Error configurando cable loss: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Lee la configuracion actual de antenas desde el lector FX7500.
+     * Actualiza los valores en RFIDConfig con la configuracion real del lector.
+     * 
+     * @return true si se leyo correctamente
+     */
+    public boolean readAntennaConfigFromReader() {
+        if (!connected || reader == null) {
+            notifyError("No conectado al lector");
+            return false;
+        }
+        
+        try {
+            notifyStatus("Leyendo configuracion de antenas del lector...");
+            
+            int[] powerLevels = capabilities.getTransmitPowerLevelValues();
+            
+            for (int ant = 1; ant <= 4; ant++) {
+                try {
+                    Antennas.AntennaRfConfig rfConfig = reader.Config.Antennas.getAntennaRfConfig(ant);
+                    int powerIndex = rfConfig.getTransmitPowerIndex();
+                    
+                    // Convertir indice a dBm (cada indice = 0.1 dBm tipicamente)
+                    double powerDbm = 10.0; // Minimo
+                    if (powerLevels != null && powerIndex < powerLevels.length) {
+                        powerDbm = powerLevels[powerIndex] / 10.0; // Valor en decimas de dBm
+                    }
+                    
+                    AntennaConfig antConfig = config.getAntennaConfig(ant);
+                    if (antConfig != null) {
+                        antConfig.setTransmitPower(powerDbm);
+                        notifyStatus("Antena " + ant + " potencia leida: " + powerDbm + " dBm");
+                    }
+                    
+                } catch (Exception e) {
+                    // Antena no disponible o error
+                    AntennaConfig antConfig = config.getAntennaConfig(ant);
+                    if (antConfig != null) {
+                        antConfig.setEnabled(false);
+                    }
+                }
+            }
+            
+            // Leer cable loss si esta disponible
+            try {
+                for (int ant = 1; ant <= 4; ant++) {
+                    CableLossCompensation clc = reader.ReaderManagement.getCableLossCompensation(ant);
+                    if (clc != null) {
+                        double cableLossDb = clc.getCableLoss() / 10.0; // Decimas de dB a dB
+                        AntennaConfig antConfig = config.getAntennaConfig(ant);
+                        if (antConfig != null) {
+                            antConfig.setCableLoss(cableLossDb);
+                            if (cableLossDb > 0) {
+                                notifyStatus("Antena " + ant + " cable loss leido: " + cableLossDb + " dB");
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                notifyStatus("Cable loss no disponible en este lector");
+            }
+            
+            notifyStatus("Configuracion de antenas leida del lector");
+            return true;
+            
+        } catch (Exception e) {
+            notifyError("Error leyendo configuracion: " + e.getMessage());
+            return false;
         }
     }
     

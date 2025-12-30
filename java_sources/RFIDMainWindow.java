@@ -771,15 +771,68 @@ public class RFIDMainWindow extends JFrame {
      * @return Panel de antenas
      */
     private JPanel createAntennasPanel() {
+        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 20, 20));
+        
+        // Panel superior con boton para leer del lector
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
+        JButton readFromReaderBtn = new JButton("Leer configuracion del lector");
+        readFromReaderBtn.setToolTipText("Lee la configuracion actual de antenas desde el FX7500");
+        readFromReaderBtn.addActionListener(e -> readAntennaConfigFromReader());
+        topPanel.add(readFromReaderBtn);
+        
+        JLabel infoLabel = new JLabel("(Al conectar, la app aplica esta configuracion al lector)");
+        infoLabel.setForeground(Color.GRAY);
+        infoLabel.setFont(new Font("Segoe UI", Font.ITALIC, 11));
+        topPanel.add(infoLabel);
+        
+        mainPanel.add(topPanel, BorderLayout.NORTH);
+        
+        // Panel central con las 4 antenas
         JPanel panel = new JPanel(new GridLayout(2, 2, 15, 15));
-        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         
         for (int i = 0; i < 4; i++) {
             JPanel antennaPanel = createAntennaSubPanel(i);
             panel.add(antennaPanel);
         }
         
-        return panel;
+        mainPanel.add(panel, BorderLayout.CENTER);
+        
+        return mainPanel;
+    }
+    
+    /**
+     * Lee la configuracion de antenas del lector y actualiza la UI.
+     */
+    private void readAntennaConfigFromReader() {
+        if (zebraConnection == null || !zebraConnection.isConnected()) {
+            JOptionPane.showMessageDialog(this, 
+                "Debe estar conectado al lector para leer la configuracion.",
+                "No conectado", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        new Thread(() -> {
+            boolean success = zebraConnection.readAntennaConfigFromReader();
+            
+            if (success) {
+                // Actualizar UI con los nuevos valores
+                SwingUtilities.invokeLater(() -> {
+                    for (int i = 0; i < 4; i++) {
+                        AntennaConfig ac = config.getAntennaConfig(i + 1);
+                        if (ac != null) {
+                            powerSliders[i].setValue((int) ac.getTransmitPower());
+                            powerLabels[i].setText((int) ac.getTransmitPower() + " dBm");
+                            cableLossSpinners[i].setValue(ac.getCableLoss());
+                            antennaEnableChecks[i].setSelected(ac.isEnabled());
+                        }
+                    }
+                    JOptionPane.showMessageDialog(RFIDMainWindow.this,
+                        "Configuracion de antenas leida del lector.",
+                        "Exito", JOptionPane.INFORMATION_MESSAGE);
+                });
+            }
+        }).start();
     }
     
     /**
