@@ -1701,31 +1701,15 @@ public class RFIDMainWindow extends JFrame {
                         String lastEpc = getLastReadTag();
                         
                         if (lastEpc == null || lastEpc.isEmpty()) {
-                            // No hay tags, esperar a que llegue uno (con timeout)
+                            // No hay tags, esperar indefinidamente hasta que llegue uno
                             System.out.println("[PLC] Esperando tag del lector...");
                             updatePlcMonitorLog("[PLC] Esperando tag del lector...");
-                            
-                            int waitTime = 0;
-                            int maxWait = 5000; // Maximo 5 segundos
-                            int checkInterval = 100; // Verificar cada 100ms
-                            
-                            while (waitTime < maxWait && plcRunning) {
-                                Thread.sleep(checkInterval);
-                                waitTime += checkInterval;
-                                lastEpc = getLastReadTag();
-                                if (lastEpc != null && !lastEpc.isEmpty()) {
-                                    break;
-                                }
-                            }
+                            updatePlcMonitorStatus("--", "Esperando", "--", "--", "Leyendo...");
                         }
                         
                         // Procesar el tag si hay uno disponible
                         if (lastEpc != null && !lastEpc.isEmpty()) {
                             processTagFromMonitoringTable(clientRef);
-                        } else {
-                            System.out.println("[PLC] Timeout: No llego ningun tag");
-                            updatePlcMonitorLog("[PLC] Timeout: No llego ningun tag");
-                            updatePlcMonitorStatus("--", "Sin tag", "--", "--", "Timeout");
                         }
                         
                     } else if (!enablerActive && wasEnabled) {
