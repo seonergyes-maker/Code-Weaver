@@ -793,10 +793,12 @@ public class RFIDMainWindow extends JFrame {
         
         mainContainer.add(topRow);
         
-        // === FILA 2: Ultimo TAG ===
+        // === FILA 2: Ultimo TAG (reducido 30%) ===
         JPanel tagPanel = new JPanel(new BorderLayout());
         tagPanel.setBackground(pastelYellow);
-        tagPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        tagPanel.setBorder(BorderFactory.createEmptyBorder(10, 30, 10, 30));
+        tagPanel.setPreferredSize(new Dimension(0, 80));
+        tagPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 80));
         
         JLabel tagTitleLabel = new JLabel("ULTIMO TAG LEIDO", SwingConstants.CENTER);
         tagTitleLabel.setFont(titleFont);
@@ -804,7 +806,7 @@ public class RFIDMainWindow extends JFrame {
         tagPanel.add(tagTitleLabel, BorderLayout.NORTH);
         
         inicioUltimoTagLabel = new JLabel("---", SwingConstants.CENTER);
-        inicioUltimoTagLabel.setFont(tagFont);
+        inicioUltimoTagLabel.setFont(new Font("Monospaced", Font.BOLD, 32));
         inicioUltimoTagLabel.setForeground(Color.BLACK);
         tagPanel.add(inicioUltimoTagLabel, BorderLayout.CENTER);
         
@@ -814,17 +816,17 @@ public class RFIDMainWindow extends JFrame {
         tagWrapper.add(tagPanel, BorderLayout.CENTER);
         mainContainer.add(tagWrapper);
         
-        // === FILA 3: Descripcion ===
+        // === FILA 3: Descripcion (ampliado 30%) ===
         JPanel descPanel = new JPanel(new BorderLayout());
         descPanel.setBackground(pastelPink);
-        descPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        descPanel.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
         
         JLabel descTitleLabel = new JLabel("DESCRIPCION", SwingConstants.CENTER);
         descTitleLabel.setFont(titleFont);
         descTitleLabel.setForeground(Color.BLACK);
         descPanel.add(descTitleLabel, BorderLayout.NORTH);
         
-        inicioDescripcionLabel = new JLabel("---", SwingConstants.CENTER);
+        inicioDescripcionLabel = new JLabel("<html><div style='text-align:center;'>---</div></html>", SwingConstants.CENTER);
         inicioDescripcionLabel.setFont(descFont);
         inicioDescripcionLabel.setForeground(Color.BLACK);
         descPanel.add(inicioDescripcionLabel, BorderLayout.CENTER);
@@ -862,7 +864,16 @@ public class RFIDMainWindow extends JFrame {
             SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss");
             inicioHoraUltimaLecturaLabel.setText(sdf.format(new Date()));
             inicioUltimoTagLabel.setText(tag != null ? tag : "---");
-            inicioDescripcionLabel.setText(descripcion != null && !descripcion.isEmpty() ? descripcion : "---");
+            
+            // Formatear descripcion con salto de linea antes de "("
+            String descText = "---";
+            if (descripcion != null && !descripcion.isEmpty()) {
+                // Reemplazar "(" por salto de linea + "("
+                descText = "<html><div style='text-align:center;'>" + 
+                           descripcion.replace("(", "<br>(") + 
+                           "</div></html>";
+            }
+            inicioDescripcionLabel.setText(descText);
         });
     }
     
