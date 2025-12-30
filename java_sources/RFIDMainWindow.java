@@ -140,6 +140,13 @@ public class RFIDMainWindow extends JFrame {
     private JLabel plcMonitorGrabacionLabel;
     private JTextArea plcMonitorLogArea;
     
+    // ==================== Componentes de pestaña INICIO ====================
+    private JLabel inicioHoraUltimaLecturaLabel;
+    private JLabel inicioHoraActualLabel;
+    private JLabel inicioUltimoTagLabel;
+    private JLabel inicioDescripcionLabel;
+    private javax.swing.Timer inicioRelojTimer;
+    
     // Variables de control para PLC
     private String lastProcessedEpc = "";
     private long lastProcessedTime = 0;
@@ -701,6 +708,7 @@ public class RFIDMainWindow extends JFrame {
         tabbedPane = new JTabbedPane();
         ModernUIStyle.styleTabbedPane(tabbedPane);
         
+        tabbedPane.addTab("INICIO", createInicioPanel());
         tabbedPane.addTab("Conexión", createConnectionPanel());
         tabbedPane.addTab("Monitoreo", createMonitorPanel());
         tabbedPane.addTab("Antenas", createAntennasPanel());
@@ -712,6 +720,118 @@ public class RFIDMainWindow extends JFrame {
         
         add(tabbedPane, BorderLayout.CENTER);
         add(createStatusBar(), BorderLayout.SOUTH);
+    }
+    
+    /**
+     * Crea el panel INICIO con información principal en grande.
+     * Muestra: Hora última lectura, Hora actual, Último TAG, Descripción API.
+     * 
+     * @return Panel de inicio
+     */
+    private JPanel createInicioPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
+        panel.setBackground(Color.WHITE);
+        
+        // Panel central con los datos grandes
+        JPanel centerPanel = new JPanel(new GridBagLayout());
+        centerPanel.setBackground(Color.WHITE);
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(20, 20, 20, 20);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.CENTER;
+        
+        // Fuente grande para etiquetas
+        Font labelFont = new Font("Arial", Font.BOLD, 18);
+        Font valueFont = new Font("Arial", Font.BOLD, 36);
+        Font tagFont = new Font("Monospaced", Font.BOLD, 28);
+        Font descFont = new Font("Arial", Font.PLAIN, 24);
+        
+        // Fila 0: Hora Actual
+        gbc.gridx = 0; gbc.gridy = 0;
+        JLabel horaActualTitleLabel = new JLabel("HORA ACTUAL:");
+        horaActualTitleLabel.setFont(labelFont);
+        horaActualTitleLabel.setForeground(Color.DARK_GRAY);
+        centerPanel.add(horaActualTitleLabel, gbc);
+        
+        gbc.gridx = 1;
+        inicioHoraActualLabel = new JLabel("--:--:--");
+        inicioHoraActualLabel.setFont(valueFont);
+        inicioHoraActualLabel.setForeground(new Color(0, 100, 200));
+        centerPanel.add(inicioHoraActualLabel, gbc);
+        
+        // Fila 1: Hora Última Lectura
+        gbc.gridx = 0; gbc.gridy = 1;
+        JLabel horaUltimaTitleLabel = new JLabel("HORA ULTIMA LECTURA:");
+        horaUltimaTitleLabel.setFont(labelFont);
+        horaUltimaTitleLabel.setForeground(Color.DARK_GRAY);
+        centerPanel.add(horaUltimaTitleLabel, gbc);
+        
+        gbc.gridx = 1;
+        inicioHoraUltimaLecturaLabel = new JLabel("--:--:--");
+        inicioHoraUltimaLecturaLabel.setFont(valueFont);
+        inicioHoraUltimaLecturaLabel.setForeground(new Color(0, 150, 0));
+        centerPanel.add(inicioHoraUltimaLecturaLabel, gbc);
+        
+        // Fila 2: Separador
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
+        JSeparator sep = new JSeparator();
+        sep.setPreferredSize(new Dimension(500, 2));
+        centerPanel.add(sep, gbc);
+        gbc.gridwidth = 1;
+        
+        // Fila 3: Último TAG
+        gbc.gridx = 0; gbc.gridy = 3;
+        JLabel ultimoTagTitleLabel = new JLabel("ULTIMO TAG LEIDO:");
+        ultimoTagTitleLabel.setFont(labelFont);
+        ultimoTagTitleLabel.setForeground(Color.DARK_GRAY);
+        centerPanel.add(ultimoTagTitleLabel, gbc);
+        
+        gbc.gridx = 1;
+        inicioUltimoTagLabel = new JLabel("---");
+        inicioUltimoTagLabel.setFont(tagFont);
+        inicioUltimoTagLabel.setForeground(new Color(50, 50, 50));
+        centerPanel.add(inicioUltimoTagLabel, gbc);
+        
+        // Fila 4: Descripción API
+        gbc.gridx = 0; gbc.gridy = 4;
+        JLabel descripcionTitleLabel = new JLabel("DESCRIPCION:");
+        descripcionTitleLabel.setFont(labelFont);
+        descripcionTitleLabel.setForeground(Color.DARK_GRAY);
+        centerPanel.add(descripcionTitleLabel, gbc);
+        
+        gbc.gridx = 1;
+        inicioDescripcionLabel = new JLabel("---");
+        inicioDescripcionLabel.setFont(descFont);
+        inicioDescripcionLabel.setForeground(new Color(100, 100, 100));
+        centerPanel.add(inicioDescripcionLabel, gbc);
+        
+        panel.add(centerPanel, BorderLayout.CENTER);
+        
+        // Iniciar timer para actualizar hora actual cada segundo
+        inicioRelojTimer = new javax.swing.Timer(1000, e -> {
+            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss");
+            inicioHoraActualLabel.setText(sdf.format(new Date()));
+        });
+        inicioRelojTimer.start();
+        
+        return panel;
+    }
+    
+    /**
+     * Actualiza los datos de la pestaña INICIO.
+     * Se llama cuando se lee un tag y se obtiene respuesta de la API.
+     * 
+     * @param tag EPC del tag leído
+     * @param descripcion Descripción obtenida de la API
+     */
+    private void updateInicioPanel(String tag, String descripcion) {
+        SwingUtilities.invokeLater(() -> {
+            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss");
+            inicioHoraUltimaLecturaLabel.setText(sdf.format(new Date()));
+            inicioUltimoTagLabel.setText(tag != null ? tag : "---");
+            inicioDescripcionLabel.setText(descripcion != null && !descripcion.isEmpty() ? descripcion : "---");
+        });
     }
     
     /**
@@ -1727,6 +1847,9 @@ public class RFIDMainWindow extends JFrame {
             updatePlcMonitorLog("[PLC] API OK - Codigo: " + modelo.codigo + ", " + modelo.descripcion);
             updatePlcMonitorCodigo(modelo.codigo);
             updatePlcMonitorDatos(modelo.tipoEmbalaje, modelo.ancho, modelo.largo);
+            
+            // Actualizar panel INICIO con el tag y descripcion
+            updateInicioPanel(epc, modelo.descripcion);
             
             // 3. Escribir datos al PLC
             updatePlcMonitorLog("[PLC] Escribiendo al PLC - Tipo: " + modelo.tipoEmbalaje + 
