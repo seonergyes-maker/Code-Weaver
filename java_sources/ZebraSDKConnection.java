@@ -216,13 +216,15 @@ public class ZebraSDKConnection implements RfidEventsListener {
                     System.out.println("[ZebraSDK] Antena " + ant + " powerIndex: " + powerIndex);
                     
                     // Convertir indice a dBm
+                    // powerLevels contiene valores en centesimas de dBm (ej: 2510 = 25.10 dBm)
                     double powerDbm = 10.0; // Minimo por defecto
                     if (powerLevels != null && powerIndex >= 0 && powerIndex < powerLevels.length) {
-                        powerDbm = powerLevels[powerIndex] / 10.0; // Valor en decimas de dBm
+                        powerDbm = powerLevels[powerIndex] / 100.0; // Centesimas de dBm a dBm
                     } else if (powerIndex >= 0) {
                         // Aproximacion: cada indice es 0.1 dBm desde 10 dBm
                         powerDbm = 10.0 + (powerIndex * 0.1);
                     }
+                    System.out.println("[ZebraSDK] Antena " + ant + " potencia calculada: " + powerDbm + " dBm");
                     
                     antConfig.setTransmitPower(powerDbm);
                     antConfig.setEnabled(true); // Marcar como habilitada si se pudo leer
