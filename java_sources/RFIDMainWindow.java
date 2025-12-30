@@ -724,89 +724,119 @@ public class RFIDMainWindow extends JFrame {
     
     /**
      * Crea el panel INICIO con información principal en grande.
+     * Diseño tipo divs que ocupan 100% del ancho.
      * Muestra: Hora última lectura, Hora actual, Último TAG, Descripción API.
      * 
      * @return Panel de inicio
      */
     private JPanel createInicioPanel() {
         JPanel panel = new JPanel(new BorderLayout());
-        panel.setBorder(BorderFactory.createEmptyBorder(30, 30, 30, 30));
         panel.setBackground(Color.WHITE);
         
-        // Panel central con los datos grandes
-        JPanel centerPanel = new JPanel(new GridBagLayout());
-        centerPanel.setBackground(Color.WHITE);
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(20, 20, 20, 20);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.anchor = GridBagConstraints.CENTER;
+        // Colores pastel
+        Color pastelBlue = new Color(173, 216, 230);    // Azul pastel
+        Color pastelGreen = new Color(144, 238, 144);   // Verde pastel
+        Color pastelYellow = new Color(255, 255, 180);  // Amarillo pastel
+        Color pastelPink = new Color(255, 182, 193);    // Rosa pastel
         
-        // Fuente grande para etiquetas
-        Font labelFont = new Font("Arial", Font.BOLD, 18);
-        Font valueFont = new Font("Arial", Font.BOLD, 36);
-        Font tagFont = new Font("Monospaced", Font.BOLD, 28);
-        Font descFont = new Font("Arial", Font.PLAIN, 24);
+        // Fuentes
+        Font titleFont = new Font("Arial", Font.BOLD, 16);
+        Font valueFont = new Font("Arial", Font.BOLD, 48);
+        Font tagFont = new Font("Monospaced", Font.BOLD, 36);
+        Font descFont = new Font("Arial", Font.BOLD, 28);
         
-        // Fila 0: Hora Actual
-        gbc.gridx = 0; gbc.gridy = 0;
-        JLabel horaActualTitleLabel = new JLabel("HORA ACTUAL:");
-        horaActualTitleLabel.setFont(labelFont);
-        horaActualTitleLabel.setForeground(Color.DARK_GRAY);
-        centerPanel.add(horaActualTitleLabel, gbc);
+        // Panel principal con BoxLayout vertical para apilar las filas
+        JPanel mainContainer = new JPanel();
+        mainContainer.setLayout(new BoxLayout(mainContainer, BoxLayout.Y_AXIS));
+        mainContainer.setBackground(Color.WHITE);
         
-        gbc.gridx = 1;
-        inicioHoraActualLabel = new JLabel("--:--:--");
-        inicioHoraActualLabel.setFont(valueFont);
-        inicioHoraActualLabel.setForeground(new Color(0, 100, 200));
-        centerPanel.add(inicioHoraActualLabel, gbc);
+        // === FILA 1: Hora Lectura (izq) y Hora Actual (der) ===
+        JPanel topRow = new JPanel(new GridLayout(1, 2, 10, 0));
+        topRow.setBackground(Color.WHITE);
+        topRow.setBorder(BorderFactory.createEmptyBorder(10, 10, 5, 10));
         
-        // Fila 1: Hora Última Lectura
-        gbc.gridx = 0; gbc.gridy = 1;
-        JLabel horaUltimaTitleLabel = new JLabel("HORA ULTIMA LECTURA:");
-        horaUltimaTitleLabel.setFont(labelFont);
-        horaUltimaTitleLabel.setForeground(Color.DARK_GRAY);
-        centerPanel.add(horaUltimaTitleLabel, gbc);
+        // Panel izquierdo: Hora Ultima Lectura
+        JPanel horaLecturaPanel = new JPanel(new BorderLayout());
+        horaLecturaPanel.setBackground(pastelGreen);
+        horaLecturaPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         
-        gbc.gridx = 1;
-        inicioHoraUltimaLecturaLabel = new JLabel("--:--:--");
+        JLabel horaLecturaTitleLabel = new JLabel("HORA ULTIMA LECTURA", SwingConstants.CENTER);
+        horaLecturaTitleLabel.setFont(titleFont);
+        horaLecturaTitleLabel.setForeground(Color.BLACK);
+        horaLecturaPanel.add(horaLecturaTitleLabel, BorderLayout.NORTH);
+        
+        inicioHoraUltimaLecturaLabel = new JLabel("--:--:--", SwingConstants.CENTER);
         inicioHoraUltimaLecturaLabel.setFont(valueFont);
-        inicioHoraUltimaLecturaLabel.setForeground(new Color(0, 150, 0));
-        centerPanel.add(inicioHoraUltimaLecturaLabel, gbc);
+        inicioHoraUltimaLecturaLabel.setForeground(Color.BLACK);
+        horaLecturaPanel.add(inicioHoraUltimaLecturaLabel, BorderLayout.CENTER);
         
-        // Fila 2: Separador
-        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
-        JSeparator sep = new JSeparator();
-        sep.setPreferredSize(new Dimension(500, 2));
-        centerPanel.add(sep, gbc);
-        gbc.gridwidth = 1;
+        topRow.add(horaLecturaPanel);
         
-        // Fila 3: Último TAG
-        gbc.gridx = 0; gbc.gridy = 3;
-        JLabel ultimoTagTitleLabel = new JLabel("ULTIMO TAG LEIDO:");
-        ultimoTagTitleLabel.setFont(labelFont);
-        ultimoTagTitleLabel.setForeground(Color.DARK_GRAY);
-        centerPanel.add(ultimoTagTitleLabel, gbc);
+        // Panel derecho: Hora Actual
+        JPanel horaActualPanel = new JPanel(new BorderLayout());
+        horaActualPanel.setBackground(pastelBlue);
+        horaActualPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         
-        gbc.gridx = 1;
-        inicioUltimoTagLabel = new JLabel("---");
+        JLabel horaActualTitleLabel = new JLabel("HORA ACTUAL", SwingConstants.CENTER);
+        horaActualTitleLabel.setFont(titleFont);
+        horaActualTitleLabel.setForeground(Color.BLACK);
+        horaActualPanel.add(horaActualTitleLabel, BorderLayout.NORTH);
+        
+        inicioHoraActualLabel = new JLabel("--:--:--", SwingConstants.CENTER);
+        inicioHoraActualLabel.setFont(valueFont);
+        inicioHoraActualLabel.setForeground(Color.BLACK);
+        horaActualPanel.add(inicioHoraActualLabel, BorderLayout.CENTER);
+        
+        topRow.add(horaActualPanel);
+        
+        mainContainer.add(topRow);
+        
+        // === FILA 2: Ultimo TAG ===
+        JPanel tagPanel = new JPanel(new BorderLayout());
+        tagPanel.setBackground(pastelYellow);
+        tagPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        
+        JLabel tagTitleLabel = new JLabel("ULTIMO TAG LEIDO", SwingConstants.CENTER);
+        tagTitleLabel.setFont(titleFont);
+        tagTitleLabel.setForeground(Color.BLACK);
+        tagPanel.add(tagTitleLabel, BorderLayout.NORTH);
+        
+        inicioUltimoTagLabel = new JLabel("---", SwingConstants.CENTER);
         inicioUltimoTagLabel.setFont(tagFont);
-        inicioUltimoTagLabel.setForeground(new Color(50, 50, 50));
-        centerPanel.add(inicioUltimoTagLabel, gbc);
+        inicioUltimoTagLabel.setForeground(Color.BLACK);
+        tagPanel.add(inicioUltimoTagLabel, BorderLayout.CENTER);
         
-        // Fila 4: Descripción API
-        gbc.gridx = 0; gbc.gridy = 4;
-        JLabel descripcionTitleLabel = new JLabel("DESCRIPCION:");
-        descripcionTitleLabel.setFont(labelFont);
-        descripcionTitleLabel.setForeground(Color.DARK_GRAY);
-        centerPanel.add(descripcionTitleLabel, gbc);
+        JPanel tagWrapper = new JPanel(new BorderLayout());
+        tagWrapper.setBackground(Color.WHITE);
+        tagWrapper.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        tagWrapper.add(tagPanel, BorderLayout.CENTER);
+        mainContainer.add(tagWrapper);
         
-        gbc.gridx = 1;
-        inicioDescripcionLabel = new JLabel("---");
+        // === FILA 3: Descripcion ===
+        JPanel descPanel = new JPanel(new BorderLayout());
+        descPanel.setBackground(pastelPink);
+        descPanel.setBorder(BorderFactory.createEmptyBorder(20, 30, 20, 30));
+        
+        JLabel descTitleLabel = new JLabel("DESCRIPCION", SwingConstants.CENTER);
+        descTitleLabel.setFont(titleFont);
+        descTitleLabel.setForeground(Color.BLACK);
+        descPanel.add(descTitleLabel, BorderLayout.NORTH);
+        
+        inicioDescripcionLabel = new JLabel("---", SwingConstants.CENTER);
         inicioDescripcionLabel.setFont(descFont);
-        inicioDescripcionLabel.setForeground(new Color(100, 100, 100));
-        centerPanel.add(inicioDescripcionLabel, gbc);
+        inicioDescripcionLabel.setForeground(Color.BLACK);
+        descPanel.add(inicioDescripcionLabel, BorderLayout.CENTER);
         
-        panel.add(centerPanel, BorderLayout.CENTER);
+        JPanel descWrapper = new JPanel(new BorderLayout());
+        descWrapper.setBackground(Color.WHITE);
+        descWrapper.setBorder(BorderFactory.createEmptyBorder(5, 10, 10, 10));
+        descWrapper.add(descPanel, BorderLayout.CENTER);
+        mainContainer.add(descWrapper);
+        
+        // Agregar espacio flexible para empujar hacia arriba
+        mainContainer.add(Box.createVerticalGlue());
+        
+        panel.add(mainContainer, BorderLayout.CENTER);
         
         // Iniciar timer para actualizar hora actual cada segundo
         inicioRelojTimer = new javax.swing.Timer(1000, e -> {
