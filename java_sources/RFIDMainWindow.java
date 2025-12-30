@@ -735,6 +735,20 @@ public class RFIDMainWindow extends JFrame {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBackground(Color.WHITE);
         
+        // DEBUG: Listar fuentes disponibles que contengan "Bahn"
+        System.out.println("=== DEBUG FUENTES DISPONIBLES ===");
+        String[] fontNames = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
+        String fontName = "SansSerif";  // Default fallback
+        for (String fn : fontNames) {
+            if (fn.toLowerCase().contains("bahn")) {
+                System.out.println("Encontrada: " + fn);
+                fontName = fn;  // Usar la primera que encuentre
+            }
+        }
+        System.out.println("Fuente seleccionada: " + fontName);
+        System.out.println("Total fuentes en sistema: " + fontNames.length);
+        System.out.println("=================================");
+        
         // Colores pastel
         Color pastelBlue = new Color(173, 216, 230);    // Azul pastel
         Color pastelGreen = new Color(144, 238, 144);   // Verde pastel
@@ -742,12 +756,11 @@ public class RFIDMainWindow extends JFrame {
         Color pastelPink = new Color(255, 182, 193);    // Rosa pastel
         
         // Fuentes - tamaños grandes para ver a 10 metros en monitor 32"
-        // Usando Bahnschrift SemiBold Condensed (Windows 10/11)
-        String fontName = "Bahnschrift SemiBold Condensed";
-        Font titleFont = new Font(fontName, Font.PLAIN, 24);
-        Font valueFont = new Font(fontName, Font.PLAIN, 120);  // Horas muy grandes
-        Font tagFont = new Font(fontName, Font.PLAIN, 32);
-        Font descFont = new Font(fontName, Font.PLAIN, 72);    // Descripcion grande
+        // Usando la fuente encontrada o fallback a SansSerif
+        Font titleFont = new Font(fontName, Font.BOLD, 24);
+        Font valueFont = new Font(fontName, Font.BOLD, 120);  // Horas muy grandes
+        Font tagFont = new Font(fontName, Font.BOLD, 32);
+        Font descFont = new Font(fontName, Font.BOLD, 72);    // Descripcion grande
         
         // Panel principal con BoxLayout vertical para apilar las filas
         JPanel mainContainer = new JPanel();
