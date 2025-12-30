@@ -48,6 +48,9 @@ public class AntennaConfig implements Serializable {
     /** Habilitar filtrado por RSSI para esta antena */
     private boolean rssiFilterEnabled;
     
+    /** Indica si la antena esta fisicamente conectada al lector (detectado por hardware) */
+    private transient boolean physicallyConnected = false;
+    
     /**
      * Constructor por defecto. Crea una configuración con valores predeterminados.
      */
@@ -257,6 +260,26 @@ public class AntennaConfig implements Serializable {
      */
     public void setRssiFilterEnabled(boolean enabled) {
         this.rssiFilterEnabled = enabled;
+    }
+    
+    /**
+     * Verifica si la antena esta fisicamente conectada al lector.
+     * Este valor es detectado por el hardware y no se persiste.
+     * 
+     * @return true si la antena esta fisicamente conectada
+     */
+    public boolean isPhysicallyConnected() {
+        return physicallyConnected;
+    }
+    
+    /**
+     * Establece si la antena esta fisicamente conectada.
+     * Este metodo es llamado por ZebraSDKConnection al leer el estado del lector.
+     * 
+     * @param connected true si la antena esta conectada fisicamente
+     */
+    public void setPhysicallyConnected(boolean connected) {
+        this.physicallyConnected = connected;
     }
     
     /**

@@ -3668,14 +3668,29 @@ public class RFIDMainWindow extends JFrame {
     
     /**
      * Guarda la configuración actual en archivo JSON.
+     * Si está conectado al lector, también aplica la configuración de antenas.
      */
     private void saveConfiguration() {
         saveUIToConfig();
         
         try {
             config.saveToFile(CONFIG_FILE_PATH);
+            
+            // Si está conectado, enviar configuración de antenas al lector
+            String readerMessage = "";
+            if (connection != null && connection.isConnected()) {
+                boolean applied = connection.applyAntennaConfigToReader();
+                if (applied) {
+                    readerMessage = "\n\nConfiguración de antenas aplicada al lector.";
+                } else {
+                    readerMessage = "\n\nNo se pudo aplicar configuración al lector.";
+                }
+            } else {
+                readerMessage = "\n\n(Conecte al lector para aplicar cambios)";
+            }
+            
             JOptionPane.showMessageDialog(this,
-                "Configuración guardada en " + CONFIG_FILE_PATH,
+                "Configuración guardada en " + CONFIG_FILE_PATH + readerMessage,
                 "Guardado",
                 JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception e) {
