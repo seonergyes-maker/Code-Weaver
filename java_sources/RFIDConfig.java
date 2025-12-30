@@ -133,6 +133,12 @@ public class RFIDConfig implements Serializable {
     /** Debounce PLC en milisegundos */
     private int plcDebounceMs = 2000;
     
+    /** Modo de lectura de un solo tag (para procesar y parar) */
+    private boolean plcSingleTagMode = false;
+    
+    /** Parar lectura RFID cuando el enabler pasa a OFF */
+    private boolean plcStopOnDisable = true;
+    
     /** Modo sin expiración para el filtro de duplicados (estilo VZEBRA) */
     private boolean duplicateFilterNoExpiration;
     
@@ -512,6 +518,12 @@ public class RFIDConfig implements Serializable {
     
     public int getPlcDebounceMs() { return plcDebounceMs; }
     public void setPlcDebounceMs(int ms) { this.plcDebounceMs = ms; }
+    
+    public boolean isPlcSingleTagMode() { return plcSingleTagMode; }
+    public void setPlcSingleTagMode(boolean singleTag) { this.plcSingleTagMode = singleTag; }
+    
+    public boolean isPlcStopOnDisable() { return plcStopOnDisable; }
+    public void setPlcStopOnDisable(boolean stop) { this.plcStopOnDisable = stop; }
 
     public boolean isDuplicateFilterNoExpiration() {
         return duplicateFilterNoExpiration;

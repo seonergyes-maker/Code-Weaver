@@ -69,6 +69,8 @@ public class RFIDMainWindow extends JFrame {
     private JLabel plcStatusLabel;
     private JPanel plcStatusIndicator;
     private JButton plcTestButton;
+    private JCheckBox plcSingleTagCheck;
+    private JCheckBox plcStopOnDisableCheck;
     private volatile boolean plcRunning = false;
     private Thread plcPollingThread;
         
@@ -1470,6 +1472,21 @@ public class RFIDMainWindow extends JFrame {
         plcUnitIdEnableSpinner.addChangeListener(e -> config.setPlcUnitIdEnable((Integer)plcUnitIdEnableSpinner.getValue()));
         enablerSection.add(plcUnitIdEnableSpinner, gbc);
         
+        // Opciones de control de lectura RFID
+        gbc.gridx = 0; gbc.gridy = 1; gbc.gridwidth = 2;
+        plcSingleTagCheck = new JCheckBox("Leer solo 1 tag y parar");
+        plcSingleTagCheck.setToolTipText("Detiene la lectura RFID despues de procesar un tag");
+        plcSingleTagCheck.setSelected(config.isPlcSingleTagMode());
+        plcSingleTagCheck.addActionListener(e -> config.setPlcSingleTagMode(plcSingleTagCheck.isSelected()));
+        enablerSection.add(plcSingleTagCheck, gbc);
+        
+        gbc.gridx = 2; gbc.gridy = 1; gbc.gridwidth = 2;
+        plcStopOnDisableCheck = new JCheckBox("Parar lectura cuando Enabler = OFF");
+        plcStopOnDisableCheck.setToolTipText("Detiene la lectura RFID cuando el coil enabler pasa a OFF");
+        plcStopOnDisableCheck.setSelected(config.isPlcStopOnDisable());
+        plcStopOnDisableCheck.addActionListener(e -> config.setPlcStopOnDisable(plcStopOnDisableCheck.isSelected()));
+        enablerSection.add(plcStopOnDisableCheck, gbc);
+        
         mainPanel.add(enablerSection);
         mainPanel.add(Box.createVerticalStrut(15));
         
@@ -1582,6 +1599,8 @@ public class RFIDMainWindow extends JFrame {
         plcUnitIdLargoSpinner.setEnabled(enabled);
         plcRefActivaSpinner.setEnabled(enabled);
         plcUnitIdActivaSpinner.setEnabled(enabled);
+        plcSingleTagCheck.setEnabled(enabled);
+        plcStopOnDisableCheck.setEnabled(enabled);
         plcTestButton.setEnabled(enabled);
     }
     
@@ -1714,6 +1733,12 @@ public class RFIDMainWindow extends JFrame {
                         System.out.println("[PLC] Enabler 1->0 - Listo para siguiente ciclo");
                         processedThisHigh = false; // Reset para permitir siguiente 0->1
                         // NO reseteamos lastProcessedEpc - el filtro de duplicados sigue activo
+                        
+                        // Parar lectura RFID si la opcion esta habilitada
+                        if (config.isPlcStopOnDisable() && isReading) {
+                            System.out.println("[PLC] Parando lectura RFID (Enabler OFF)");
+                            SwingUtilities.invokeLater(() -> stopReading());
+                        }
                     }
                     
                     wasEnabled = enablerActive;
@@ -1854,6 +1879,12 @@ public class RFIDMainWindow extends JFrame {
         // Procesar el tag
         updatePlcMonitorLog("[PLC] Transicion 0->1 - Procesando tag: " + lastEpc);
         processPlcReadCycleForTag(modbusClient, lastEpc);
+        
+        // Parar lectura si modo "solo 1 tag" esta activo
+        if (config.isPlcSingleTagMode() && isReading) {
+            System.out.println("[PLC] Parando lectura RFID (modo solo 1 tag)");
+            SwingUtilities.invokeLater(() -> stopReading());
+        }
     }
     
     /**
