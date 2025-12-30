@@ -925,7 +925,7 @@ public class RFIDMainWindow extends JFrame {
      * Lee la configuracion de antenas del lector y actualiza la UI.
      */
     private void readAntennaConfigFromReader() {
-        if (zebraConnection == null || !zebraConnection.isConnected()) {
+        if (connection == null || !connection.isConnected()) {
             JOptionPane.showMessageDialog(this, 
                 "Debe estar conectado al lector para leer la configuracion.",
                 "No conectado", JOptionPane.WARNING_MESSAGE);
@@ -933,7 +933,7 @@ public class RFIDMainWindow extends JFrame {
         }
         
         new Thread(() -> {
-            boolean success = zebraConnection.readAntennaConfigFromReader();
+            boolean success = connection.readAntennaConfigFromReader();
             
             if (success) {
                 // Actualizar UI con los nuevos valores

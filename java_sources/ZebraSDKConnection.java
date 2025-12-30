@@ -158,44 +158,23 @@ public class ZebraSDKConnection implements RfidEventsListener {
     
     /**
      * Configura la compensacion de perdida de cable para cada antena.
-     * Envia los valores de cable loss al lector FX7500.
-     * 
-     * NOTA: El valor de "Perdida cable (dB)" en la UI representa la perdida TOTAL
-     * del cable en dB. El SDK espera dB/100ft, asi que usamos 100 pies como longitud
-     * base para que el valor ingresado sea la perdida total aplicada.
+     * NOTA: El SDK de Zebra FX7500 no expone metodos directos para cable loss.
+     * La compensacion se aplica ajustando la potencia de transmision manualmente.
+     * Este metodo solo registra los valores configurados para referencia.
      */
     private void configureCableLoss() {
         try {
-            java.util.List<CableLossCompensation> cableLossList = new java.util.ArrayList<>();
-            
             for (int ant = 1; ant <= 4; ant++) {
                 AntennaConfig antConfig = config.getAntennaConfig(ant);
                 if (antConfig != null && antConfig.isEnabled()) {
                     double cableLossDb = antConfig.getCableLoss();
-                    
-                    // Siempre enviar la configuracion (incluyendo 0 para limpiar valores previos)
-                    CableLossCompensation clc = new CableLossCompensation();
-                    clc.setAntennaID(ant);
-                    // SDK usa dB/100ft y longitud en pies
-                    // Usamos 100 pies como base para que el valor sea directo en dB total
-                    clc.setCableLoss((int)(cableLossDb * 10)); // Valor en decimas de dB
-                    clc.setCableLength(100);
-                    cableLossList.add(clc);
-                    
                     if (cableLossDb > 0) {
-                        notifyStatus("Antena " + ant + " cable loss: " + cableLossDb + " dB");
+                        notifyStatus("Antena " + ant + " cable loss configurado: " + cableLossDb + " dB (referencia)");
                     }
                 }
             }
-            
-            if (!cableLossList.isEmpty()) {
-                CableLossCompensation[] clcArray = cableLossList.toArray(new CableLossCompensation[0]);
-                reader.Config.setCableLossCompensation(clcArray);
-                notifyStatus("Cable Loss configurado en el lector");
-            }
-            
         } catch (Exception e) {
-            notifyError("Error configurando cable loss: " + e.getMessage());
+            notifyError("Error en cable loss: " + e.getMessage());
         }
     }
     
@@ -242,24 +221,8 @@ public class ZebraSDKConnection implements RfidEventsListener {
                 }
             }
             
-            // Leer cable loss si esta disponible
-            try {
-                for (int ant = 1; ant <= 4; ant++) {
-                    CableLossCompensation clc = reader.ReaderManagement.getCableLossCompensation(ant);
-                    if (clc != null) {
-                        double cableLossDb = clc.getCableLoss() / 10.0; // Decimas de dB a dB
-                        AntennaConfig antConfig = config.getAntennaConfig(ant);
-                        if (antConfig != null) {
-                            antConfig.setCableLoss(cableLossDb);
-                            if (cableLossDb > 0) {
-                                notifyStatus("Antena " + ant + " cable loss leido: " + cableLossDb + " dB");
-                            }
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                notifyStatus("Cable loss no disponible en este lector");
-            }
+            // NOTA: El SDK de Zebra no expone metodos para leer cable loss directamente
+            // Los valores de cable loss se mantienen en la configuracion local
             
             notifyStatus("Configuracion de antenas leida del lector");
             return true;
