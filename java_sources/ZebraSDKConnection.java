@@ -197,14 +197,12 @@ public class ZebraSDKConnection implements RfidEventsListener {
             System.out.println("[ZebraSDK] Power levels disponibles: " + 
                 (powerLevels != null ? powerLevels.length : 0) + " niveles");
             
-            // Obtener antenas conectadas
-            short[] connectedAntennas = null;
+            // Obtener numero de antenas soportadas
             try {
-                connectedAntennas = reader.Config.Antennas.getAntennaID();
-                System.out.println("[ZebraSDK] Antenas conectadas: " + 
-                    (connectedAntennas != null ? connectedAntennas.length : 0));
+                short numAntennas = capabilities.getNumAntennaSupported();
+                System.out.println("[ZebraSDK] Antenas soportadas por el lector: " + numAntennas);
             } catch (Exception e) {
-                System.out.println("[ZebraSDK] No se pudo obtener lista de antenas: " + e.getMessage());
+                System.out.println("[ZebraSDK] No se pudo obtener numero de antenas: " + e.getMessage());
             }
             
             for (int ant = 1; ant <= 4; ant++) {
