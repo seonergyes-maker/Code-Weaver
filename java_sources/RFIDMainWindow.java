@@ -1718,10 +1718,10 @@ public class RFIDMainWindow extends JFrame {
                         processedThisHigh = false; // Reset para permitir siguiente 0->1
                         // NO reseteamos lastProcessedEpc - el filtro de duplicados sigue activo
                         
-                        // Parar lectura RFID si la opcion esta habilitada
+                        // Parar lectura RFID si la opcion esta habilitada (sin detener polling PLC)
                         if (config.isPlcStopOnDisable() && isReading) {
                             System.out.println("[PLC] Parando lectura RFID (Enabler OFF)");
-                            SwingUtilities.invokeLater(() -> stopReading());
+                            SwingUtilities.invokeLater(() -> stopReadingFromPLC());
                         }
                     }
                     
@@ -1864,10 +1864,10 @@ public class RFIDMainWindow extends JFrame {
         updatePlcMonitorLog("[PLC] Transicion 0->1 - Procesando tag: " + lastEpc);
         processPlcReadCycleForTag(modbusClient, lastEpc);
         
-        // Parar lectura si modo "solo 1 tag" esta activo
+        // Parar lectura si modo "solo 1 tag" esta activo (sin detener polling PLC)
         if (config.isPlcSingleTagMode() && isReading) {
             System.out.println("[PLC] Parando lectura RFID (modo solo 1 tag)");
-            SwingUtilities.invokeLater(() -> stopReading());
+            SwingUtilities.invokeLater(() -> stopReadingFromPLC());
         }
     }
     
