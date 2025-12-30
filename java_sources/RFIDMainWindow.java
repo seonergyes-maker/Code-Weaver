@@ -1663,13 +1663,51 @@ public class RFIDMainWindow extends JFrame {
                     
                     // Controlar proceso segun estado del enabler
                     if (enablerActive && !wasEnabled && !processedThisHigh) {
-                        // Flanco de subida: OFF -> ON = Procesar UN tag de la tabla de monitoreo
-                        System.out.println("[PLC] Enabler 0->1 - Procesando tag de tabla de monitoreo");
+                        // Flanco de subida: OFF -> ON
+                        System.out.println("[PLC] Enabler 0->1 - Iniciando ciclo de lectura");
                         processedThisHigh = true; // Marcar como procesado para este ciclo alto
                         
-                        // Tomar el ultimo tag de la tabla y procesarlo
                         final ModbusClient clientRef = modbusClient;
-                        processTagFromMonitoringTable(clientRef);
+                        
+                        // Iniciar lectura RFID si no esta activa
+                        if (!isReading && connection != null && connection.isConnected()) {
+                            System.out.println("[PLC] Iniciando lectura RFID...");
+                            SwingUtilities.invokeLater(() -> startReadingFromPLC());
+                            
+                            // Esperar un momento para que empiece a leer
+                            Thread.sleep(500);
+                        }
+                        
+                        // Verificar si hay tags en la tabla
+                        String lastEpc = getLastReadTag();
+                        
+                        if (lastEpc == null || lastEpc.isEmpty()) {
+                            // No hay tags, esperar a que llegue uno (con timeout)
+                            System.out.println("[PLC] Esperando tag del lector...");
+                            updatePlcMonitorLog("[PLC] Esperando tag del lector...");
+                            
+                            int waitTime = 0;
+                            int maxWait = 5000; // Maximo 5 segundos
+                            int checkInterval = 100; // Verificar cada 100ms
+                            
+                            while (waitTime < maxWait && plcRunning) {
+                                Thread.sleep(checkInterval);
+                                waitTime += checkInterval;
+                                lastEpc = getLastReadTag();
+                                if (lastEpc != null && !lastEpc.isEmpty()) {
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        // Procesar el tag si hay uno disponible
+                        if (lastEpc != null && !lastEpc.isEmpty()) {
+                            processTagFromMonitoringTable(clientRef);
+                        } else {
+                            System.out.println("[PLC] Timeout: No llego ningun tag");
+                            updatePlcMonitorLog("[PLC] Timeout: No llego ningun tag");
+                            updatePlcMonitorStatus("--", "Sin tag", "--", "--", "Timeout");
+                        }
                         
                     } else if (!enablerActive && wasEnabled) {
                         // Flanco de bajada: ON -> OFF = Listo para siguiente ciclo
