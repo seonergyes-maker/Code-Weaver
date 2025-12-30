@@ -1,0 +1,42 @@
+[ZebraSDK] Conectado!
+[ZebraSDK] Modelo: 75004
+[ZebraSDK] Firmware: 3.31.22.0
+[ZebraSDK] Antenas: 4
+[ZebraSDK] Eventos configurados
+[ZebraSDK] Antena 1 configurada: potencia indice 151
+[ZebraSDK] Singulación configurada: Sesión S0
+[RFID] [2025-12-30 10:37:33.021] [INFO] Conectado al lector: 192.168.1.117
+[PLC-DEBUG] startPlcPolling() llamado
+[PLC-DEBUG] config.isPlcEnabled() = true
+[PLC-DEBUG] plcRunning = false
+[PLC-DEBUG] IP = 127.0.0.1
+[PLC-DEBUG] Puerto = 502
+[PLC] Iniciando polling cada 1200ms
+[Config] Última IP conectada guardada: 192.168.1.117
+[ModbusClient] Conectado a PLC: 127.0.0.1:502
+[APIClient] Cliente iniciado. Endpoint: https://localdev.expowin.es:4443/apex/da36433e80dc306bf87ae9ee6b40518b
+[PLC] Enabler 0->1 - Iniciando ciclo de lectura
+[PLC] Iniciando lectura RFID...
+[ZebraSDK] Lectura iniciada
+[PLC] [2025-12-30 10:37:40.344] [INFO] Lectura iniciada por enabler PLC
+[ZebraSDK] Inventario INICIADO
+[APIClient] Enviando tag: https://localdev.expowin.es:4443/apex/da36433e80dc306bf87ae9ee6b40518b/rfid_lecturas/alta/A708D480DC053385A5589C818EE7FAE1/192.168.1.117/TRABAJO/100000000000138906000017/S
+[APIClient] [2025-12-30 10:37:40.508] [DEBUG] Enviando tag: 100000000000138906000017
+[APIClient] Enviando tag: https://localdev.expowin.es:4443/apex/da36433e80dc306bf87ae9ee6b40518b/rfid_lecturas/alta/A708D480DC053385A5589C818EE7FAE1/192.168.1.117/TRABAJO/100100000000014805002698/S
+[APIClient] [2025-12-30 10:37:40.608] [DEBUG] Enviando tag: 100100000000014805002698
+[PLC] Transicion 0->1 - Procesando tag: 100100000000014805002698
+[PLC] Procesando tag: 100100000000014805002698
+[APIClient] Consultando modelo para tag: 100100000000014805002698
+[APIClient] URL modelo: https://localdev.expowin.es:4443/apex/da36433e80dc306bf87ae9ee6b40518b/rfid_lecturas/modelo
+[RFID] [2025-12-30 10:37:41.072] [TAG] EPC=100100000000014805002698 ANT=1 RSSI=-76 API:OK
+[APIClient] Respuesta modelo: 200
+[APIClient] Respuesta JSON: {"valido":"FALSE","codigo":"0","descripcion":"ERROR NO ENCUENTRO EL MODELO","tipo_embalaje":0,"ancho":0,"largo":0}
+[RFID] [2025-12-30 10:37:41.098] [TAG] EPC=100000000000138906000017 ANT=1 RSSI=-40 API:OK
+[APIClient] Modelo parseado con Gson: valido=false, codigo=0, tipo=0
+[PLC] Error API: Tag no valido
+[PLC] Parando lectura RFID (modo solo 1 tag)
+[ZebraSDK] Lectura detenida
+[ZebraSDK] Inventario DETENIDO
+[PLC] Deteniendo polling
+[RFID] Lectura detenida
+[RFID] Lista de tags limpiada
