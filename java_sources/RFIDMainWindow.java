@@ -907,22 +907,22 @@ public class RFIDMainWindow extends JFrame {
      */
     private String getTipoEmbalajeDescripcion(int tipo) {
         switch (tipo) {
-            case 0: return "PLANO";
-            case 1: return "ENROLLADO";
-            case 2: return "PLANO EN CAJA";
-            case 3: return "ENROLLADO EN CAJA";
-            case 4: return "ENROLLADO ALMOHADAS";
-            case 5: return "PLANO EN CAJA >150 (SENTTIX)";
-            case 6: return "PLEGADO+ ENROLLADO";
-            case 7: return "PLEGADO PLASTICO";
-            case 8: return "DOBLE EMBALAJE PLASTICO";
-            case 9: return "ENROLLADO PLASTICO";
-            case 10: return "ENROLLADO FILM";
-            case 11: return "ENROLLADO TOPPING";
-            case 12: return "PLANO EN CAJA ARTICULADOS KHAMA";
-            case 13: return "ENROLLADO COLCHONES CUNAS";
-            case 14: return "ARTICULOS COMPRADOS";
-            default: return "DESCONOCIDO (" + tipo + ")";
+            case 0: return "0 - PLANO";
+            case 1: return "1 - ENROLLADO";
+            case 2: return "2 - PLANO EN CAJA";
+            case 3: return "3 - ENROLLADO EN CAJA";
+            case 4: return "4 - ENROLLADO ALMOHADAS";
+            case 5: return "5 - PLANO EN CAJA >150 (SENTTIX)";
+            case 6: return "6 - PLEGADO+ ENROLLADO";
+            case 7: return "7 - PLEGADO PLASTICO";
+            case 8: return "8 - DOBLE EMBALAJE PLASTICO";
+            case 9: return "9 - ENROLLADO PLASTICO";
+            case 10: return "10 - ENROLLADO FILM";
+            case 11: return "11 - ENROLLADO TOPPING";
+            case 12: return "12 - PLANO EN CAJA ARTICULADOS KHAMA";
+            case 13: return "13 - ENROLLADO COLCHONES CUNAS";
+            case 14: return "14 - ARTICULOS COMPRADOS";
+            default: return tipo + " - DESCONOCIDO";
         }
     }
     
