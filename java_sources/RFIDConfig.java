@@ -210,6 +210,9 @@ public class RFIDConfig implements Serializable {
     /** Última conexión exitosa (para auto-conexión) */
     private String lastConnectedIP;
     
+    /** Tiempo de autolimpieza de tags procesados en minutos (0 = deshabilitado) */
+    private int autoCleanMinutes;
+    
     /**
      * Constructor por defecto con valores predeterminados.
      */
@@ -280,6 +283,7 @@ public class RFIDConfig implements Serializable {
         this.autoConnectEnabled = false;    // Deshabilitado por defecto
         this.displayHexMode = true;          // Hexadecimal por defecto
         this.lastConnectedIP = null;
+        this.autoCleanMinutes = 0;           // Deshabilitado por defecto (0 = sin autolimpieza)
     }
     
     /**
@@ -740,6 +744,14 @@ public class RFIDConfig implements Serializable {
         this.lastConnectedIP = ip;
     }
     
+    public int getAutoCleanMinutes() {
+        return autoCleanMinutes;
+    }
+    
+    public void setAutoCleanMinutes(int minutes) {
+        this.autoCleanMinutes = Math.max(0, minutes);
+    }
+    
     // ==================== Métodos de utilidad ====================
     
     /**
@@ -937,7 +949,8 @@ public class RFIDConfig implements Serializable {
         sb.append("  \"reportPhaseAngle\": ").append(reportPhaseAngle).append(",\n");
         sb.append("  \"reportChannelIndex\": ").append(reportChannelIndex).append(",\n");
         sb.append("  \"autoConnectEnabled\": ").append(autoConnectEnabled).append(",\n");
-        sb.append("  \"displayHexMode\": ").append(displayHexMode).append("\n");
+        sb.append("  \"displayHexMode\": ").append(displayHexMode).append(",\n");
+        sb.append("  \"autoCleanMinutes\": ").append(autoCleanMinutes).append("\n");
         
         // Opciones de API
         sb.append("  \"apiApilado\": ").append(apiApilado).append(",\n");
@@ -1064,6 +1077,7 @@ public class RFIDConfig implements Serializable {
         config.reportChannelIndex = extractBooleanValue(json, "reportChannelIndex", config.reportChannelIndex);
         config.autoConnectEnabled = extractBooleanValue(json, "autoConnectEnabled", config.autoConnectEnabled);
         config.displayHexMode = extractBooleanValue(json, "displayHexMode", config.displayHexMode);
+        config.autoCleanMinutes = extractIntValue(json, "autoCleanMinutes", config.autoCleanMinutes);
         
         return config;
     }
