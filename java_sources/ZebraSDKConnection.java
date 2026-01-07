@@ -113,6 +113,13 @@ public class ZebraSDKConnection implements RfidEventsListener {
     
     private void configureAntennas() {
         try {
+            // Determinar RF Mode Index (para Dense Reader Mode)
+            int rfModeIndex = 0;
+            if (config.isDenseReaderMode()) {
+                rfModeIndex = config.getRfModeIndex();
+                notifyStatus("Dense Reader Mode activado, RF Mode Index: " + rfModeIndex);
+            }
+            
             for (int ant = 1; ant <= 4; ant++) {
                 AntennaConfig antConfig = config.getAntennaConfig(ant);
                 if (antConfig != null && antConfig.isEnabled()) {
@@ -123,19 +130,41 @@ public class ZebraSDKConnection implements RfidEventsListener {
                     
                     Antennas.AntennaRfConfig rfConfig = reader.Config.Antennas.getAntennaRfConfig(ant);
                     rfConfig.setTransmitPowerIndex(powerIndex);
-                    rfConfig.setrfModeTableIndex(0);
+                    rfConfig.setrfModeTableIndex(rfModeIndex);  // Aplicar RF Mode configurado
                     rfConfig.setTari(0);
                     reader.Config.Antennas.setAntennaRfConfig(ant, rfConfig);
                     
-                    notifyStatus("Antena " + ant + " configurada: potencia indice " + powerIndex);
+                    notifyStatus("Antena " + ant + " configurada: potencia=" + powerIndex + ", rfMode=" + rfModeIndex);
                 }
             }
             
             // Configurar Cable Loss para todas las antenas habilitadas
             configureCableLoss();
             
-            Antennas.SingulationControl singulation = reader.Config.Antennas.getSingulationControl(1);
+            // Configurar Singulación C1G2 para cada antena habilitada
+            for (int ant = 1; ant <= 4; ant++) {
+                AntennaConfig antConfig = config.getAntennaConfig(ant);
+                if (antConfig != null && antConfig.isEnabled()) {
+                    configureSingulation(ant);
+                }
+            }
             
+        } catch (Exception e) {
+            notifyError("Error configurando antenas: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Configura los parámetros de singulación C1G2 para una antena.
+     * Aplica Session, Target e InventoryState según la configuración.
+     * 
+     * @param antennaId ID de la antena (1-4)
+     */
+    private void configureSingulation(int antennaId) {
+        try {
+            Antennas.SingulationControl singulation = reader.Config.Antennas.getSingulationControl(antennaId);
+            
+            // Configurar Session (S0-S3)
             SESSION session = SESSION.SESSION_S0;
             switch (config.getInventorySession()) {
                 case 0: session = SESSION.SESSION_S0; break;
@@ -144,15 +173,41 @@ public class ZebraSDKConnection implements RfidEventsListener {
                 case 3: session = SESSION.SESSION_S3; break;
             }
             singulation.setSession(session);
-            singulation.setTagPopulation((short) config.getTagPopulation());
-            singulation.Action.setInventoryState(INVENTORY_STATE.INVENTORY_STATE_A);
-            singulation.Action.setSLFlag(SL_FLAG.SL_ALL);
-            reader.Config.Antennas.setSingulationControl(1, singulation);
             
-            notifyStatus("Singulación configurada: Sesión S" + config.getInventorySession());
+            // Configurar población de tags (optimiza algoritmo Q)
+            singulation.setTagPopulation((short) config.getTagPopulation());
+            
+            // Configurar Target (A, B, o alternado A↔B)
+            int targetConfig = config.getInventoryTarget();
+            INVENTORY_STATE invState = INVENTORY_STATE.INVENTORY_STATE_A;
+            SL_FLAG slFlag = SL_FLAG.SL_ALL;
+            
+            switch (targetConfig) {
+                case 0:  // Target A
+                    invState = INVENTORY_STATE.INVENTORY_STATE_A;
+                    slFlag = SL_FLAG.SL_ALL;
+                    break;
+                case 1:  // Target B
+                    invState = INVENTORY_STATE.INVENTORY_STATE_B;
+                    slFlag = SL_FLAG.SL_ALL;
+                    break;
+                case 2:  // Target A↔B (alternado)
+                    invState = INVENTORY_STATE.INVENTORY_STATE_AB_FLIP;
+                    slFlag = SL_FLAG.SL_ALL;
+                    break;
+            }
+            
+            singulation.Action.setInventoryState(invState);
+            singulation.Action.setSLFlag(slFlag);
+            
+            reader.Config.Antennas.setSingulationControl(antennaId, singulation);
+            
+            String targetName = (targetConfig == 0) ? "A" : (targetConfig == 1) ? "B" : "A↔B";
+            notifyStatus("Antena " + antennaId + " C1G2: Session=S" + config.getInventorySession() + 
+                        ", Target=" + targetName + ", Population=" + config.getTagPopulation());
             
         } catch (Exception e) {
-            notifyError("Error configurando antenas: " + e.getMessage());
+            notifyError("Error configurando singulación antena " + antennaId + ": " + e.getMessage());
         }
     }
     
