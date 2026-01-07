@@ -146,6 +146,7 @@ public class RFIDMainWindow extends JFrame {
     private JLabel inicioHoraUltimaLecturaLabel;
     private JLabel inicioHoraActualLabel;
     private JLabel inicioUltimoTagLabel;
+    private JLabel inicioTipoLabel;  // Tipo de embalaje enviado al PLC
     private JLabel inicioDescripcionLabel;
     private javax.swing.Timer inicioRelojTimer;
     
@@ -816,12 +817,15 @@ public class RFIDMainWindow extends JFrame {
         
         mainContainer.add(topRow);
         
-        // === FILA 2: Ultimo TAG (reducido 30%) ===
+        // === FILA 2: Ultimo TAG (izq) y TIPO (der) - igual que las horas ===
+        JPanel tagRow = new JPanel(new GridLayout(1, 2, 10, 0));
+        tagRow.setBackground(Color.WHITE);
+        tagRow.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        
+        // Panel izquierdo: Ultimo TAG
         JPanel tagPanel = new JPanel(new BorderLayout());
         tagPanel.setBackground(pastelYellow);
-        tagPanel.setBorder(BorderFactory.createEmptyBorder(10, 30, 10, 30));
-        tagPanel.setPreferredSize(new Dimension(0, 80));
-        tagPanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 80));
+        tagPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
         
         JLabel tagTitleLabel = new JLabel("ULTIMO TAG LEIDO", SwingConstants.CENTER);
         tagTitleLabel.setFont(titleFont);
@@ -829,15 +833,31 @@ public class RFIDMainWindow extends JFrame {
         tagPanel.add(tagTitleLabel, BorderLayout.NORTH);
         
         inicioUltimoTagLabel = new JLabel("---", SwingConstants.CENTER);
-        inicioUltimoTagLabel.setFont(new Font("Monospaced", Font.BOLD, 32));
+        inicioUltimoTagLabel.setFont(new Font(fontName, Font.BOLD, 36));
         inicioUltimoTagLabel.setForeground(Color.BLACK);
         tagPanel.add(inicioUltimoTagLabel, BorderLayout.CENTER);
         
-        JPanel tagWrapper = new JPanel(new BorderLayout());
-        tagWrapper.setBackground(Color.WHITE);
-        tagWrapper.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
-        tagWrapper.add(tagPanel, BorderLayout.CENTER);
-        mainContainer.add(tagWrapper);
+        tagRow.add(tagPanel);
+        
+        // Panel derecho: TIPO (naranja pastel)
+        Color pastelOrange = new Color(255, 200, 150);  // Naranja pastel
+        JPanel tipoPanel = new JPanel(new BorderLayout());
+        tipoPanel.setBackground(pastelOrange);
+        tipoPanel.setBorder(BorderFactory.createEmptyBorder(15, 20, 15, 20));
+        
+        JLabel tipoTitleLabel = new JLabel("TIPO", SwingConstants.CENTER);
+        tipoTitleLabel.setFont(titleFont);
+        tipoTitleLabel.setForeground(Color.BLACK);
+        tipoPanel.add(tipoTitleLabel, BorderLayout.NORTH);
+        
+        inicioTipoLabel = new JLabel("--", SwingConstants.CENTER);
+        inicioTipoLabel.setFont(new Font(fontName, Font.BOLD, 72));
+        inicioTipoLabel.setForeground(Color.BLACK);
+        tipoPanel.add(inicioTipoLabel, BorderLayout.CENTER);
+        
+        tagRow.add(tipoPanel);
+        
+        mainContainer.add(tagRow);
         
         // === FILA 3: Descripcion (ampliado 30%) ===
         JPanel descPanel = new JPanel(new BorderLayout());
@@ -881,12 +901,16 @@ public class RFIDMainWindow extends JFrame {
      * 
      * @param tag EPC del tag leído
      * @param descripcion Descripción obtenida de la API
+     * @param tipoEmbalaje Tipo de embalaje enviado al PLC
      */
-    private void updateInicioPanel(String tag, String descripcion) {
+    private void updateInicioPanel(String tag, String descripcion, int tipoEmbalaje) {
         SwingUtilities.invokeLater(() -> {
             SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss");
             inicioHoraUltimaLecturaLabel.setText(sdf.format(new Date()));
             inicioUltimoTagLabel.setText(tag != null ? tag : "---");
+            
+            // Actualizar TIPO
+            inicioTipoLabel.setText(String.valueOf(tipoEmbalaje));
             
             // Formatear descripcion con salto de linea antes de "("
             String descText = "---";
@@ -898,6 +922,14 @@ public class RFIDMainWindow extends JFrame {
             }
             inicioDescripcionLabel.setText(descText);
         });
+    }
+    
+    /**
+     * Actualiza los datos de la pestaña INICIO (sin tipo).
+     * Sobrecarga para compatibilidad.
+     */
+    private void updateInicioPanel(String tag, String descripcion) {
+        updateInicioPanel(tag, descripcion, 0);
     }
     
     /**
@@ -1989,8 +2021,8 @@ public class RFIDMainWindow extends JFrame {
             updatePlcMonitorCodigo(modelo.codigo);
             updatePlcMonitorDatos(modelo.tipoEmbalaje, modelo.ancho, modelo.largo);
             
-            // Actualizar panel INICIO con el tag y descripcion
-            updateInicioPanel(epc, modelo.descripcion);
+            // Actualizar panel INICIO con el tag, descripcion y tipo
+            updateInicioPanel(epc, modelo.descripcion, modelo.tipoEmbalaje);
             
             // 3. Escribir datos al PLC
             updatePlcMonitorLog("[PLC] Escribiendo al PLC - Tipo: " + modelo.tipoEmbalaje + 
