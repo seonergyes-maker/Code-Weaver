@@ -154,6 +154,12 @@ public class RFIDMainWindow extends JFrame {
     private long lastProcessedTime = 0;
     // Set de TODOS los EPCs ya procesados por el PLC (evita duplicados durante toda la sesion)
     private final java.util.Set<String> plcProcessedTags = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    
+    // Variables para reintento automatico de conexion
+    private volatile boolean autoRetryEnabled = false;
+    private volatile int autoRetryCount = 0;
+    private static final int AUTO_RETRY_INTERVAL_MS = 5000; // Reintentar cada 5 segundos
+    private javax.swing.Timer autoRetryTimer;
     // plcWaitingForTag eliminado - ahora el proceso se dispara en transicion 0->1 del Coil
     // Debounce configurable desde pestaña PLC
     private volatile ModbusClient activeModbusClient = null; // Cliente Modbus activo para escritura
@@ -3021,6 +3027,9 @@ public class RFIDMainWindow extends JFrame {
      * Llamado cuando la conexión es exitosa.
      */
     private void onConnected() {
+        // Detener reintentos automaticos si estaban activos
+        stopAutoRetry();
+        
         logger.logConnection(config.getReaderIP(), true);
         connectionIndicator.setBackground(ModernUIStyle.ACCENT_SUCCESS);
         connectionStatusLabel.setText("Conectado");
@@ -3031,6 +3040,7 @@ public class RFIDMainWindow extends JFrame {
         stopReadingButton.setEnabled(false);
         setStatus("Conectado a " + config.getReaderIP() + " - Presione 'Iniciar Lectura' para leer etiquetas");
         statistics.recordConnection();
+        System.out.println("[AutoConnect] Conexion exitosa a " + config.getReaderIP());
         
         // Iniciar polling PLC si está habilitado (el PLC controlará la lectura)
         startPlcPolling();
@@ -3061,12 +3071,55 @@ public class RFIDMainWindow extends JFrame {
      */
     private void onConnectionFailed(String error) {
         connectionIndicator.setBackground(ModernUIStyle.ACCENT_ERROR);
-        connectionStatusLabel.setText("Error: " + error);
         connectionStatusLabel.setForeground(ModernUIStyle.ACCENT_ERROR);
-        connectButton.setEnabled(true);
-        disconnectButton.setEnabled(false);
-        setStatus("Error de conexión: " + error);
         statistics.recordError("Connection error");
+        
+        // Si autoConnect está habilitado, reintentar automáticamente
+        if (config.isAutoConnectEnabled()) {
+            autoRetryEnabled = true;
+            autoRetryCount++;
+            
+            String msg = "Error: " + error + " - Reintento #" + autoRetryCount + " en " + (AUTO_RETRY_INTERVAL_MS/1000) + "s...";
+            connectionStatusLabel.setText(msg);
+            setStatus(msg);
+            System.out.println("[AutoConnect] " + msg);
+            logger.warn("AutoConnect", "Conexion fallida: " + error + ". Reintentando en " + (AUTO_RETRY_INTERVAL_MS/1000) + "s (intento #" + autoRetryCount + ")");
+            
+            // Deshabilitar boton conectar mientras reintenta
+            connectButton.setEnabled(false);
+            disconnectButton.setEnabled(false);
+            
+            // Programar reintento
+            if (autoRetryTimer != null) {
+                autoRetryTimer.stop();
+            }
+            autoRetryTimer = new javax.swing.Timer(AUTO_RETRY_INTERVAL_MS, e -> {
+                if (autoRetryEnabled) {
+                    System.out.println("[AutoConnect] Reintentando conexion (intento #" + (autoRetryCount + 1) + ")...");
+                    setStatus("Reintentando conexion (intento #" + (autoRetryCount + 1) + ")...");
+                    connect();
+                }
+            });
+            autoRetryTimer.setRepeats(false);
+            autoRetryTimer.start();
+        } else {
+            connectionStatusLabel.setText("Error: " + error);
+            setStatus("Error de conexión: " + error);
+            connectButton.setEnabled(true);
+            disconnectButton.setEnabled(false);
+        }
+    }
+    
+    /**
+     * Detiene el reintento automatico de conexion.
+     */
+    private void stopAutoRetry() {
+        autoRetryEnabled = false;
+        autoRetryCount = 0;
+        if (autoRetryTimer != null) {
+            autoRetryTimer.stop();
+            autoRetryTimer = null;
+        }
     }
     
     /**
