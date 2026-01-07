@@ -155,8 +155,11 @@ public class RFIDMainWindow extends JFrame {
     // Variables de control para PLC
     private String lastProcessedEpc = "";
     private long lastProcessedTime = 0;
-    // Set de TODOS los EPCs ya procesados por el PLC (evita duplicados durante toda la sesion)
-    private final java.util.Set<String> plcProcessedTags = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    // Map de TODOS los EPCs ya procesados por el PLC -> timestamp de procesamiento (evita duplicados durante toda la sesion)
+    private final java.util.Map<String, Long> plcProcessedTags = java.util.Collections.synchronizedMap(new java.util.HashMap<>());
+    // Timer para autolimpieza de tags procesados
+    private javax.swing.Timer autoCleanTimer;
+    private JSpinner autoCleanSpinner;
     
     // Variables para reintento automatico de conexion
     private volatile boolean autoRetryEnabled = false;
@@ -1606,6 +1609,27 @@ public class RFIDMainWindow extends JFrame {
         plcHistoryLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
         enablerSection.add(plcHistoryLabel, gbc);
         
+        // Fila 3: Autolimpieza configurable
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 1;
+        enablerSection.add(new JLabel("Autolimpieza (min):"), gbc);
+        gbc.gridx = 1;
+        autoCleanSpinner = new JSpinner(new SpinnerNumberModel(config.getAutoCleanMinutes(), 0, 1440, 1));
+        autoCleanSpinner.setToolTipText("Minutos para limpiar tags del historial (0 = deshabilitado)");
+        autoCleanSpinner.addChangeListener(e -> {
+            int minutes = (Integer) autoCleanSpinner.getValue();
+            config.setAutoCleanMinutes(minutes);
+            configureAutoCleanTimer(minutes);
+        });
+        enablerSection.add(autoCleanSpinner, gbc);
+        
+        gbc.gridx = 2; gbc.gridwidth = 2;
+        JLabel autoCleanLabel = new JLabel("0 = deshabilitado");
+        autoCleanLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
+        enablerSection.add(autoCleanLabel, gbc);
+        
+        // Inicializar timer de autolimpieza
+        configureAutoCleanTimer(config.getAutoCleanMinutes());
+        
         // Timer para actualizar el contador de historial
         javax.swing.Timer historyTimer = new javax.swing.Timer(1000, e -> {
             plcHistoryLabel.setText("Tags ya enviados: " + plcProcessedTags.size());
@@ -1958,7 +1982,7 @@ public class RFIDMainWindow extends JFrame {
         }
         
         // FILTRO ROBUSTO: verificar si el tag ya fue procesado durante esta sesion
-        if (plcProcessedTags.contains(lastEpc)) {
+        if (plcProcessedTags.containsKey(lastEpc)) {
             updatePlcMonitorLog("[PLC] Tag YA ENVIADO anteriormente, ignorando: " + lastEpc);
             updatePlcMonitorStatus(lastEpc, "Ya enviado", "--", "--", "Duplicado bloqueado");
             System.out.println("[PLC] FILTRO DUPLICADOS: tag " + lastEpc + " ya fue enviado al PLC anteriormente");
@@ -1993,7 +2017,7 @@ public class RFIDMainWindow extends JFrame {
             }
             
             // FILTRO ROBUSTO: verificar si el tag ya fue procesado durante esta sesion
-            if (plcProcessedTags.contains(lastEpc)) {
+            if (plcProcessedTags.containsKey(lastEpc)) {
                 System.out.println("[PLC] FILTRO DUPLICADOS: tag " + lastEpc + " ya fue enviado al PLC anteriormente");
                 return;
             }
@@ -2069,8 +2093,8 @@ public class RFIDMainWindow extends JFrame {
             updatePlcMonitorLog("[PLC] Datos escritos al PLC correctamente");
             updatePlcMonitorGrabacion("OK - Grabado", ModernUIStyle.ACCENT_SUCCESS);
             
-            // IMPORTANTE: Agregar al Set de tags ya procesados para evitar duplicados
-            plcProcessedTags.add(epc);
+            // IMPORTANTE: Agregar al Map de tags ya procesados con timestamp para autolimpieza
+            plcProcessedTags.put(epc, System.currentTimeMillis());
             
             // Marcar éxito en la tabla
             if (tagRef != null) {
@@ -2098,6 +2122,58 @@ public class RFIDMainWindow extends JFrame {
                 SwingUtilities.invokeLater(this::updateTagTable);
             }
         }
+    }
+    
+    // === Configuracion del timer de autolimpieza de tags procesados ===
+    
+    /**
+     * Configura el timer de autolimpieza de tags procesados.
+     * Elimina del historial los tags cuyo tiempo de procesamiento supera los minutos configurados.
+     * 
+     * @param minutes Minutos para autolimpieza (0 = deshabilitado)
+     */
+    private void configureAutoCleanTimer(int minutes) {
+        // Detener timer existente si hay uno
+        if (autoCleanTimer != null) {
+            autoCleanTimer.stop();
+            autoCleanTimer = null;
+        }
+        
+        if (minutes <= 0) {
+            System.out.println("[AutoClean] Autolimpieza deshabilitada");
+            return;
+        }
+        
+        // Crear timer que revisa cada 30 segundos
+        autoCleanTimer = new javax.swing.Timer(30000, e -> {
+            long now = System.currentTimeMillis();
+            long expirationMs = minutes * 60 * 1000L;
+            int cleaned = 0;
+            
+            // Crear lista de tags a eliminar (evitar ConcurrentModificationException)
+            java.util.List<String> toRemove = new java.util.ArrayList<>();
+            
+            synchronized (plcProcessedTags) {
+                for (java.util.Map.Entry<String, Long> entry : plcProcessedTags.entrySet()) {
+                    if (now - entry.getValue() > expirationMs) {
+                        toRemove.add(entry.getKey());
+                    }
+                }
+                
+                for (String epc : toRemove) {
+                    plcProcessedTags.remove(epc);
+                    cleaned++;
+                }
+            }
+            
+            if (cleaned > 0) {
+                updatePlcMonitorLog("[AutoClean] Limpiados " + cleaned + " tags (>" + minutes + " min)");
+                logger.info("AutoClean", "Limpiados " + cleaned + " tags por expiracion (" + minutes + " min)");
+                System.out.println("[AutoClean] Limpiados " + cleaned + " tags por expiracion");
+            }
+        });
+        autoCleanTimer.start();
+        System.out.println("[AutoClean] Timer configurado: " + minutes + " minutos");
     }
     
     // === Metodos de actualizacion del panel de estado PLC en Monitoreo ===
@@ -3355,7 +3431,7 @@ public class RFIDMainWindow extends JFrame {
             final TagData tagRef = tagCache.get(tagEpc);
             
             // Verificar si el tag ya fue enviado al PLC
-            if (!plcProcessedTags.contains(tagEpc)) {
+            if (!plcProcessedTags.containsKey(tagEpc)) {
                 System.out.println("[PLC] Nuevo tag detectado con enabler activo: " + tagEpc);
                 
                 // Marcar como "Enviando" en la tabla
@@ -3370,7 +3446,7 @@ public class RFIDMainWindow extends JFrame {
                     
                     // Actualizar estado en la tabla
                     SwingUtilities.invokeLater(() -> {
-                        if (tagRef != null && plcProcessedTags.contains(tagEpc)) {
+                        if (tagRef != null && plcProcessedTags.containsKey(tagEpc)) {
                             tagRef.setPlcStatus("OK");
                         }
                         updateTagTable();
