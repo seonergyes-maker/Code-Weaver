@@ -274,6 +274,7 @@ public class RFIDMainWindow extends JFrame {
         setSize(DEFAULT_SIZE);
         setMinimumSize(new Dimension(800, 600));
         setLocationRelativeTo(null);
+        setExtendedState(JFrame.MAXIMIZED_BOTH);
         
         initializeSystemTray();
         
@@ -899,6 +900,33 @@ public class RFIDMainWindow extends JFrame {
     }
     
     /**
+     * Convierte el codigo numerico de tipo de embalaje a su descripcion.
+     * 
+     * @param tipo Codigo numerico del tipo de embalaje
+     * @return Descripcion del tipo de embalaje
+     */
+    private String getTipoEmbalajeDescripcion(int tipo) {
+        switch (tipo) {
+            case 0: return "PLANO";
+            case 1: return "ENROLLADO";
+            case 2: return "PLANO EN CAJA";
+            case 3: return "ENROLLADO EN CAJA";
+            case 4: return "ENROLLADO ALMOHADAS";
+            case 5: return "PLANO EN CAJA >150 (SENTTIX)";
+            case 6: return "PLEGADO+ ENROLLADO";
+            case 7: return "PLEGADO PLASTICO";
+            case 8: return "DOBLE EMBALAJE PLASTICO";
+            case 9: return "ENROLLADO PLASTICO";
+            case 10: return "ENROLLADO FILM";
+            case 11: return "ENROLLADO TOPPING";
+            case 12: return "PLANO EN CAJA ARTICULADOS KHAMA";
+            case 13: return "ENROLLADO COLCHONES CUNAS";
+            case 14: return "ARTICULOS COMPRADOS";
+            default: return "DESCONOCIDO (" + tipo + ")";
+        }
+    }
+    
+    /**
      * Actualiza los datos de la pestaña INICIO.
      * Se llama cuando se lee un tag y se obtiene respuesta de la API.
      * 
@@ -912,8 +940,8 @@ public class RFIDMainWindow extends JFrame {
             inicioHoraUltimaLecturaLabel.setText(sdf.format(new Date()));
             inicioUltimoTagLabel.setText(tag != null ? tag : "---");
             
-            // Actualizar TIPO
-            inicioTipoLabel.setText(String.valueOf(tipoEmbalaje));
+            // Actualizar TIPO con descripcion en lugar de numero
+            inicioTipoLabel.setText(getTipoEmbalajeDescripcion(tipoEmbalaje));
             
             // Formatear descripcion con salto de linea antes de "("
             String descText = "---";
