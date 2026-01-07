@@ -72,6 +72,8 @@ public class RFIDMainWindow extends JFrame {
     private JCheckBox plcSingleTagCheck;
     private JCheckBox plcStopOnDisableCheck;
     private volatile boolean plcRunning = false;
+    private volatile boolean plcEnablerActive = false;  // Estado actual del enabler PLC
+    private volatile ModbusClient sharedModbusClient = null;  // Cliente Modbus compartido
     private Thread plcPollingThread;
         
     // ==================== Componentes de antenas ====================
@@ -528,7 +530,7 @@ public class RFIDMainWindow extends JFrame {
             ModernUIStyle.styleSpinner(cableLossSpinners[i]);
         }
         
-        String[] columnNames = {"EPC", "RSSI (dBm)", "Antena", "Lecturas", "Última Lectura", "API"};
+        String[] columnNames = {"EPC", "RSSI (dBm)", "Antena", "Lecturas", "Última Lectura", "API", "PLC"};
         tagTableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -538,6 +540,7 @@ public class RFIDMainWindow extends JFrame {
         tagTable = new JTable(tagTableModel);
         tagTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         tagTable.getColumnModel().getColumn(0).setPreferredWidth(200);
+        tagTable.getColumnModel().getColumn(6).setPreferredWidth(60);  // Columna PLC más pequeña
         tagTable.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
         ModernUIStyle.styleTable(tagTable);
         
@@ -1774,43 +1777,27 @@ public class RFIDMainWindow extends JFrame {
                         config.getPlcUnitIdEnable()
                     );
                     
+                    // Actualizar estado global del enabler y cliente compartido
+                    plcEnablerActive = enablerActive;
+                    sharedModbusClient = modbusClient;
+                    
                     // Controlar proceso segun estado del enabler
-                    if (enablerActive && !wasEnabled && !processedThisHigh) {
+                    if (enablerActive && !wasEnabled) {
                         // Flanco de subida: OFF -> ON
-                        System.out.println("[PLC] Enabler 0->1 - Iniciando ciclo de lectura");
-                        processedThisHigh = true; // Marcar como procesado para este ciclo alto
-                        
-                        final ModbusClient clientRef = modbusClient;
+                        System.out.println("[PLC] Enabler 0->1 - Esperando NUEVO tag para enviar");
+                        updatePlcMonitorLog("[PLC] Enabler activo - Esperando nuevo tag...");
+                        updatePlcMonitorStatus("--", "Esperando", "--", "--", "Listo para enviar");
                         
                         // Iniciar lectura RFID si no esta activa
                         if (!isReading && connection != null && connection.isConnected()) {
                             System.out.println("[PLC] Iniciando lectura RFID...");
                             SwingUtilities.invokeLater(() -> startReadingFromPLC());
-                            
-                            // Esperar un momento para que empiece a leer
-                            Thread.sleep(500);
-                        }
-                        
-                        // Verificar si hay tags en la tabla
-                        String lastEpc = getLastReadTag();
-                        
-                        if (lastEpc == null || lastEpc.isEmpty()) {
-                            // No hay tags, esperar indefinidamente hasta que llegue uno
-                            System.out.println("[PLC] Esperando tag del lector...");
-                            updatePlcMonitorLog("[PLC] Esperando tag del lector...");
-                            updatePlcMonitorStatus("--", "Esperando", "--", "--", "Leyendo...");
-                        }
-                        
-                        // Procesar el tag si hay uno disponible
-                        if (lastEpc != null && !lastEpc.isEmpty()) {
-                            processTagFromMonitoringTable(clientRef);
                         }
                         
                     } else if (!enablerActive && wasEnabled) {
                         // Flanco de bajada: ON -> OFF = Listo para siguiente ciclo
-                        System.out.println("[PLC] Enabler 1->0 - Listo para siguiente ciclo");
-                        processedThisHigh = false; // Reset para permitir siguiente 0->1
-                        // NO reseteamos lastProcessedEpc - el filtro de duplicados sigue activo
+                        System.out.println("[PLC] Enabler 1->0 - Esperando siguiente ciclo");
+                        updatePlcMonitorLog("[PLC] Enabler desactivado");
                         
                         // Parar lectura RFID si la opcion esta habilitada (sin detener polling PLC)
                         if (config.isPlcStopOnDisable() && isReading) {
@@ -1999,10 +1986,19 @@ public class RFIDMainWindow extends JFrame {
      * @param epc EPC del tag a procesar
      */
     private void processPlcReadCycleForTag(ModbusClient modbusClient, String epc) {
+        // Obtener referencia al tag en cache para actualizar estado
+        TagData tagRef = tagCache.get(epc);
+        
         try {
             updatePlcMonitorLog("[PLC] Procesando tag: " + epc);
             updatePlcMonitorTagLabel(epc);
             updatePlcMonitorApiStatus("Consultando...", ModernUIStyle.ACCENT_WARNING);
+            
+            // Marcar como enviando en la tabla
+            if (tagRef != null) {
+                tagRef.setPlcStatus("Enviando...");
+                SwingUtilities.invokeLater(this::updateTagTable);
+            }
             
             // 2. Consultar API /rfid_lecturas/modelo
             APIClient apiClient = new APIClient(config);
@@ -2013,6 +2009,12 @@ public class RFIDMainWindow extends JFrame {
                 updatePlcMonitorLog("[PLC] Error API: " + error);
                 updatePlcMonitorApiStatus("Error: " + error, ModernUIStyle.ACCENT_ERROR);
                 updatePlcMonitorGrabacion("Error API", ModernUIStyle.ACCENT_ERROR);
+                
+                // Marcar error en la tabla
+                if (tagRef != null) {
+                    tagRef.setPlcStatus("Error API");
+                    SwingUtilities.invokeLater(this::updateTagTable);
+                }
                 return;
             }
             
@@ -2041,6 +2043,12 @@ public class RFIDMainWindow extends JFrame {
             
             // IMPORTANTE: Agregar al Set de tags ya procesados para evitar duplicados
             plcProcessedTags.add(epc);
+            
+            // Marcar éxito en la tabla
+            if (tagRef != null) {
+                tagRef.setPlcStatus("OK");
+                SwingUtilities.invokeLater(this::updateTagTable);
+            }
             System.out.println("[PLC] Tag agregado a lista de procesados: " + epc + " (total: " + plcProcessedTags.size() + ")");
             
             // Actualizar ultimo tag procesado (para compatibilidad)
@@ -2055,6 +2063,12 @@ public class RFIDMainWindow extends JFrame {
             updatePlcMonitorLog("[PLC] Error: " + ex.getMessage());
             updatePlcMonitorGrabacion("Error: " + ex.getMessage(), ModernUIStyle.ACCENT_ERROR);
             logger.error("PLC", "Error en ciclo: " + ex.getMessage());
+            
+            // Marcar error en la tabla
+            if (tagRef != null) {
+                tagRef.setPlcStatus("Error");
+                SwingUtilities.invokeLater(this::updateTagTable);
+            }
         }
     }
     
@@ -3307,6 +3321,36 @@ public class RFIDMainWindow extends JFrame {
             }, "API-Send-" + tagEpc.substring(Math.max(0, tagEpc.length()-4))).start();
         }
         
+        // NUEVO FLUJO PLC: Enviar al PLC cuando llega un nuevo tag Y el enabler está activo
+        if (plcEnablerActive && sharedModbusClient != null && sharedModbusClient.isConnected()) {
+            final String tagEpc = tag.getEpc();
+            final TagData tagRef = tagCache.get(tagEpc);
+            
+            // Verificar si el tag ya fue enviado al PLC
+            if (!plcProcessedTags.contains(tagEpc)) {
+                System.out.println("[PLC] Nuevo tag detectado con enabler activo: " + tagEpc);
+                
+                // Marcar como "Enviando" en la tabla
+                if (tagRef != null) {
+                    tagRef.setPlcStatus("Enviando...");
+                }
+                
+                // Enviar al PLC en hilo separado
+                final ModbusClient clientRef = sharedModbusClient;
+                new Thread(() -> {
+                    processPlcReadCycleForTag(clientRef, tagEpc);
+                    
+                    // Actualizar estado en la tabla
+                    SwingUtilities.invokeLater(() -> {
+                        if (tagRef != null && plcProcessedTags.contains(tagEpc)) {
+                            tagRef.setPlcStatus("OK");
+                        }
+                        updateTagTable();
+                    });
+                }, "PLC-Send-" + tagEpc.substring(Math.max(0, tagEpc.length()-4))).start();
+            }
+        }
+        
         updateTagTable();
     }
     
@@ -3329,7 +3373,8 @@ public class RFIDMainWindow extends JFrame {
                 tag.getAntennaPort(),
                 tag.getReadCount(),
                 sdf.format(new Date(tag.getLastSeen())),
-                tag.getApiStatus()
+                tag.getApiStatus(),
+                tag.getPlcStatus()
             });
         }
         

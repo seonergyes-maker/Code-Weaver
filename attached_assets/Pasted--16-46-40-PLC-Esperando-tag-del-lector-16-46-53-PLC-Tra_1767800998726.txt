@@ -1,0 +1,46 @@
+[16:46:40] [PLC] Esperando tag del lector...
+[16:46:53] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000017
+[16:46:53] [PLC] Procesando tag: 100000000000138906000017
+[16:46:53] [PLC] API OK - Codigo: OXJS190090, COLCHON OXSI JUNIOR SLIM H-16 190 X 090 (ENROLLADO EN CAJA)
+[16:46:53] [PLC] Escribiendo al PLC - Tipo: 8, Ancho: 90, Largo: 190
+[16:46:53] [PLC] Datos escritos al PLC correctamente
+[16:47:03] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000025
+[16:47:03] [PLC] Procesando tag: 100000000000138906000025
+[16:47:03] [PLC] Error API: Tag no valido
+[16:47:25] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000025
+[16:47:25] [PLC] Procesando tag: 100000000000138906000025
+[16:47:25] [PLC] Error API: Tag no valido
+[16:47:28] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000025
+[16:47:28] [PLC] Procesando tag: 100000000000138906000025
+[16:47:28] [PLC] Error API: Tag no valido
+[16:47:32] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000025
+[16:47:32] [PLC] Procesando tag: 100000000000138906000025
+[16:47:32] [PLC] Error API: Tag no valido
+[16:47:47] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000025
+[16:47:47] [PLC] Procesando tag: 100000000000138906000025
+[16:47:48] [PLC] Error API: Tag no valido
+[16:47:53] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000025
+[16:47:53] [PLC] Procesando tag: 100000000000138906000025
+[16:47:53] [PLC] Error API: Tag no valido
+[16:47:55] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000025
+[16:47:55] [PLC] Procesando tag: 100000000000138906000025
+[16:47:55] [PLC] Error API: Tag no valido
+[16:47:57] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000025
+[16:47:57] [PLC] Procesando tag: 100000000000138906000025
+[16:47:57] [PLC] Error API: Tag no valido
+[16:48:02] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000025
+[16:48:02] [PLC] Procesando tag: 100000000000138906000025
+[16:48:02] [PLC] Error API: Tag no valido
+[16:48:17] [PLC] Historial de tags procesados limpiado (1 tags)
+[16:48:23] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000017
+[16:48:23] [PLC] Procesando tag: 100000000000138906000017
+[16:48:23] [PLC] API OK - Codigo: OXJS190090, COLCHON OXSI JUNIOR SLIM H-16 190 X 090 (ENROLLADO EN CAJA)
+[16:48:23] [PLC] Escribiendo al PLC - Tipo: 8, Ancho: 90, Largo: 190
+[16:48:23] [PLC] Datos escritos al PLC correctamente
+[16:48:29] [PLC] Tag YA ENVIADO anteriormente, ignorando: 100000000000138906000017
+[16:49:04] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000025
+[16:49:04] [PLC] Procesando tag: 100000000000138906000025
+[16:49:04] [PLC] Error API: Tag no valido
+[16:49:20] [PLC] Transicion 0->1 - Procesando tag: 100000000000138906000025
+[16:49:20] [PLC] Procesando tag: 100000000000138906000025
+[16:49:20] [PLC] Error API: Tag no valido
