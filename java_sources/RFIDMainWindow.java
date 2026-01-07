@@ -152,6 +152,8 @@ public class RFIDMainWindow extends JFrame {
     // Variables de control para PLC
     private String lastProcessedEpc = "";
     private long lastProcessedTime = 0;
+    // Set de TODOS los EPCs ya procesados por el PLC (evita duplicados durante toda la sesion)
+    private final java.util.Set<String> plcProcessedTags = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     // plcWaitingForTag eliminado - ahora el proceso se dispara en transicion 0->1 del Coil
     // Debounce configurable desde pestaña PLC
     private volatile ModbusClient activeModbusClient = null; // Cliente Modbus activo para escritura
@@ -1513,6 +1515,34 @@ public class RFIDMainWindow extends JFrame {
         plcStopOnDisableCheck.addActionListener(e -> config.setPlcStopOnDisable(plcStopOnDisableCheck.isSelected()));
         enablerSection.add(plcStopOnDisableCheck, gbc);
         
+        // Fila 2: Boton para limpiar historial de tags procesados
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2;
+        JButton clearPlcHistoryBtn = new JButton("Limpiar Historial Tags");
+        clearPlcHistoryBtn.setToolTipText("Limpia la lista de tags ya enviados al PLC (permite reprocesar tags)");
+        clearPlcHistoryBtn.addActionListener(e -> {
+            int count = plcProcessedTags.size();
+            plcProcessedTags.clear();
+            lastProcessedEpc = "";
+            lastProcessedTime = 0;
+            JOptionPane.showMessageDialog(this, 
+                "Historial limpiado.\nSe eliminaron " + count + " tags de la lista.", 
+                "Historial PLC", JOptionPane.INFORMATION_MESSAGE);
+            updatePlcMonitorLog("[PLC] Historial de tags procesados limpiado (" + count + " tags)");
+            logger.info("PLC", "Historial limpiado: " + count + " tags eliminados");
+        });
+        enablerSection.add(clearPlcHistoryBtn, gbc);
+        
+        gbc.gridx = 2; gbc.gridwidth = 2;
+        JLabel plcHistoryLabel = new JLabel("Tags ya enviados: 0");
+        plcHistoryLabel.setForeground(ModernUIStyle.TEXT_SECONDARY);
+        enablerSection.add(plcHistoryLabel, gbc);
+        
+        // Timer para actualizar el contador de historial
+        javax.swing.Timer historyTimer = new javax.swing.Timer(1000, e -> {
+            plcHistoryLabel.setText("Tags ya enviados: " + plcProcessedTags.size());
+        });
+        historyTimer.start();
+        
         mainPanel.add(enablerSection);
         mainPanel.add(Box.createVerticalStrut(15));
         
@@ -1874,16 +1904,13 @@ public class RFIDMainWindow extends JFrame {
             return;
         }
         
-        // Filtro de duplicados: evitar reprocesar el mismo tag
-        long now = System.currentTimeMillis();
-        if (lastEpc.equals(lastProcessedEpc)) {
-            // Verificar debounce solo si es el mismo tag
-            if ((now - lastProcessedTime) < config.getPlcDebounceMs()) {
-                updatePlcMonitorLog("[PLC] Tag duplicado ignorado: " + lastEpc);
-                updatePlcMonitorStatus(lastEpc, "Duplicado", "--", "--", "Filtrado");
-                System.out.println("[PLC] Filtro duplicados: tag " + lastEpc + " ya procesado");
-                return;
-            }
+        // FILTRO ROBUSTO: verificar si el tag ya fue procesado durante esta sesion
+        if (plcProcessedTags.contains(lastEpc)) {
+            updatePlcMonitorLog("[PLC] Tag YA ENVIADO anteriormente, ignorando: " + lastEpc);
+            updatePlcMonitorStatus(lastEpc, "Ya enviado", "--", "--", "Duplicado bloqueado");
+            System.out.println("[PLC] FILTRO DUPLICADOS: tag " + lastEpc + " ya fue enviado al PLC anteriormente");
+            logger.info("PLC", "Duplicado bloqueado: " + lastEpc + " (ya procesado en esta sesion)");
+            return;
         }
         
         // Procesar el tag
@@ -1912,10 +1939,9 @@ public class RFIDMainWindow extends JFrame {
                 return;
             }
             
-            // Debounce: evitar reprocesar el mismo tag en poco tiempo
-            long now = System.currentTimeMillis();
-            if (lastEpc.equals(lastProcessedEpc) && (now - lastProcessedTime) < config.getPlcDebounceMs()) {
-                System.out.println("[PLC] Debounce: tag " + lastEpc + " ya procesado recientemente");
+            // FILTRO ROBUSTO: verificar si el tag ya fue procesado durante esta sesion
+            if (plcProcessedTags.contains(lastEpc)) {
+                System.out.println("[PLC] FILTRO DUPLICADOS: tag " + lastEpc + " ya fue enviado al PLC anteriormente");
                 return;
             }
             
@@ -1975,12 +2001,17 @@ public class RFIDMainWindow extends JFrame {
             updatePlcMonitorLog("[PLC] Datos escritos al PLC correctamente");
             updatePlcMonitorGrabacion("OK - Grabado", ModernUIStyle.ACCENT_SUCCESS);
             
-            // Actualizar ultimo tag procesado
+            // IMPORTANTE: Agregar al Set de tags ya procesados para evitar duplicados
+            plcProcessedTags.add(epc);
+            System.out.println("[PLC] Tag agregado a lista de procesados: " + epc + " (total: " + plcProcessedTags.size() + ")");
+            
+            // Actualizar ultimo tag procesado (para compatibilidad)
             lastProcessedEpc = epc;
             lastProcessedTime = System.currentTimeMillis();
             
             logger.info("PLC", "Tag " + epc + " -> Tipo:" + modelo.tipoEmbalaje + 
-                       " Ancho:" + modelo.ancho + " Largo:" + modelo.largo);
+                       " Ancho:" + modelo.ancho + " Largo:" + modelo.largo + 
+                       " (Total procesados: " + plcProcessedTags.size() + ")");
             
         } catch (Exception ex) {
             updatePlcMonitorLog("[PLC] Error: " + ex.getMessage());
