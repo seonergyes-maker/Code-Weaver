@@ -341,7 +341,7 @@ public class AntennaConfig implements Serializable {
      * @return Índice de potencia para protocolo LLRP (1-201)
      */
     public int getTransmitPowerIndex() {
-        return (int) Math.round((transmitPower - MIN_TRANSMIT_POWER) * 10) + 1;
+        return (int) Math.round((transmitPower - MIN_TRANSMIT_POWER) * 10);
     }
     
     /**
@@ -360,7 +360,7 @@ public class AntennaConfig implements Serializable {
      * @param index Índice de potencia LLRP (1-201)
      */
     public void setTransmitPowerFromIndex(int index) {
-        double power = ((index - 1) / 10.0) + MIN_TRANSMIT_POWER;
+        double power = (index / 10.0) + MIN_TRANSMIT_POWER;
         setTransmitPower(Math.min(Math.max(power, MIN_TRANSMIT_POWER), MAX_TRANSMIT_POWER));
     }
     
