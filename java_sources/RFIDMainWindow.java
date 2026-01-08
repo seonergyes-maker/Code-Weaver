@@ -2167,9 +2167,19 @@ public class RFIDMainWindow extends JFrame {
             }
             
             if (cleaned > 0) {
-                updatePlcMonitorLog("[AutoClean] Limpiados " + cleaned + " tags (>" + minutes + " min)");
+                // También eliminar de tagCache y duplicateFilter para permitir nueva lectura
+                for (String epc : toRemove) {
+                    tagCache.remove(epc);
+                    if (duplicateFilter != null) {
+                        duplicateFilter.remove(epc);
+                    }
+                }
+                // Actualizar tabla de monitoreo
+                SwingUtilities.invokeLater(() -> updateTagTable());
+                
+                updatePlcMonitorLog("[AutoClean] Limpiados " + cleaned + " tags (>" + minutes + " min) - Pueden ser leidos nuevamente");
                 logger.info("AutoClean", "Limpiados " + cleaned + " tags por expiracion (" + minutes + " min)");
-                System.out.println("[AutoClean] Limpiados " + cleaned + " tags por expiracion");
+                System.out.println("[AutoClean] Limpiados " + cleaned + " tags por expiracion - eliminados de cache y tabla");
             }
         });
         autoCleanTimer.start();

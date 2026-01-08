@@ -108,6 +108,18 @@ public class DuplicateFilter {
     }
     
     /**
+     * Elimina un tag específico del cache.
+     * Permite que el tag sea procesado nuevamente.
+     * 
+     * @param epc EPC del tag a eliminar
+     */
+    public synchronized void remove(String epc) {
+        if (epc != null) {
+            seenTags.remove(epc);
+        }
+    }
+    
+    /**
      * Resetea las estadísticas.
      */
     public synchronized void resetStats() {
