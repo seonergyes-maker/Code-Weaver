@@ -148,7 +148,7 @@ public class RFIDMainWindow extends JFrame {
     private JLabel inicioHoraUltimaLecturaLabel;
     private JLabel inicioHoraActualLabel;
     private JLabel inicioUltimoTagLabel;
-    private JLabel inicioTipoLabel;  // Tipo de embalaje enviado al PLC
+    private JLabel inicioTipoLabel;  // Variante enviada al PLC
     private JLabel inicioDescripcionLabel;
     private javax.swing.Timer inicioRelojTimer;
     
@@ -935,16 +935,16 @@ public class RFIDMainWindow extends JFrame {
      * 
      * @param tag EPC del tag leído
      * @param descripcion Descripción obtenida de la API
-     * @param tipoEmbalaje Tipo de embalaje enviado al PLC
+     * @param variante Variante enviada al PLC
      */
-    private void updateInicioPanel(String tag, String descripcion, int tipoEmbalaje) {
+    private void updateInicioPanel(String tag, String descripcion, int variante) {
         SwingUtilities.invokeLater(() -> {
             SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss");
             inicioHoraUltimaLecturaLabel.setText(sdf.format(new Date()));
             inicioUltimoTagLabel.setText(tag != null ? tag : "---");
             
             // Actualizar TIPO con descripcion en lugar de numero
-            inicioTipoLabel.setText(getTipoEmbalajeDescripcion(tipoEmbalaje));
+            inicioTipoLabel.setText(getTipoEmbalajeDescripcion(variante));
             
             // Formatear descripcion con salto de linea antes de "("
             String descText = "---";
@@ -2073,17 +2073,27 @@ public class RFIDMainWindow extends JFrame {
             updatePlcMonitorApiStatus("OK", ModernUIStyle.ACCENT_SUCCESS);
             updatePlcMonitorLog("[PLC] API OK - Codigo: " + modelo.codigo + ", " + modelo.descripcion);
             updatePlcMonitorCodigo(modelo.codigo);
-            updatePlcMonitorDatos(modelo.tipoEmbalaje, modelo.ancho, modelo.largo);
+            // Parsear variante a int (la API devuelve String)
+            int varianteInt = 0;
+            try {
+                if (modelo.variante != null && !modelo.variante.isEmpty()) {
+                    varianteInt = Integer.parseInt(modelo.variante.trim());
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("[PLC] Error parseando variante: " + modelo.variante);
+            }
+            
+            updatePlcMonitorDatos(varianteInt, modelo.ancho, modelo.largo);
             
             // Actualizar panel INICIO con el tag, descripcion y tipo
-            updateInicioPanel(epc, modelo.descripcion, modelo.tipoEmbalaje);
+            updateInicioPanel(epc, modelo.descripcion, varianteInt);
             
             // 3. Escribir datos al PLC
-            updatePlcMonitorLog("[PLC] Escribiendo al PLC - Tipo: " + modelo.tipoEmbalaje + 
+            updatePlcMonitorLog("[PLC] Escribiendo al PLC - Variante: " + varianteInt + 
                                ", Ancho: " + modelo.ancho + ", Largo: " + modelo.largo);
             updatePlcMonitorGrabacion("Escribiendo...", ModernUIStyle.ACCENT_WARNING);
             
-            modbusClient.writeRegister(config.getPlcRefTipoEmbalaje(), config.getPlcUnitIdTipoEmbalaje(), modelo.tipoEmbalaje);
+            modbusClient.writeRegister(config.getPlcRefTipoEmbalaje(), config.getPlcUnitIdTipoEmbalaje(), varianteInt);
             modbusClient.writeRegister(config.getPlcRefAncho(), config.getPlcUnitIdAncho(), modelo.ancho);
             modbusClient.writeRegister(config.getPlcRefLargo(), config.getPlcUnitIdLargo(), modelo.largo);
             
@@ -2107,7 +2117,7 @@ public class RFIDMainWindow extends JFrame {
             lastProcessedEpc = epc;
             lastProcessedTime = System.currentTimeMillis();
             
-            logger.info("PLC", "Tag " + epc + " -> Tipo:" + modelo.tipoEmbalaje + 
+            logger.info("PLC", "Tag " + epc + " -> Variante:" + varianteInt + 
                        " Ancho:" + modelo.ancho + " Largo:" + modelo.largo + 
                        " (Total procesados: " + plcProcessedTags.size() + ")");
             
