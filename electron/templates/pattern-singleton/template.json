@@ -1,0 +1,7 @@
+{
+  "id": "pattern-singleton",
+  "name": "Singleton",
+  "description": "Garantiza una única instancia de una clase",
+  "category": "Patrones de diseño",
+  "order": 20
+}

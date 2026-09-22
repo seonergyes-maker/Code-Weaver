@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self' app:; script-src 'self' app: 'unsafe-eval'; style-src 'self' app: 'unsafe-inline'; font-src 'self' app: data:; img-src 'self' app: data:; worker-src 'self' app: blob:;">
+  <title>Code Weaver</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">CW</span>
+      <div class="brand-text">
+        <strong>Code Weaver</strong>
+        <span id="project-name" class="project-name">Proyecto sin guardar</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="btn-compile" class="btn" title="Ctrl+B">Compilar</button>
+      <button id="btn-run" class="btn btn-primary" title="F5">Ejecutar</button>
+      <button id="btn-stop" class="btn btn-danger" title="Mayús+F5" disabled>Detener</button>
+      <button id="btn-jar" class="btn" title="Ctrl+Mayús+B">Generar JAR</button>
+      <select id="main-class" class="select" title="Clase principal"></select>
+    </div>
+
+    <div class="status">
+      <span id="jdk-badge" class="badge" title="JDK activo">JDK —</span>
+      <button id="btn-toggle-chat" class="btn btn-ghost" title="Mostrar u ocultar el asistente">Asistente</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="rail">
+      <button class="rail-btn is-active" data-panel="files" title="Archivos">
+        <svg viewBox="0 0 24 24"><path d="M4 4h6l2 2h8v12H4z"/></svg>
+        <span>Archivos</span>
+      </button>
+      <button class="rail-btn" data-panel="projects" title="Proyectos">
+        <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/></svg>
+        <span>Proyectos</span>
+      </button>
+      <button class="rail-btn" data-panel="libs" title="Librerías">
+        <svg viewBox="0 0 24 24"><path d="M6 4h12v16H6z"/><path d="M9 4v16M15 4v16"/></svg>
+        <span>Librerías</span>
+      </button>
+      <button class="rail-btn" data-panel="templates" title="Plantillas">
+        <svg viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 11h7v9h-7zM4 14h7v6H4z"/></svg>
+        <span>Plantillas</span>
+      </button>
+      <button class="rail-btn rail-bottom" data-panel="settings" title="Preferencias">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M18.4 5.6l-1.8 1.8M7.4 16.6l-1.8 1.8"/></svg>
+        <span>Ajustes</span>
+      </button>
+    </nav>
+
+    <aside class="sidebar" id="sidebar">
+      <!-- Archivos -->
+      <section class="panel is-active" data-panel="files">
+        <div class="panel-head">
+          <h2>Archivos</h2>
+          <button id="btn-new-file" class="icon-btn" title="Nuevo archivo">+</button>
+        </div>
+        <ul id="file-list" class="list"></ul>
+        <div class="panel-foot">
+          <button id="btn-import-folder" class="btn btn-block btn-ghost">Importar carpeta…</button>
+        </div>
+      </section>
+
+      <!-- Proyectos -->
+      <section class="panel" data-panel="projects">
+        <div class="panel-head">
+          <h2>Proyectos</h2>
+          <button id="btn-save-project" class="icon-btn" title="Guardar proyecto actual">💾</button>
+        </div>
+        <ul id="project-list" class="list"></ul>
+        <div class="panel-foot">
+          <button id="btn-new-project" class="btn btn-block btn-ghost">Proyecto nuevo</button>
+          <button id="btn-export-zip" class="btn btn-block btn-ghost">Exportar ZIP…</button>
+          <button id="btn-export-folder" class="btn btn-block btn-ghost">Exportar a carpeta…</button>
+        </div>
+      </section>
+
+      <!-- Librerías -->
+      <section class="panel" data-panel="libs">
+        <div class="panel-head">
+          <h2>Librerías</h2>
+          <button id="btn-open-libs" class="icon-btn" title="Abrir carpeta de librerías">📂</button>
+        </div>
+        <div class="field-row">
+          <input id="lib-search" class="input" type="search" placeholder="Buscar en el catálogo…">
+        </div>
+        <div class="subhead">Instaladas</div>
+        <ul id="lib-installed" class="list"></ul>
+        <div class="subhead">Catálogo Maven</div>
+        <ul id="lib-catalog" class="list"></ul>
+        <div class="panel-foot">
+          <button id="btn-lib-custom" class="btn btn-block btn-ghost">Coordenadas Maven…</button>
+          <button id="btn-lib-file" class="btn btn-block btn-ghost">Añadir .jar local…</button>
+        </div>
+      </section>
+
+      <!-- Plantillas -->
+      <section class="panel" data-panel="templates">
+        <div class="panel-head"><h2>Plantillas</h2></div>
+        <ul id="template-list" class="list"></ul>
+      </section>
+
+      <!-- Preferencias -->
+      <section class="panel" data-panel="settings">
+        <div class="panel-head"><h2>Preferencias</h2></div>
+        <div class="settings">
+          <label class="field">
+            <span>API key de Anthropic</span>
+            <input id="set-apikey" class="input" type="password" placeholder="sk-ant-…" autocomplete="off">
+            <small id="apikey-hint">Se guarda cifrada en este equipo.</small>
+          </label>
+          <label class="field">
+            <span>Modelo</span>
+            <select id="set-model" class="input">
+              <option value="claude-sonnet-4-5">claude-sonnet-4-5</option>
+              <option value="claude-opus-4-1">claude-opus-4-1</option>
+              <option value="claude-haiku-4-5">claude-haiku-4-5</option>
+            </select>
+          </label>
+          <label class="field-check">
+            <input id="set-agents" type="checkbox">
+            <span>Usar sistema de agentes (clasifica la intención y delega)</span>
+          </label>
+          <label class="field-check">
+            <input id="set-autodeps" type="checkbox">
+            <span>Descargar automáticamente las librerías detectadas</span>
+          </label>
+          <label class="field">
+            <span>JDK</span>
+            <select id="set-jdk" class="input"></select>
+            <small id="jdk-hint"></small>
+          </label>
+          <div class="field-row">
+            <button id="btn-detect-jdk" class="btn btn-ghost">Volver a detectar</button>
+            <button id="btn-browse-jdk" class="btn btn-ghost">Elegir carpeta…</button>
+          </div>
+          <label class="field">
+            <span>Versión de destino (--release)</span>
+            <select id="set-target" class="input">
+              <option value="8">8</option>
+              <option value="11">11</option>
+              <option value="17">17</option>
+              <option value="21">21</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Tamaño de fuente del editor</span>
+            <input id="set-fontsize" class="input" type="number" min="10" max="24" step="1">
+          </label>
+          <label class="field-check">
+            <input id="set-wrap" type="checkbox">
+            <span>Ajuste de línea en el editor</span>
+          </label>
+          <div class="field">
+            <span>Carpetas</span>
+            <button id="btn-open-data" class="btn btn-block btn-ghost">Abrir carpeta de datos</button>
+            <button id="btn-open-output" class="btn btn-block btn-ghost">Abrir carpeta de JAR</button>
+          </div>
+          <p id="about" class="muted"></p>
+        </div>
+      </section>
+    </aside>
+
+    <main class="main">
+      <div class="tabs" id="tabs"></div>
+      <div class="editor-wrap"><div id="editor"></div></div>
+
+      <div class="console" id="console-pane">
+        <div class="console-head">
+          <div class="console-tabs">
+            <button class="console-tab is-active" data-tab="output">Consola</button>
+            <button class="console-tab" data-tab="problems">Problemas <span id="problem-count" class="pill">0</span></button>
+          </div>
+          <div class="console-actions">
+            <button id="btn-explain" class="btn btn-ghost btn-sm">Explicar con Claude</button>
+            <button id="btn-fix" class="btn btn-ghost btn-sm">Corregir error</button>
+            <button id="btn-clear-console" class="btn btn-ghost btn-sm">Limpiar</button>
+          </div>
+        </div>
+        <pre id="console-output" class="console-body is-active" data-tab="output"></pre>
+        <div id="problems" class="console-body" data-tab="problems"></div>
+        <div class="stdin-row" id="stdin-row" hidden>
+          <input id="stdin-input" class="input" placeholder="Escribe aquí para enviar al programa y pulsa Intro">
+        </div>
+      </div>
+    </main>
+
+    <aside class="chat" id="chat">
+      <div class="chat-head">
+        <h2>Asistente Claude</h2>
+        <div>
+          <button id="btn-chat-clear" class="icon-btn" title="Vaciar conversación">🗑</button>
+          <button id="btn-chat-cancel" class="icon-btn" title="Cancelar consulta" hidden>⏹</button>
+        </div>
+      </div>
+      <div id="chat-messages" class="chat-messages"></div>
+      <div class="chat-quick">
+        <button class="chip" data-quick="tests">Tests del archivo</button>
+        <button class="chip" data-quick="docs">JavaDoc</button>
+        <button class="chip" data-quick="plan">Planificar proyecto</button>
+        <button class="chip" data-quick="review">Revisar código</button>
+      </div>
+      <form id="chat-form" class="chat-form">
+        <textarea id="chat-input" rows="3" placeholder="Pide una clase, una corrección o una explicación… (Intro para enviar)"></textarea>
+        <button id="chat-send" class="btn btn-primary" type="submit">Enviar</button>
+      </form>
+    </aside>
+  </div>
+
+  <div id="toasts" class="toasts"></div>
+
+  <dialog id="modal" class="modal">
+    <form method="dialog" class="modal-body">
+      <h3 id="modal-title"></h3>
+      <p id="modal-text" class="muted"></p>
+      <div id="modal-fields"></div>
+      <menu class="modal-actions">
+        <button value="cancel" class="btn btn-ghost">Cancelar</button>
+        <button id="modal-ok" value="ok" class="btn btn-primary">Aceptar</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <script src="app://local/monaco/loader.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

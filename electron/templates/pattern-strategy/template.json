@@ -1,0 +1,7 @@
+{
+  "id": "pattern-strategy",
+  "name": "Strategy",
+  "description": "Define una familia de algoritmos intercambiables",
+  "category": "Patrones de diseño",
+  "order": 20
+}

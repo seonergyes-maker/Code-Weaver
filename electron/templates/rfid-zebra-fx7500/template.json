@@ -1,0 +1,9 @@
+{
+  "id": "rfid-zebra-fx7500",
+  "name": "RFID Zebra FX7500 / FX9600",
+  "description": "Lector RFID con SDK oficial de Zebra, filtro de duplicados, envío a API, integración Modbus TCP con PLC e instalador de servicio Windows.",
+  "category": "Daemon4",
+  "order": 5,
+  "requiresLibs": ["Symbol.RFID.API3.jar", "gson-2.10.1.jar"],
+  "notes": "Necesita la DLL nativa RFIDAPI3_JNI_HOST.dll del SDK de Zebra para conectar con el lector desde Windows."
+}

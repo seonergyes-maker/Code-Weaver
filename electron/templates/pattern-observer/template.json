@@ -1,0 +1,7 @@
+{
+  "id": "pattern-observer",
+  "name": "Observer",
+  "description": "Notifica cambios a múltiples objetos",
+  "category": "Patrones de diseño",
+  "order": 20
+}

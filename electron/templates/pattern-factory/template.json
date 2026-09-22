@@ -1,0 +1,7 @@
+{
+  "id": "pattern-factory",
+  "name": "Factory Method",
+  "description": "Crea objetos sin especificar la clase exacta",
+  "category": "Patrones de diseño",
+  "order": 20
+}

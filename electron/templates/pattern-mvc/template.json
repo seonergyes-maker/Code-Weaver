@@ -1,0 +1,7 @@
+{
+  "id": "pattern-mvc",
+  "name": "MVC (Model-View-Controller)",
+  "description": "Separa datos, presentación y lógica de control",
+  "category": "Patrones de diseño",
+  "order": 20
+}

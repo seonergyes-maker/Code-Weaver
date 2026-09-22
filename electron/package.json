@@ -1,0 +1,70 @@
+{
+  "name": "code-weaver",
+  "productName": "Code Weaver",
+  "version": "1.0.0",
+  "description": "IDE Java de escritorio con compilador integrado y asistente Claude - Daemon4",
+  "author": {
+    "name": "Daemon4",
+    "email": "enrique.aguilar@daemon4.com"
+  },
+  "license": "UNLICENSED",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "dist": "electron-builder --win",
+    "pack": "electron-builder --win --dir",
+    "selftest": "node tools/selftest.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.127.0",
+    "adm-zip": "^0.5.16",
+    "monaco-editor": "^0.56.0"
+  },
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.daemon4.codeweaver",
+    "productName": "Code Weaver",
+    "copyright": "Copyright (c) 2026 Daemon4",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "templates/**/*",
+      "bundled-libs/**/*",
+      "build/icon.ico",
+      "node_modules/monaco-editor/min/**/*",
+      "node_modules/@anthropic-ai/**/*",
+      "node_modules/adm-zip/**/*",
+      "!node_modules/monaco-editor/esm/**/*",
+      "!node_modules/monaco-editor/dev/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Code Weaver"
+    },
+    "asarUnpack": [
+      "bundled-libs/**/*",
+      "templates/**/*"
+    ]
+  }
+}

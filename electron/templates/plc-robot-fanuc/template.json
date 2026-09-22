@@ -1,0 +1,8 @@
+{
+  "id": "plc-robot-fanuc",
+  "name": "PLC Robot Fanuc",
+  "description": "Monitor de API JSON con escritura de holding registers por Modbus TCP para el robot de apilado Fanuc.",
+  "category": "Daemon4",
+  "order": 6,
+  "requiresLibs": ["gson-2.10.1.jar"]
+}

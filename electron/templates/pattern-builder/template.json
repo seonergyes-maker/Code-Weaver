@@ -1,0 +1,7 @@
+{
+  "id": "pattern-builder",
+  "name": "Builder",
+  "description": "Construye objetos complejos paso a paso",
+  "category": "Patrones de diseño",
+  "order": 20
+}
